@@ -1,55 +1,45 @@
 ﻿@page "/todo"
 @using System
-
-<style>
-
-</style>
-
+@inject ITodoRepository _todoRepository;
 <PageTitle>Todo</PageTitle>
 
-<form class="" @onsubmit=Button>
+@if(error){
+<h2>
+	Invalid
+</h2>
+}
+@* form makes a postback and runs the code twice *@
+@* <form class="" @onsubmit=Button> *@
 	<label>
 		Title
-		<input type="text" placeholder="somethintg todo" @bind="_newTodoTitle" />
+		<input type="text" placeholder="somethintg todo" @bind="todo.Title" />
 	</label>
 
 	<button class="btn" @onclick="Button">Add todo</button>
-</form>
+@* </form> *@
 
 
-<h3>Todo (@_todos.Count(todo => !todo.IsDone))</h3>
+<h3>Todo (@_todoRepository.GetTodos().Count(todo => !todo.IsDone))</h3>
 
 <ul>
-	@foreach (var todo in _todos)
+	@foreach (var StoredTodo in _todoRepository.GetTodos())
 	{
 		<li>
-			<input type="checkbox" @bind="todo.IsDone"/>
-			<input @bind="todo.Title"/>
+			<input type="checkbox" @bind="StoredTodo.IsDone" />
+			<input @bind="StoredTodo.Title" />
 		</li>
 	}
 </ul>
 
 
 @code {
-	private List<TodoItem> _todos = new();
-	private string _newTodoTitle = string.Empty;
+	private TodoItem todo = new();
+	private bool error = false;
 
 	private void Button()
 	{
-		AddTodo(_newTodoTitle);
-		_newTodoTitle = string.Empty;
-	}
+		error = !_todoRepository.Add(todo);
 
-	private void AddTodo(string title)
-	{
-		if (String.IsNullOrEmpty(title))
-		{
-			return;
-		}
-
-		_todos.Add(new TodoItem()
-			{
-				Title = title
-			});
+		todo = new();
 	}
 }
