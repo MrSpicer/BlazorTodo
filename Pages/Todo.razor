@@ -1,0 +1,55 @@
+﻿@page "/todo"
+@using System
+
+<style>
+
+</style>
+
+<PageTitle>Todo</PageTitle>
+
+<form class="" @onsubmit=Button>
+	<label>
+		Title
+		<input type="text" placeholder="somethintg todo" @bind="_newTodoTitle" />
+	</label>
+
+	<button class="btn" @onclick="Button">Add todo</button>
+</form>
+
+
+<h3>Todo (@_todos.Count(todo => !todo.IsDone))</h3>
+
+<ul>
+	@foreach (var todo in _todos)
+	{
+		<li>
+			<input type="checkbox" @bind="todo.IsDone"/>
+			<input @bind="todo.Title"/>
+		</li>
+	}
+</ul>
+
+
+@code {
+	private List<TodoItem> _todos = new();
+	private string _newTodoTitle = string.Empty;
+
+	private void Button()
+	{
+		AddTodo(_newTodoTitle);
+		_newTodoTitle = string.Empty;
+	}
+
+	private void AddTodo(string title)
+	{
+		if (String.IsNullOrEmpty(title))
+		{
+			return;
+		}
+
+		_todos.Add(new TodoItem()
+			{
+				Title = title
+			});
+	}
+}
