@@ -1,25 +1,33 @@
 ﻿@page "/todo"
 @using System
+@using TodoList.Models
+@using TodoList.Data
 @inject ITodoRepository _todoRepository;
+
 <PageTitle>Todo</PageTitle>
 
-@if(error){
-<h2>
-	Invalid
-</h2>
+@if (error)
+{
+	<h2>Invalid</h2>
 }
-@* form makes a postback and runs the code twice *@
-@* <form class="" @onsubmit=Button> *@
-	<label>
-		Title
-		<input type="text" placeholder="somethintg todo" @bind="todo.Title" />
-	</label>
+<div class="form-group">
+	<div class="mb-3">
+		<label for="TodoTitle" class="form-label">Title</label>
+		<input type="text" class="form-control" id="TodoTitle" aria-describedby="TodoTitle" @bind="todo.Title">
+		<div id="todoTitleHelp" class="form-text">Title</div>
+	</div>
 
-	<button class="btn" @onclick="Button">Add todo</button>
-@* </form> *@
+	<div class="mb-3">
+		<label for="TodoTitle" class="form-label">Description</label>
+		<textarea class="form-control" id="TodoDescription" aria-describedby="TodoDescription"
+		@bind="todo.Description" />
+		<div id="todoDescriptionHelp" class="form-text">Description</div>
+	</div>
 
+	<button class="btn btn-primary" @onclick="Button">Add todo</button>
+</div>
 
-<h3>Todo (@_todoRepository.GetTodos().Count(todo => !todo.IsDone))</h3>
+<h3>Todos remaining: (@_todoRepository.GetTodos().Count(todo => !todo.IsDone))</h3>
 
 <ul>
 	@foreach (var StoredTodo in _todoRepository.GetTodos())
