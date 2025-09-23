@@ -2,12 +2,14 @@ using System;
 using TodoList.Models;
 using Blazored.LocalStorage;
 using TodoList.Pages;
+using System.Reflection.Metadata.Ecma335;
+using System.Threading.Tasks;
 
 namespace TodoList.Data;
 
-public class TodoRepository : ITodoRepository, IDisposable
+public class TodoRepository : ITodoRepository
 {
-	private HashSet<TodoItem> TodoSet = new();
+	private HashSet<Guid> TodoIds = new();
 	private ILogger<TodoRepository> _logger;
 	private ILocalStorageService _localStorage;
 
@@ -18,12 +20,13 @@ public class TodoRepository : ITodoRepository, IDisposable
 		_logger = logger;
 		_localStorage = LocalStorage;
 	}
+
 	async Task ITodoRepository.InitializeAsync()
 	{
-		TodoSet = await _localStorage.GetItemAsync<HashSet<TodoItem>>(_storageName) ?? new HashSet<TodoItem>();
+		TodoIds = await _localStorage.GetItemAsync<HashSet<Guid>>($"{_storageName}_Ids") ?? new HashSet<Guid>();
 	}
 
-	bool ITodoRepository.AddOrUpdate(TodoItem todo)
+	async Task<bool> ITodoRepository.AddOrUpdate(TodoItem todo)
 	{
 		if (todo == null || !todo.IsValid())
 		{
@@ -31,22 +34,15 @@ public class TodoRepository : ITodoRepository, IDisposable
 			return false;
 		}
 
-		if (TodoSet.Contains(todo) == true)
-		{
-			_logger.Log(LogLevel.Debug, $"Todo Already up to date: {todo.Title}");
-			return false;
-		}
-
 
 		try
 		{
-			if (TodoSet.Any(t => t.Id == todo.Id))
+			if (!TodoIds.Contains(todo.Id))
 			{
-				TodoSet.RemoveWhere(t => t.Id == todo.Id);
+				TodoIds.Add(todo.Id);
+				await this.PersistToStorage();
 			}
-
-			TodoSet.Add(todo);
-			this.PersistToStorage();
+			await _localStorage.SetItemAsync($"{_storageName}_{todo.Id}", todo);
 			return true;
 		}
 		catch (Exception ex)
@@ -56,29 +52,40 @@ public class TodoRepository : ITodoRepository, IDisposable
 		}
 	}
 
-	IQueryable<TodoItem> ITodoRepository.GetTodos()
+	async Task<List<TodoItem>> ITodoRepository.GetTodos()
 	{
-		_logger.Log(LogLevel.Trace, $"Todos retrieved");
-		return TodoSet.AsQueryable();
-	}
-
-	void ITodoRepository.Delete(TodoItem todo)
-	{
-		if (TodoSet.Contains(todo))
+		try
 		{
-			_logger.Log(LogLevel.Trace, $"Todo Deleted: {todo.Title}");
-			TodoSet.Remove(todo);
-			this.PersistToStorage();
+			var set = new List<TodoItem>();
+			foreach (Guid id in TodoIds)
+			{
+				var item = await _localStorage.GetItemAsync<TodoItem>($"{_storageName}_{id}");
+				if (item != null)
+				{
+					set.Add(item);
+				}
+			}
+			return set;
+		}
+		catch (Exception ex)
+		{
+			_logger.Log(LogLevel.Error, $"Error retrieving todos: {ex.Message}");
+			return new List<TodoItem>();
 		}
 	}
 
-	public void PersistToStorage()
+	async Task ITodoRepository.Delete(TodoItem todo)
 	{
-		_localStorage.SetItemAsync(_storageName, TodoSet);
+		if (TodoIds.Contains(todo.Id))
+		{
+			TodoIds.Remove(todo.Id);
+			await this.PersistToStorage();
+			await _localStorage.RemoveItemAsync($"{_storageName}_{todo.Id}");
+		}
 	}
 
-	public void Dispose()
+	public async Task PersistToStorage()
 	{
-		this.PersistToStorage();
+		await _localStorage.SetItemAsync($"{_storageName}_Ids", TodoIds);
 	}
 }

@@ -3,10 +3,10 @@ using TodoList.Models;
 namespace TodoList.Data;
 public interface ITodoRepository
 {
-	bool AddOrUpdate(TodoItem todo);
-	void Delete(TodoItem todo);
-	void PersistToStorage();
+	Task<bool> AddOrUpdate(TodoItem todo);
+	Task Delete(TodoItem todo);
+	Task PersistToStorage();
 	Task InitializeAsync();
 
-	IQueryable<TodoItem> GetTodos();
+	Task<List<TodoItem>> GetTodos();
 }
