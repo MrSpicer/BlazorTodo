@@ -1,5 +1,7 @@
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Web;
+using Blazored.LocalStorage;
+using Blazored.LocalStorage.Serialization;
 using TodoList.Data;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -7,6 +9,11 @@ var builder = WebApplication.CreateBuilder(args);
 // Add services to the container.
 builder.Services.AddRazorPages();
 builder.Services.AddServerSideBlazor();
+
+//third party
+builder.Services.AddBlazoredLocalStorage();
+
+// DI
 builder.Services.AddScoped<ITodoRepository,TodoRepository>();
 
 var app = builder.Build();

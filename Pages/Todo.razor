@@ -24,7 +24,7 @@
 		<div id="todoDescriptionHelp" class="form-text">Description</div>
 	</div>
 
-	<button class="btn btn-primary" @onclick="Button">Add todo</button>
+	<button class="btn btn-primary" @onclick="onAddButtonClick">Add todo</button>
 </div>
 
 <h3>Todos remaining: (@_todoRepository.GetTodos().Count(todo => !todo.IsDone))</h3>
@@ -33,21 +33,52 @@
 	@foreach (var StoredTodo in _todoRepository.GetTodos())
 	{
 		<li>
-			<input type="checkbox" @bind="StoredTodo.IsDone" />
+			<input ref="todoCheckbox" type="checkbox" bind="@StoredTodo.IsDone" @onchange="(e) => OnTodoCheckboxChanged(e, StoredTodo)"/>
+			@* @checked="StoredTodo.IsDone" @onchange="(e) => OnTodoCheckboxChanged(e, StoredTodo)"/> *@
+			<button class="btn btn-secondary" @onclick="() => onEditButtonClick(StoredTodo)">Edit</button>
 			<input @bind="StoredTodo.Title" />
+			<span>@StoredTodo.Status</span>
+			<span>@StoredTodo.Description</span>
 		</li>
 	}
 </ul>
 
 
 @code {
-	private TodoItem todo = new();
+	private TodoItem todo = new(){Id = Guid.NewGuid()};
 	private bool error = false;
 
-	private void Button()
+	protected override async Task OnAfterRenderAsync(bool firstRender)
 	{
-		error = !_todoRepository.Add(todo);
+		if (firstRender)
+		{
+			await Initialize();
+			StateHasChanged();
+		}
+	}
+
+	private async Task Initialize()
+	{
+		await _todoRepository.InitializeAsync();
+	}
+
+	private void onAddButtonClick()
+	{
+		error = !_todoRepository.AddOrUpdate(todo);
 
 		todo = new();
+	}
+
+	private void onEditButtonClick(TodoItem selectedTodo)
+	{
+		todo = selectedTodo;
+	}
+
+	private void OnTodoCheckboxChanged(ChangeEventArgs e ,TodoItem todo)
+	{
+		//todo: not persisting status change
+		todo.Status = (bool)e.Value ? TodoItemStatus.Done : TodoItemStatus.InProgress;
+		_todoRepository.AddOrUpdate(todo);
+		@* StateHasChanged(); *@
 	}
 }
