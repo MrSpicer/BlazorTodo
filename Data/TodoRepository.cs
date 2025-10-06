@@ -39,6 +39,7 @@ public class TodoRepository : ITodoRepository
 		{
 			if (!TodoIds.Contains(todo.Id))
 			{
+				todo.Status = TodoItemStatus.New;
 				TodoIds.Add(todo.Id);
 				await this.PersistToStorage();
 			}
@@ -87,5 +88,15 @@ public class TodoRepository : ITodoRepository
 	public async Task PersistToStorage()
 	{
 		await _localStorage.SetItemAsync($"{_storageName}_Ids", TodoIds);
+	}
+
+	public async Task ClearAll()
+	{
+		foreach (var id in TodoIds)
+		{
+			await _localStorage.RemoveItemAsync($"{_storageName}_{id}");
+		}
+
+		await _localStorage.RemoveItemAsync($"{_storageName}_Ids");
 	}
 }

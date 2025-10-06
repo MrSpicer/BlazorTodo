@@ -1,10 +1,14 @@
-﻿@page "/todo"
+﻿@page "/"
 @using System
 @using TodoList.Models
 @using TodoList.Data
 @inject ITodoRepository _todoRepository;
 
 <PageTitle>Todo</PageTitle>
+
+<div class="mb-5">
+	<button class="btn btn-danger" @onclick="onClearAllButtonClick">Clear All</button>
+</div>
 
 @if (error)
 {
@@ -13,33 +17,34 @@
 <div class="form-group">
 	<div class="mb-3">
 		<label for="TodoTitle" class="form-label">Title</label>
-		<input type="text" class="form-control" id="TodoTitle" aria-describedby="TodoTitle" @bind="todo.Title">
+		<input type="text" class="form-control" id="TodoTitle" aria-describedby="TodoTitle" @bind="_todo.Title">
 		<div id="todoTitleHelp" class="form-text">Title</div>
 	</div>
 
 	<div class="mb-3">
 		<label for="TodoTitle" class="form-label">Description</label>
 		<textarea class="form-control" id="TodoDescription" aria-describedby="TodoDescription"
-			@bind="todo.Description" />
+			@bind="_todo.Description" />
 		<div id="todoDescriptionHelp" class="form-text">Description</div>
 	</div>
 
 	<button class="btn btn-primary" @onclick="onAddButtonClick">Add todo</button>
+	<button class="btn btn-danger" @onclick="onClearTodoFormButtonClick" enabled="@(_todo.Title.Length > 0 || _todo.Description.Length > 0 && _todo.Status != TodoItemStatus.None)">Clear</button>
 </div>
 
-<h3>Todos remaining: @todos.Count(todo => !todo.IsDone)</h3>
+<h3>Todos remaining: @_todos.Count(todo => !todo.IsDone)</h3>
 
 <ul>
-    @foreach (var StoredTodo in todos)
+    @foreach (var StoredTodo in _todos)
     {
         <li>
             <input @ref="todoCheckbox"
                    type="checkbox"
                    @bind="StoredTodo.IsDone"
                    @bind:after="() => OnTodoCheckboxChanged(StoredTodo)" />
+			<span>@StoredTodo.Status</span>
             <button class="btn btn-secondary" @onclick="(e) => onEditButtonClick(e, StoredTodo)">Edit</button>
-            <input @bind="StoredTodo.Title" />
-            <span>@StoredTodo.Status</span>
+            <span>@StoredTodo.Title</span>
             <span>@StoredTodo.Description</span>
         </li>
     }
@@ -47,8 +52,8 @@
 
 
 @code {
-	private List<TodoItem> todos = new();
-	private TodoItem todo = new() { Id = Guid.NewGuid() };
+	private List<TodoItem> _todos = new();
+	private TodoItem _todo = new() { Id = Guid.NewGuid() };
 	private bool error = false;
 
 	private ElementReference todoCheckbox;
@@ -64,15 +69,15 @@
 
 	private async Task onAddButtonClick(MouseEventArgs e)
 	{
-		error = !await _todoRepository.AddOrUpdate(todo);
+		error = !await _todoRepository.AddOrUpdate(_todo);
 
-		todo = new() { Id = Guid.NewGuid() };
+		_todo = new() { Id = Guid.NewGuid() };
 		await RefreshTodos();
 	}
 
 	private void onEditButtonClick(MouseEventArgs e, TodoItem selectedTodo)
 	{
-		todo = selectedTodo;
+		_todo = selectedTodo;
 	}
 
 	private async Task OnTodoCheckboxChanged(TodoItem todo)
@@ -84,7 +89,21 @@
 
 	private async Task RefreshTodos()
 	{
-		todos = await _todoRepository.GetTodos();
+		_todos = await _todoRepository.GetTodos();
+		StateHasChanged();
+	}
+
+	private async Task onClearAllButtonClick(MouseEventArgs e)
+	{
+		await _todoRepository.ClearAll();
+		_todos.Clear();
+		_todo = new() { Id = Guid.NewGuid() };
+		StateHasChanged();
+	}
+
+	private void onClearTodoFormButtonClick(MouseEventArgs e)
+	{
+		_todo = new() { Id = Guid.NewGuid() };
 		StateHasChanged();
 	}
 }

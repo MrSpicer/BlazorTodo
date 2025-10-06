@@ -9,15 +9,16 @@ public class TodoItem
 	public string Title { get; set; } = string.Empty;
 	public string Description { get; set; } = string.Empty;
 	public Priority Priority { get; set; }
-	public TodoItemStatus Status { get; set; }
+	public TodoItemStatus Status { get; set; } = TodoItemStatus.None;
 	public DateTime CreatedAt { get; set; } = DateTime.Now;
+	public DateTime? StartedAt { get; set; }
 
 	public bool IsDone
 	{
 		get { return Status == TodoItemStatus.Done; }
 		set
 		{
-			if(value)
+			if (value)
 			{
 				Status = TodoItemStatus.Done;
 			}
@@ -31,4 +32,4 @@ public class TodoItem
 }
 
 public enum Priority { Low, Medium, High, Emergency }
-public enum TodoItemStatus { New, InProgress, Done, Abandoned, Archived }
+public enum TodoItemStatus { None, New, InProgress, Done, Abandoned, Archived }
