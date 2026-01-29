@@ -16,6 +16,8 @@ public static class ServiceCollectionExtensions
         services.AddScoped<ITodoRepository, TodoRepository>();
         services.AddScoped<ITodoService, TodoService>();
         services.AddScoped<IDialogService, DialogService>();
+        services.AddScoped<IFileService, FileService>();
+        services.AddScoped<IImportExportService, ImportExportService>();
         return services;
     }
 }

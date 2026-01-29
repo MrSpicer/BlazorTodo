@@ -2,12 +2,23 @@
 @implements IDisposable
 @inject ITodoService TodoService
 @inject IDialogService DialogService
+@inject IImportExportService ImportExportService
+@inject IFileService FileService
 
 <PageTitle>Todo</PageTitle>
 
-<div class="mb-3">
+<div class="d-flex gap-2 mb-3">
+    <button class="btn btn-outline-primary btn-sm" @onclick="ShowImportExportModal">
+        📦 Import / Export
+    </button>
     <button class="btn btn-danger btn-sm" @onclick="HandleClearAll">Clear All</button>
 </div>
+
+<ImportExportModal IsVisible="@_showImportExportModal"
+                   OnClose="HideImportExportModal"
+                   OnExport="HandleExport"
+                   OnImport="HandleImport"
+                   @ref="_importExportModal" />
 
 <TodoForm Todo="@_currentTodo"
           IsEditing="@_isEditing"
@@ -36,6 +47,8 @@
     private FilterOption _filter = FilterOption.All;
     private SortOption _sort = SortOption.CreatedDate;
     private bool _initialized;
+    private bool _showImportExportModal;
+    private ImportExportModal? _importExportModal;
 
     protected override void OnInitialized()
     {
@@ -93,6 +106,34 @@
     {
         _currentTodo = new TodoItem();
         _isEditing = false;
+    }
+
+    private void ShowImportExportModal() => _showImportExportModal = true;
+
+    private void HideImportExportModal() => _showImportExportModal = false;
+
+    private async Task HandleExport()
+    {
+        var json = await ImportExportService.ExportToJsonAsync();
+        var fileName = $"todos-export-{DateTime.Now:yyyy-MM-dd-HHmmss}.json";
+        await FileService.DownloadFileAsync(fileName, json);
+    }
+
+    private async Task HandleImport((string Content, bool ReplaceExisting) args)
+    {
+        var result = await ImportExportService.ImportFromJsonAsync(args.Content, args.ReplaceExisting);
+        
+        if (result.Success)
+        {
+            var message = $"Successfully imported {result.ImportedCount} todo(s).";
+            if (result.SkippedCount > 0)
+                message += $" Skipped {result.SkippedCount} duplicate(s).";
+            _importExportModal?.ShowMessage(message, false);
+        }
+        else
+        {
+            _importExportModal?.ShowMessage(result.ErrorMessage ?? "Import failed.", true);
+        }
     }
 
     public void Dispose()

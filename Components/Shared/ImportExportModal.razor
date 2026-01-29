@@ -1,0 +1,196 @@
+@using Microsoft.AspNetCore.Components.Forms
+
+@if (IsVisible)
+{
+    <div class="modal fade show d-block" tabindex="-1" style="background-color: rgba(0,0,0,0.5);">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">📦 Import / Export Todos</h5>
+                    <button type="button" class="btn-close" @onclick="Close" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    @if (!string.IsNullOrEmpty(_message))
+                    {
+                        <div class="alert @(_isError ? "alert-danger" : "alert-success") alert-dismissible fade show" role="alert">
+                            @_message
+                            <button type="button" class="btn-close" @onclick="ClearMessage" aria-label="Close"></button>
+                        </div>
+                    }
+
+                    <!-- Export Section -->
+                    <div class="card mb-3">
+                        <div class="card-header">
+                            <h6 class="mb-0">📤 Export</h6>
+                        </div>
+                        <div class="card-body">
+                            <p class="card-text text-muted small">
+                                Download all your todos as a JSON file that can be imported later.
+                            </p>
+                            <button class="btn btn-primary" @onclick="HandleExport" disabled="@_isProcessing">
+                                @if (_isProcessing && _isExporting)
+                                {
+                                    <span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                                }
+                                📥 Download JSON
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Import Section -->
+                    <div class="card">
+                        <div class="card-header">
+                            <h6 class="mb-0">📥 Import</h6>
+                        </div>
+                        <div class="card-body">
+                            <p class="card-text text-muted small">
+                                Import todos from a previously exported JSON file.
+                            </p>
+                            
+                            <div class="mb-3">
+                                <label for="importFile" class="form-label">Select JSON file</label>
+                                <InputFile id="importFile" class="form-control" OnChange="HandleFileSelected" accept=".json" />
+                            </div>
+
+                            @if (_selectedFile != null)
+                            {
+                                <div class="alert alert-info py-2 mb-3">
+                                    <small>📄 Selected: @_selectedFile.Name (@FormatFileSize(_selectedFile.Size))</small>
+                                </div>
+                            }
+
+                            <div class="form-check mb-3">
+                                <input class="form-check-input" type="checkbox" id="replaceExisting" @bind="_replaceExisting">
+                                <label class="form-check-label" for="replaceExisting">
+                                    Replace all existing todos
+                                </label>
+                                <div class="form-text text-warning small">
+                                    ⚠️ This will delete all current todos before importing!
+                                </div>
+                            </div>
+
+                            <button class="btn btn-success" @onclick="HandleImport" 
+                                    disabled="@(_isProcessing || _selectedFile == null)">
+                                @if (_isProcessing && !_isExporting)
+                                {
+                                    <span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                                }
+                                📤 Import Todos
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" @onclick="Close">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter]
+    public bool IsVisible { get; set; }
+
+    [Parameter]
+    public EventCallback OnClose { get; set; }
+
+    [Parameter]
+    public EventCallback<string> OnExport { get; set; }
+
+    [Parameter]
+    public EventCallback<(string Content, bool ReplaceExisting)> OnImport { get; set; }
+
+    private IBrowserFile? _selectedFile;
+    private bool _replaceExisting;
+    private bool _isProcessing;
+    private bool _isExporting;
+    private string? _message;
+    private bool _isError;
+
+    private async Task HandleExport()
+    {
+        _isProcessing = true;
+        _isExporting = true;
+        ClearMessage();
+
+        try
+        {
+            await OnExport.InvokeAsync();
+            ShowMessage("Export completed successfully!", false);
+        }
+        catch (Exception ex)
+        {
+            ShowMessage($"Export failed: {ex.Message}", true);
+        }
+        finally
+        {
+            _isProcessing = false;
+            _isExporting = false;
+        }
+    }
+
+    private void HandleFileSelected(InputFileChangeEventArgs e)
+    {
+        _selectedFile = e.File;
+        ClearMessage();
+    }
+
+    private async Task HandleImport()
+    {
+        if (_selectedFile == null) return;
+
+        _isProcessing = true;
+        _isExporting = false;
+        ClearMessage();
+
+        try
+        {
+            // Read file content (limit to 10MB)
+            using var stream = _selectedFile.OpenReadStream(maxAllowedSize: 10 * 1024 * 1024);
+            using var reader = new StreamReader(stream);
+            var content = await reader.ReadToEndAsync();
+
+            await OnImport.InvokeAsync((content, _replaceExisting));
+            
+            _selectedFile = null;
+            _replaceExisting = false;
+        }
+        catch (Exception ex)
+        {
+            ShowMessage($"Failed to read file: {ex.Message}", true);
+        }
+        finally
+        {
+            _isProcessing = false;
+        }
+    }
+
+    public void ShowMessage(string message, bool isError)
+    {
+        _message = message;
+        _isError = isError;
+        StateHasChanged();
+    }
+
+    private void ClearMessage()
+    {
+        _message = null;
+        _isError = false;
+    }
+
+    private async Task Close()
+    {
+        ClearMessage();
+        _selectedFile = null;
+        _replaceExisting = false;
+        await OnClose.InvokeAsync();
+    }
+
+    private static string FormatFileSize(long bytes)
+    {
+        if (bytes < 1024) return $"{bytes} B";
+        if (bytes < 1024 * 1024) return $"{bytes / 1024.0:F1} KB";
+        return $"{bytes / (1024.0 * 1024.0):F1} MB";
+    }
+}
