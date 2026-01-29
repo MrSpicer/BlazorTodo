@@ -1,8 +1,7 @@
 using System;
 using TodoList.Models;
+using TodoList.Models.Enums;
 using Blazored.LocalStorage;
-using TodoList.Pages;
-using System.Reflection.Metadata.Ecma335;
 using System.Threading.Tasks;
 
 namespace TodoList.Data;

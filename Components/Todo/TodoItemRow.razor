@@ -1,0 +1,60 @@
+@using TodoList.Models
+@using TodoList.Models.Enums
+@using TodoList.Helpers
+@using TodoList.Components.Shared
+
+<div class="list-group-item @CssHelpers.GetStatusItemClass(Item.Status)">
+    <div class="d-flex flex-wrap align-items-center gap-2">
+        <PriorityBadge Priority="@Item.Priority" />
+
+        <select class="form-select form-select-sm" style="width: auto; min-width: 120px;"
+                value="@Item.Status" @onchange="HandleStatusChange">
+            @foreach (var status in Enum.GetValues<TodoItemStatus>())
+            {
+                <option value="@status" selected="@(Item.Status == status)">@status</option>
+            }
+        </select>
+
+        <div class="flex-grow-1 @CssHelpers.GetStatusTextClass(Item.Status)">
+            <strong>@Item.Title</strong>
+            @if (!string.IsNullOrWhiteSpace(Item.Description))
+            {
+                <small class="text-muted d-block d-md-inline ms-md-2">— @Item.Description</small>
+            }
+        </div>
+
+        <div class="btn-group btn-group-sm">
+            <button class="btn btn-outline-secondary" @onclick="HandleEdit" title="Edit">
+                ✏️ Edit
+            </button>
+            <button class="btn btn-outline-danger" @onclick="HandleDelete" title="Delete">
+                🗑️ Delete
+            </button>
+        </div>
+    </div>
+    <small class="text-muted mt-1 d-block">Created: @Item.CreatedAt.ToString("g")</small>
+</div>
+
+@code {
+    [Parameter, EditorRequired]
+    public TodoItem Item { get; set; } = default!;
+
+    [Parameter]
+    public EventCallback<TodoItem> OnEdit { get; set; }
+
+    [Parameter]
+    public EventCallback<TodoItem> OnDelete { get; set; }
+
+    [Parameter]
+    public EventCallback<(TodoItem, TodoItemStatus)> OnStatusChange { get; set; }
+
+    private async Task HandleEdit() => await OnEdit.InvokeAsync(Item);
+
+    private async Task HandleDelete() => await OnDelete.InvokeAsync(Item);
+
+    private async Task HandleStatusChange(ChangeEventArgs e)
+    {
+        if (Enum.TryParse<TodoItemStatus>(e.Value?.ToString(), out var status))
+            await OnStatusChange.InvokeAsync((Item, status));
+    }
+}

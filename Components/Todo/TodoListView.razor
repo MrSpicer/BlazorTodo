@@ -1,0 +1,33 @@
+@using TodoList.Models
+@using TodoList.Models.Enums
+
+@if (!Items.Any())
+{
+    <div class="alert alert-info">No todos to display. Add one above!</div>
+}
+else
+{
+    <div class="list-group">
+        @foreach (var item in Items)
+        {
+            <TodoItemRow Item="@item"
+                         OnEdit="OnEdit"
+                         OnDelete="OnDelete"
+                         OnStatusChange="OnStatusChange" />
+        }
+    </div>
+}
+
+@code {
+    [Parameter, EditorRequired]
+    public IEnumerable<TodoItem> Items { get; set; } = Enumerable.Empty<TodoItem>();
+
+    [Parameter]
+    public EventCallback<TodoItem> OnEdit { get; set; }
+
+    [Parameter]
+    public EventCallback<TodoItem> OnDelete { get; set; }
+
+    [Parameter]
+    public EventCallback<(TodoItem, TodoItemStatus)> OnStatusChange { get; set; }
+}

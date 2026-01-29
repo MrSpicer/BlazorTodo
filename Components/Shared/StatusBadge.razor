@@ -1,0 +1,19 @@
+@using TodoList.Models.Enums
+
+<span class="badge @GetBadgeClass()">@Status</span>
+
+@code {
+    [Parameter, EditorRequired]
+    public TodoItemStatus Status { get; set; }
+
+    private string GetBadgeClass() => Status switch
+    {
+        TodoItemStatus.None => "bg-light text-dark",
+        TodoItemStatus.New => "bg-info",
+        TodoItemStatus.InProgress => "bg-primary",
+        TodoItemStatus.Done => "bg-success",
+        TodoItemStatus.Abandoned => "bg-secondary",
+        TodoItemStatus.Archived => "bg-dark",
+        _ => "bg-light"
+    };
+}

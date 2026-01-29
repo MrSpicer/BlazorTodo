@@ -1,0 +1,11 @@
+@using TodoList.Models.Enums
+@using TodoList.Helpers
+
+<span class="badge @CssHelpers.GetPriorityBadgeClass(Priority)">
+    @Priority
+</span>
+
+@code {
+    [Parameter, EditorRequired]
+    public Priority Priority { get; set; }
+}

@@ -1,109 +1,103 @@
 ﻿@page "/"
-@using System
-@using TodoList.Models
-@using TodoList.Data
-@inject ITodoRepository _todoRepository;
+@implements IDisposable
+@inject ITodoService TodoService
+@inject IDialogService DialogService
 
 <PageTitle>Todo</PageTitle>
 
-<div class="mb-5">
-	<button class="btn btn-danger" @onclick="onClearAllButtonClick">Clear All</button>
+<div class="mb-3">
+    <button class="btn btn-danger btn-sm" @onclick="HandleClearAll">Clear All</button>
 </div>
 
-@if (error)
-{
-	<h2>Invalid</h2>
-}
-<div class="form-group">
-	<div class="mb-3">
-		<label for="TodoTitle" class="form-label">Title</label>
-		<input type="text" class="form-control" id="TodoTitle" aria-describedby="TodoTitle" @bind="_todo.Title">
-		<div id="todoTitleHelp" class="form-text">Title</div>
-	</div>
+<TodoForm Todo="@_currentTodo"
+          IsEditing="@_isEditing"
+          OnSubmit="HandleFormSubmit"
+          OnCancel="HandleFormCancel" />
 
-	<div class="mb-3">
-		<label for="TodoTitle" class="form-label">Description</label>
-		<textarea class="form-control" id="TodoDescription" aria-describedby="TodoDescription"
-			@bind="_todo.Description" />
-		<div id="todoDescriptionHelp" class="form-text">Description</div>
-	</div>
+<TodoFilters Filter="@_filter"
+             Sort="@_sort"
+             TotalCount="@TodoService.Todos.Count"
+             ActiveCount="@TodoService.GetActiveCount()"
+             CompletedCount="@TodoService.GetCompletedCount()"
+             FilteredCount="@GetFilteredTodos().Count()"
+             FilterChanged="f => { _filter = f; }"
+             SortChanged="s => { _sort = s; }" />
 
-	<button class="btn btn-primary" @onclick="onAddButtonClick">Add todo</button>
-	<button class="btn btn-danger" @onclick="onClearTodoFormButtonClick" enabled="@(_todo.Title.Length > 0 || _todo.Description.Length > 0 && _todo.Status != TodoItemStatus.None)">Clear</button>
-</div>
+<h4 class="mb-3">Todos remaining: @TodoService.GetActiveCount()</h4>
 
-<h3>Todos remaining: @_todos.Count(todo => !todo.IsDone)</h3>
-
-<ul>
-    @foreach (var StoredTodo in _todos)
-    {
-        <li>
-            <input @ref="todoCheckbox"
-                   type="checkbox"
-                   @bind="StoredTodo.IsDone"
-                   @bind:after="() => OnTodoCheckboxChanged(StoredTodo)" />
-			<span>@StoredTodo.Status</span>
-            <button class="btn btn-secondary" @onclick="(e) => onEditButtonClick(e, StoredTodo)">Edit</button>
-            <span>@StoredTodo.Title</span>
-            <span>@StoredTodo.Description</span>
-        </li>
-    }
-</ul>
-
+<TodoListView Items="@GetFilteredTodos()"
+              OnEdit="HandleEdit"
+              OnDelete="HandleDelete"
+              OnStatusChange="HandleStatusChange" />
 
 @code {
-	private List<TodoItem> _todos = new();
-	private TodoItem _todo = new() { Id = Guid.NewGuid() };
-	private bool error = false;
+    private TodoItem _currentTodo = new();
+    private bool _isEditing;
+    private FilterOption _filter = FilterOption.All;
+    private SortOption _sort = SortOption.CreatedDate;
+    private bool _initialized;
 
-	private ElementReference todoCheckbox;
+    protected override void OnInitialized()
+    {
+        TodoService.OnTodosChanged += StateHasChanged;
+    }
 
-	protected override async Task OnAfterRenderAsync(bool firstRender)
-	{
-		if (firstRender)
-		{
-			await _todoRepository.InitializeAsync();
-			await RefreshTodos();
-		}
-	}
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender && !_initialized)
+        {
+            _initialized = true;
+            await TodoService.InitializeAsync();
+            StateHasChanged();
+        }
+    }
 
-	private async Task onAddButtonClick(MouseEventArgs e)
-	{
-		error = !await _todoRepository.AddOrUpdate(_todo);
+    private IEnumerable<TodoItem> GetFilteredTodos() =>
+        TodoService.GetFilteredAndSorted(_filter, _sort);
 
-		_todo = new() { Id = Guid.NewGuid() };
-		await RefreshTodos();
-	}
+    private async Task HandleFormSubmit(TodoItem todo)
+    {
+        await TodoService.SaveTodoAsync(todo);
+        ResetForm();
+    }
 
-	private void onEditButtonClick(MouseEventArgs e, TodoItem selectedTodo)
-	{
-		_todo = selectedTodo;
-	}
+    private void HandleFormCancel() => ResetForm();
 
-	private async Task OnTodoCheckboxChanged(TodoItem todo)
-	{
-		//todo.Status = (e.Value is bool value && value) ? TodoItemStatus.Done : TodoItemStatus.InProgress;
-		await _todoRepository.AddOrUpdate(todo);
-		//await RefreshTodos();
-	}
+    private void HandleEdit(TodoItem todo)
+    {
+        _currentTodo = todo;
+        _isEditing = true;
+    }
 
-	private async Task RefreshTodos()
-	{
-		_todos = await _todoRepository.GetTodos();
-		StateHasChanged();
-	}
+    private async Task HandleDelete(TodoItem todo)
+    {
+        if (await DialogService.ConfirmAsync($"Delete '{todo.Title}'?"))
+            await TodoService.DeleteTodoAsync(todo);
+    }
 
-	private async Task onClearAllButtonClick(MouseEventArgs e)
-	{
-		await _todoRepository.ClearAll();
-		_todos.Clear();
-		_todo = new() { Id = Guid.NewGuid() };
-		StateHasChanged();
-	}
+    private async Task HandleStatusChange((TodoItem todo, TodoItemStatus status) args)
+    {
+        await TodoService.UpdateStatusAsync(args.todo, args.status);
+    }
 
-	private void onClearTodoFormButtonClick(MouseEventArgs e)
-	{
-		_todo = new() { Id = Guid.NewGuid() };
-		StateHasChanged();
-	}
+    private async Task HandleClearAll()
+    {
+        if (await DialogService.ConfirmAsync("Delete ALL todos? This cannot be undone."))
+        {
+            await TodoService.ClearAllAsync();
+            ResetForm();
+        }
+    }
+
+    private void ResetForm()
+    {
+        _currentTodo = new TodoItem();
+        _isEditing = false;
+    }
+
+    public void Dispose()
+    {
+        TodoService.OnTodosChanged -= StateHasChanged;
+    }
 }
+

@@ -1,0 +1,73 @@
+@using TodoList.Models
+@using TodoList.Models.Enums
+@using Microsoft.AspNetCore.Components.Forms
+
+<div class="card mb-4">
+    <div class="card-header">
+        <h5 class="mb-0">@(IsEditing ? "Edit Todo" : "Add New Todo")</h5>
+    </div>
+    <div class="card-body">
+        <EditForm Model="@Todo" OnValidSubmit="HandleValidSubmit">
+            <DataAnnotationsValidator />
+
+            <div class="row">
+                <div class="col-md-6 mb-3">
+                    <label for="TodoTitle" class="form-label">Title</label>
+                    <InputText id="TodoTitle" class="form-control" @bind-Value="Todo.Title"
+                               placeholder="Enter title" />
+                    <ValidationMessage For="@(() => Todo.Title)" class="text-danger" />
+                </div>
+
+                <div class="col-md-6 mb-3">
+                    <label for="TodoPriority" class="form-label">Priority</label>
+                    <InputSelect id="TodoPriority" class="form-select" @bind-Value="Todo.Priority">
+                        @foreach (var priority in Enum.GetValues<Priority>())
+                        {
+                            <option value="@priority">@priority</option>
+                        }
+                    </InputSelect>
+                </div>
+            </div>
+
+            <div class="mb-3">
+                <label for="TodoDescription" class="form-label">Description</label>
+                <InputTextArea id="TodoDescription" class="form-control" rows="2"
+                               @bind-Value="Todo.Description" placeholder="Enter description" />
+                <ValidationMessage For="@(() => Todo.Description)" class="text-danger" />
+            </div>
+
+            <div class="d-flex gap-2">
+                <button type="submit" class="btn btn-primary">
+                    @(IsEditing ? "Update" : "Add") Todo
+                </button>
+                <button type="button" class="btn btn-outline-secondary" @onclick="HandleCancel">
+                    Cancel
+                </button>
+            </div>
+        </EditForm>
+    </div>
+</div>
+
+@code {
+    [Parameter, EditorRequired]
+    public TodoItem Todo { get; set; } = new();
+
+    [Parameter]
+    public bool IsEditing { get; set; }
+
+    [Parameter]
+    public EventCallback<TodoItem> OnSubmit { get; set; }
+
+    [Parameter]
+    public EventCallback OnCancel { get; set; }
+
+    private async Task HandleValidSubmit()
+    {
+        await OnSubmit.InvokeAsync(Todo);
+    }
+
+    private async Task HandleCancel()
+    {
+        await OnCancel.InvokeAsync();
+    }
+}
