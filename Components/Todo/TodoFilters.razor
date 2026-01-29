@@ -4,26 +4,26 @@
     <div class="card-body">
         <div class="row align-items-end">
             <div class="col-md-4 mb-2 mb-md-0">
-                <label for="FilterStatus" class="form-label">Filter by Status</label>
+                <label for="FilterStatus" class="form-label">🔍 Filter by Status</label>
                 <select class="form-select" id="FilterStatus" value="@Filter"
                         @onchange="OnFilterChanged">
-                    <option value="@FilterOption.All">All (@TotalCount)</option>
-                    <option value="@FilterOption.Active">Active (@ActiveCount)</option>
-                    <option value="@FilterOption.Completed">Completed (@CompletedCount)</option>
+                    <option value="@FilterOption.All">📋 All (@TotalCount)</option>
+                    <option value="@FilterOption.Active">⏳ Active (@ActiveCount)</option>
+                    <option value="@FilterOption.Completed">✅ Completed (@CompletedCount)</option>
                 </select>
             </div>
             <div class="col-md-4 mb-2 mb-md-0">
-                <label for="SortBy" class="form-label">Sort by</label>
+                <label for="SortBy" class="form-label">📊 Sort by</label>
                 <select class="form-select" id="SortBy" value="@Sort"
                         @onchange="OnSortChanged">
-                    <option value="@SortOption.CreatedDate">Created Date</option>
-                    <option value="@SortOption.Priority">Priority</option>
-                    <option value="@SortOption.Status">Status</option>
+                    <option value="@SortOption.CreatedDate">📅 Created Date</option>
+                    <option value="@SortOption.Priority">🎯 Priority</option>
+                    <option value="@SortOption.Status">📌 Status</option>
                 </select>
             </div>
             <div class="col-md-4">
                 <div class="text-muted">
-                    Showing <strong>@FilteredCount</strong> of <strong>@TotalCount</strong> items
+                    👁️ Showing <strong>@FilteredCount</strong> of <strong>@TotalCount</strong> items
                 </div>
             </div>
         </div>

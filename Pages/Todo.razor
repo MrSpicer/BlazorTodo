@@ -5,13 +5,13 @@
 @inject IImportExportService ImportExportService
 @inject IFileService FileService
 
-<PageTitle>Todo</PageTitle>
+<PageTitle>✅ Todo</PageTitle>
 
 <div class="d-flex gap-2 mb-3">
     <button class="btn btn-outline-primary btn-sm" @onclick="ShowImportExportModal">
         📦 Import / Export
     </button>
-    <button class="btn btn-danger btn-sm" @onclick="HandleClearAll">Clear All</button>
+    <button class="btn btn-danger btn-sm" @onclick="HandleClearAll">🗑️ Clear All</button>
 </div>
 
 <ImportExportModal IsVisible="@_showImportExportModal"
@@ -34,7 +34,7 @@
              FilterChanged="f => { _filter = f; }"
              SortChanged="s => { _sort = s; }" />
 
-<h4 class="mb-3">Todos remaining: @TodoService.GetActiveCount()</h4>
+<h4 class="mb-3">📋 Todos remaining: @TodoService.GetActiveCount()</h4>
 
 <TodoListView Items="@GetFilteredTodos()"
               OnEdit="HandleEdit"

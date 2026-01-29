@@ -2,10 +2,19 @@
 @using TodoList.Helpers
 
 <span class="badge @CssHelpers.GetPriorityBadgeClass(Priority)">
-    @Priority
+    @GetPriorityEmoji() @Priority
 </span>
 
 @code {
     [Parameter, EditorRequired]
     public Priority Priority { get; set; }
+
+    private string GetPriorityEmoji() => Priority switch
+    {
+        Priority.Low => "🟢",
+        Priority.Medium => "🔵",
+        Priority.High => "🟠",
+        Priority.Emergency => "🔴",
+        _ => "⚪"
+    };
 }

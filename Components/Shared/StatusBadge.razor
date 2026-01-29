@@ -1,10 +1,21 @@
 @using TodoList.Models.Enums
 
-<span class="badge @GetBadgeClass()">@Status</span>
+<span class="badge @GetBadgeClass()">@GetStatusEmoji() @Status</span>
 
 @code {
     [Parameter, EditorRequired]
     public TodoItemStatus Status { get; set; }
+
+    private string GetStatusEmoji() => Status switch
+    {
+        TodoItemStatus.None => "⚪",
+        TodoItemStatus.New => "🆕",
+        TodoItemStatus.InProgress => "🔄",
+        TodoItemStatus.Done => "✅",
+        TodoItemStatus.Abandoned => "❌",
+        TodoItemStatus.Archived => "📦",
+        _ => "⚪"
+    };
 
     private string GetBadgeClass() => Status switch
     {
