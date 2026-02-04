@@ -1,0 +1,114 @@
+@using TodoList.Models
+
+<div class="project-tabs-container mb-3">
+    <ul class="nav nav-tabs d-flex flex-nowrap align-items-center">
+        @foreach (var project in Projects)
+        {
+            <li class="nav-item">
+                <button class="nav-link d-flex align-items-center gap-2 @(IsSelected(project) ? "active" : "")"
+                        style="@GetTabStyle(project)"
+                        @onclick="() => OnProjectSelected.InvokeAsync(project)">
+                    <span class="project-color-dot" style="background-color: @project.Color;"></span>
+                    <span>@project.Name</span>
+                    <span class="badge bg-secondary rounded-pill">@GetTodoCount(project.Id)</span>
+                    <button class="btn-close btn-close-sm ms-1" 
+                            style="font-size: 0.6rem;"
+                            @onclick:stopPropagation="true"
+                            @onclick="() => OnDeleteProject.InvokeAsync(project)"
+                            aria-label="Delete project"></button>
+                </button>
+            </li>
+        }
+        <li class="nav-item ms-2">
+            <button class="btn btn-outline-primary btn-sm d-flex align-items-center gap-1"
+                    @onclick="() => OnNewProjectClick.InvokeAsync()">
+                <span>➕</span>
+                <span>New Project</span>
+            </button>
+        </li>
+    </ul>
+</div>
+
+<style>
+    .project-tabs-container {
+        overflow-x: auto;
+    }
+    
+    .project-tabs-container .nav-tabs {
+        flex-wrap: nowrap;
+        border-bottom: 1px solid #dee2e6;
+    }
+    
+    .project-tabs-container .nav-link {
+        white-space: nowrap;
+        border: 1px solid transparent;
+        border-bottom: none;
+        transition: all 0.2s ease;
+    }
+    
+    .project-tabs-container .nav-link:hover:not(.active) {
+        border-color: #dee2e6 #dee2e6 transparent;
+        background-color: #f8f9fa;
+    }
+    
+    .project-tabs-container .nav-link.active {
+        border-color: #dee2e6 #dee2e6 #fff;
+        font-weight: 500;
+    }
+    
+    .project-color-dot {
+        width: 10px;
+        height: 10px;
+        border-radius: 50%;
+        display: inline-block;
+        flex-shrink: 0;
+    }
+    
+    .btn-close-sm {
+        padding: 0.15rem;
+        opacity: 0.5;
+    }
+    
+    .btn-close-sm:hover {
+        opacity: 1;
+    }
+</style>
+
+@code {
+    [Parameter, EditorRequired]
+    public IReadOnlyList<Project> Projects { get; set; } = new List<Project>();
+
+    [Parameter]
+    public Project? SelectedProject { get; set; }
+
+    [Parameter]
+    public IReadOnlyList<TodoItem> Todos { get; set; } = new List<TodoItem>();
+
+    [Parameter]
+    public EventCallback<Project> OnProjectSelected { get; set; }
+
+    [Parameter]
+    public EventCallback OnNewProjectClick { get; set; }
+
+    [Parameter]
+    public EventCallback<Project> OnDeleteProject { get; set; }
+
+    private bool IsSelected(Project project)
+    {
+        return SelectedProject?.Id == project.Id;
+    }
+
+    private string GetTabStyle(Project project)
+    {
+        if (IsSelected(project))
+        {
+            return $"border-top: 3px solid {project.Color};";
+        }
+        return "";
+    }
+
+    private int GetTodoCount(Guid projectId)
+    {
+        return Todos.Count(t => t.ProjectId == projectId);
+    }
+}

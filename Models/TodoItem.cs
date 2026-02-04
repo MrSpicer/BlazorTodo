@@ -21,6 +21,7 @@ public class TodoItem
 	public DateTime CreatedAt { get; set; } = DateTime.Now;
 	public DateTime? StartedAt { get; set; }
 	public DateTime? CompletedAt { get; set; }
+	public Guid ProjectId { get; set; }
 
 	public bool IsDone => Status == TodoItemStatus.Done;
 

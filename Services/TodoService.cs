@@ -66,13 +66,51 @@ public class TodoService : ITodoService
         NotifyStateChanged();
     }
 
-    public IEnumerable<TodoItem> GetFilteredAndSorted(FilterOption filter, SortOption sort)
+    public async Task ClearAllAsync(Guid? projectId = null)
     {
-        var filtered = filter switch
+        if (projectId == null)
         {
-            FilterOption.Active => _todos.Where(t => !t.IsDone),
-            FilterOption.Completed => _todos.Where(t => t.IsDone),
-            _ => _todos
+            await _repository.ClearAll();
+            _todos.Clear();
+        }
+        else
+        {
+            var todosToDelete = _todos.Where(t => t.ProjectId == projectId).ToList();
+            foreach (var todo in todosToDelete)
+            {
+                await _repository.Delete(todo);
+            }
+            _todos = await _repository.GetTodos();
+        }
+        NotifyStateChanged();
+    }
+
+    public async Task DeleteTodosByProjectAsync(Guid projectId)
+    {
+        var todosToDelete = _todos.Where(t => t.ProjectId == projectId).ToList();
+        foreach (var todo in todosToDelete)
+        {
+            await _repository.Delete(todo);
+        }
+        _todos = await _repository.GetTodos();
+        NotifyStateChanged();
+    }
+
+    public IEnumerable<TodoItem> GetFilteredAndSorted(FilterOption filter, SortOption sort, Guid? projectId = null)
+    {
+        var filtered = _todos.AsEnumerable();
+
+        // Filter by project if specified
+        if (projectId.HasValue)
+        {
+            filtered = filtered.Where(t => t.ProjectId == projectId.Value);
+        }
+
+        filtered = filter switch
+        {
+            FilterOption.Active => filtered.Where(t => !t.IsDone),
+            FilterOption.Completed => filtered.Where(t => t.IsDone),
+            _ => filtered
         };
 
         return sort switch
@@ -83,9 +121,21 @@ public class TodoService : ITodoService
         };
     }
 
-    public int GetActiveCount() => _todos.Count(t => !t.IsDone);
+    public int GetActiveCount(Guid? projectId = null)
+    {
+        var todos = projectId.HasValue 
+            ? _todos.Where(t => t.ProjectId == projectId.Value) 
+            : _todos;
+        return todos.Count(t => !t.IsDone);
+    }
     
-    public int GetCompletedCount() => _todos.Count(t => t.IsDone);
+    public int GetCompletedCount(Guid? projectId = null)
+    {
+        var todos = projectId.HasValue 
+            ? _todos.Where(t => t.ProjectId == projectId.Value) 
+            : _todos;
+        return todos.Count(t => t.IsDone);
+    }
 
     private void NotifyStateChanged() => OnTodosChanged?.Invoke();
 }

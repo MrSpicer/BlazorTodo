@@ -1,18 +1,33 @@
 ﻿@page "/"
 @implements IDisposable
 @inject ITodoService TodoService
+@inject IProjectService ProjectService
 @inject IDialogService DialogService
 @inject IImportExportService ImportExportService
 @inject IFileService FileService
 
 <PageTitle>✅ Todo</PageTitle>
 
-<div class="d-flex gap-2 mb-3">
-    <button class="btn btn-outline-primary btn-sm" @onclick="ShowImportExportModal">
-        📦 Import / Export
-    </button>
-    <button class="btn btn-danger btn-sm" @onclick="HandleClearAll">🗑️ Clear All</button>
+<div class="d-flex justify-content-between align-items-start mb-3">
+    <div class="flex-grow-1">
+        <ProjectTabs Projects="@ProjectService.Projects"
+                     SelectedProject="@ProjectService.SelectedProject"
+                     Todos="@TodoService.Todos"
+                     OnProjectSelected="HandleProjectSelected"
+                     OnNewProjectClick="ShowProjectModal"
+                     OnDeleteProject="HandleDeleteProject" />
+    </div>
+    <div class="ms-3 mt-1">
+        <button class="btn btn-outline-primary btn-sm" @onclick="ShowImportExportModal">
+            📦 Import / Export
+        </button>
+    </div>
 </div>
+
+<ProjectModal IsVisible="@_showProjectModal"
+              IsEditing="false"
+              OnClose="HideProjectModal"
+              OnSave="HandleSaveProject" />
 
 <ImportExportModal IsVisible="@_showImportExportModal"
                    OnClose="HideImportExportModal"
@@ -20,26 +35,46 @@
                    OnImport="HandleImport"
                    @ref="_importExportModal" />
 
-<TodoForm Todo="@_currentTodo"
-          IsEditing="@_isEditing"
-          OnSubmit="HandleFormSubmit"
-          OnCancel="HandleFormCancel" />
+@if (!ProjectService.Projects.Any())
+{
+    <div class="text-center py-5">
+        <div class="mb-4">
+            <span style="font-size: 4rem;">📁</span>
+        </div>
+        <h3 class="text-muted mb-3">No Projects Yet</h3>
+        <p class="text-muted mb-4">Create your first project to start organizing your todos.</p>
+        <button class="btn btn-primary btn-lg" @onclick="ShowProjectModal">
+            ➕ Create Your First Project
+        </button>
+    </div>
+}
+else
+{
+    <div class="d-flex gap-2 mb-3">
+        <button class="btn btn-danger btn-sm" @onclick="HandleClearAll">🗑️ Clear All</button>
+    </div>
 
-<TodoFilters Filter="@_filter"
-             Sort="@_sort"
-             TotalCount="@TodoService.Todos.Count"
-             ActiveCount="@TodoService.GetActiveCount()"
-             CompletedCount="@TodoService.GetCompletedCount()"
-             FilteredCount="@GetFilteredTodos().Count()"
-             FilterChanged="f => { _filter = f; }"
-             SortChanged="s => { _sort = s; }" />
+    <TodoForm Todo="@_currentTodo"
+              IsEditing="@_isEditing"
+              OnSubmit="HandleFormSubmit"
+              OnCancel="HandleFormCancel" />
 
-<h4 class="mb-3">📋 Todos remaining: @TodoService.GetActiveCount()</h4>
+    <TodoFilters Filter="@_filter"
+                 Sort="@_sort"
+                 TotalCount="@GetProjectTodoCount()"
+                 ActiveCount="@TodoService.GetActiveCount(ProjectService.SelectedProject?.Id)"
+                 CompletedCount="@TodoService.GetCompletedCount(ProjectService.SelectedProject?.Id)"
+                 FilteredCount="@GetFilteredTodos().Count()"
+                 FilterChanged="f => { _filter = f; }"
+                 SortChanged="s => { _sort = s; }" />
 
-<TodoListView Items="@GetFilteredTodos()"
-              OnEdit="HandleEdit"
-              OnDelete="HandleDelete"
-              OnStatusChange="HandleStatusChange" />
+    <h4 class="mb-3">📋 Todos remaining: @TodoService.GetActiveCount(ProjectService.SelectedProject?.Id)</h4>
+
+    <TodoListView Items="@GetFilteredTodos()"
+                  OnEdit="HandleEdit"
+                  OnDelete="HandleDelete"
+                  OnStatusChange="HandleStatusChange" />
+}
 
 @code {
     private TodoItem _currentTodo = new();
@@ -48,11 +83,13 @@
     private SortOption _sort = SortOption.CreatedDate;
     private bool _initialized;
     private bool _showImportExportModal;
+    private bool _showProjectModal;
     private ImportExportModal? _importExportModal;
 
     protected override void OnInitialized()
     {
         TodoService.OnTodosChanged += StateHasChanged;
+        ProjectService.OnProjectsChanged += StateHasChanged;
     }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
@@ -60,16 +97,30 @@
         if (firstRender && !_initialized)
         {
             _initialized = true;
+            await ProjectService.InitializeAsync();
             await TodoService.InitializeAsync();
             StateHasChanged();
         }
     }
 
     private IEnumerable<TodoItem> GetFilteredTodos() =>
-        TodoService.GetFilteredAndSorted(_filter, _sort);
+        TodoService.GetFilteredAndSorted(_filter, _sort, ProjectService.SelectedProject?.Id);
+
+    private int GetProjectTodoCount()
+    {
+        var projectId = ProjectService.SelectedProject?.Id;
+        return projectId.HasValue 
+            ? TodoService.Todos.Count(t => t.ProjectId == projectId.Value)
+            : TodoService.Todos.Count;
+    }
 
     private async Task HandleFormSubmit(TodoItem todo)
     {
+        // Assign the current project to new todos
+        if (todo.ProjectId == Guid.Empty && ProjectService.SelectedProject != null)
+        {
+            todo.ProjectId = ProjectService.SelectedProject.Id;
+        }
         await TodoService.SaveTodoAsync(todo);
         ResetForm();
     }
@@ -95,9 +146,10 @@
 
     private async Task HandleClearAll()
     {
-        if (await DialogService.ConfirmAsync("Delete ALL todos? This cannot be undone."))
+        var projectName = ProjectService.SelectedProject?.Name ?? "all projects";
+        if (await DialogService.ConfirmAsync($"Delete ALL todos in '{projectName}'? This cannot be undone."))
         {
-            await TodoService.ClearAllAsync();
+            await TodoService.ClearAllAsync(ProjectService.SelectedProject?.Id);
             ResetForm();
         }
     }
@@ -105,12 +157,42 @@
     private void ResetForm()
     {
         _currentTodo = new TodoItem();
+        if (ProjectService.SelectedProject != null)
+        {
+            _currentTodo.ProjectId = ProjectService.SelectedProject.Id;
+        }
         _isEditing = false;
     }
 
     private void ShowImportExportModal() => _showImportExportModal = true;
 
     private void HideImportExportModal() => _showImportExportModal = false;
+
+    private void ShowProjectModal() => _showProjectModal = true;
+
+    private void HideProjectModal() => _showProjectModal = false;
+
+    private void HandleProjectSelected(Project project)
+    {
+        ProjectService.SelectProject(project);
+        ResetForm();
+    }
+
+    private async Task HandleSaveProject(Project project)
+    {
+        await ProjectService.SaveProjectAsync(project);
+        ProjectService.SelectProject(project);
+        ResetForm();
+    }
+
+    private async Task HandleDeleteProject(Project project)
+    {
+        if (await DialogService.ConfirmAsync($"Delete project '{project.Name}' and all its todos? This cannot be undone."))
+        {
+            await TodoService.DeleteTodosByProjectAsync(project.Id);
+            await ProjectService.DeleteProjectAsync(project);
+        }
+    }
 
     private async Task HandleExport()
     {
@@ -139,6 +221,7 @@
     public void Dispose()
     {
         TodoService.OnTodosChanged -= StateHasChanged;
+        ProjectService.OnProjectsChanged -= StateHasChanged;
     }
 }
 

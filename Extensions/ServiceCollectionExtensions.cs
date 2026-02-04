@@ -14,7 +14,9 @@ public static class ServiceCollectionExtensions
     public static IServiceCollection AddTodoServices(this IServiceCollection services)
     {
         services.AddScoped<ITodoRepository, TodoRepository>();
+        services.AddScoped<IProjectRepository, ProjectRepository>();
         services.AddScoped<ITodoService, TodoService>();
+        services.AddScoped<IProjectService, ProjectService>();
         services.AddScoped<IDialogService, DialogService>();
         services.AddScoped<IFileService, FileService>();
         services.AddScoped<IImportExportService, ImportExportService>();

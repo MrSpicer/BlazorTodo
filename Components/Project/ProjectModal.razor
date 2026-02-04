@@ -1,0 +1,148 @@
+@using TodoList.Models
+@using Microsoft.AspNetCore.Components.Forms
+
+@if (IsVisible)
+{
+    <div class="modal fade show d-block" tabindex="-1" style="background-color: rgba(0,0,0,0.5);">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">@(IsEditing ? "✏️ Edit Project" : "📁 Create New Project")</h5>
+                    <button type="button" class="btn-close" @onclick="Close" aria-label="Close"></button>
+                </div>
+                <EditForm Model="@_project" OnValidSubmit="HandleValidSubmit">
+                    <DataAnnotationsValidator />
+                    <div class="modal-body">
+                        <div class="mb-3">
+                            <label for="projectName" class="form-label">📌 Project Name</label>
+                            <InputText id="projectName" class="form-control" @bind-Value="_project.Name"
+                                       placeholder="Enter project name" />
+                            <ValidationMessage For="@(() => _project.Name)" class="text-danger" />
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="projectDescription" class="form-label">📝 Description (optional)</label>
+                            <InputTextArea id="projectDescription" class="form-control" rows="2"
+                                           @bind-Value="_project.Description"
+                                           placeholder="Enter project description" />
+                            <ValidationMessage For="@(() => _project.Description)" class="text-danger" />
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="projectColor" class="form-label">🎨 Color</label>
+                            <div class="d-flex gap-2 align-items-center">
+                                <input type="color" id="projectColor" class="form-control form-control-color"
+                                       @bind="_project.Color" title="Choose project color" />
+                                <div class="color-presets d-flex gap-1">
+                                    @foreach (var color in _presetColors)
+                                    {
+                                        <button type="button" 
+                                                class="color-preset-btn @(_project.Color == color ? "selected" : "")"
+                                                style="background-color: @color;"
+                                                @onclick="() => _project.Color = color"
+                                                title="@color"></button>
+                                    }
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" @onclick="Close">Cancel</button>
+                        <button type="submit" class="btn btn-primary">
+                            @(IsEditing ? "💾 Update" : "➕ Create") Project
+                        </button>
+                    </div>
+                </EditForm>
+            </div>
+        </div>
+    </div>
+}
+
+<style>
+    .color-preset-btn {
+        width: 28px;
+        height: 28px;
+        border-radius: 4px;
+        border: 2px solid transparent;
+        cursor: pointer;
+        transition: all 0.2s ease;
+    }
+    
+    .color-preset-btn:hover {
+        transform: scale(1.1);
+    }
+    
+    .color-preset-btn.selected {
+        border-color: #212529;
+        box-shadow: 0 0 0 2px rgba(0,0,0,0.2);
+    }
+</style>
+
+@code {
+    [Parameter]
+    public bool IsVisible { get; set; }
+
+    [Parameter]
+    public bool IsEditing { get; set; }
+
+    [Parameter]
+    public Project? EditingProject { get; set; }
+
+    [Parameter]
+    public EventCallback OnClose { get; set; }
+
+    [Parameter]
+    public EventCallback<Project> OnSave { get; set; }
+
+    private Project _project = new();
+
+    private readonly string[] _presetColors = new[]
+    {
+        "#0d6efd", // Blue
+        "#198754", // Green
+        "#dc3545", // Red
+        "#ffc107", // Yellow
+        "#6f42c1", // Purple
+        "#fd7e14", // Orange
+        "#20c997", // Teal
+        "#e91e63", // Pink
+        "#6c757d"  // Gray
+    };
+
+    protected override void OnParametersSet()
+    {
+        if (IsVisible)
+        {
+            if (IsEditing && EditingProject != null)
+            {
+                _project = new Project
+                {
+                    Id = EditingProject.Id,
+                    Name = EditingProject.Name,
+                    Description = EditingProject.Description,
+                    Color = EditingProject.Color,
+                    CreatedAt = EditingProject.CreatedAt,
+                    IsDefault = EditingProject.IsDefault
+                };
+            }
+            else
+            {
+                _project = new Project
+                {
+                    Color = _presetColors[Random.Shared.Next(_presetColors.Length)]
+                };
+            }
+        }
+    }
+
+    private async Task HandleValidSubmit()
+    {
+        await OnSave.InvokeAsync(_project);
+        await Close();
+    }
+
+    private async Task Close()
+    {
+        await OnClose.InvokeAsync();
+    }
+}
