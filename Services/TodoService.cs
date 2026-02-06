@@ -96,30 +96,70 @@ public class TodoService : ITodoService
         NotifyStateChanged();
     }
 
-    public IEnumerable<TodoItem> GetFilteredAndSorted(FilterOption filter, SortOption sort, Guid? projectId = null)
-    {
-        var filtered = _todos.AsEnumerable();
+	public IEnumerable<TodoItem> GetFilteredAndSorted(FilterOption filter, SortOption sort, Guid? projectId = null)
+	{
+		var filtered = _todos.AsEnumerable();
 
-        // Filter by project if specified
-        if (projectId.HasValue)
-        {
-            filtered = filtered.Where(t => t.ProjectId == projectId.Value);
-        }
+		// Filter by project if specified
+		if (projectId.HasValue)
+		{
+			filtered = filtered.Where(t => t.ProjectId == projectId.Value);
+		}
 
-        filtered = filter switch
-        {
-            FilterOption.Active => filtered.Where(t => !t.IsDone),
-            FilterOption.Completed => filtered.Where(t => t.IsDone),
-            _ => filtered
-        };
+		filtered = filter switch
+		{
+			FilterOption.Active => filtered.Where(t => !t.IsDone),
+			FilterOption.Completed => filtered.Where(t => t.IsDone),
+			_ => filtered
+		};
 
-        return sort switch
-        {
-            SortOption.Priority => filtered.OrderByDescending(t => t.Priority),
-            SortOption.Status => filtered.OrderBy(t => t.Status),
-            _ => filtered.OrderByDescending(t => t.CreatedAt)
-        };
-    }
+		return sort switch
+		{
+			SortOption.Priority => filtered.OrderByDescending(t => t.Priority),
+			SortOption.Status => filtered.OrderBy(t => t.Status),
+			_ => filtered.OrderByDescending(t => t.CreatedAt)
+		};
+	}
+
+	public IEnumerable<TodoItem> GetFilteredAndSorted(TodoFilterCriteria criteria, Guid? projectId = null)
+	{
+		var filtered = _todos.AsEnumerable();
+
+		// Filter by project if specified
+		if (projectId.HasValue)
+		{
+			filtered = filtered.Where(t => t.ProjectId == projectId.Value);
+		}
+
+		// Text search - case insensitive search in title and description
+		if (!string.IsNullOrWhiteSpace(criteria.SearchText))
+		{
+			var searchLower = criteria.SearchText.ToLowerInvariant();
+			filtered = filtered.Where(t =>
+				t.Title.ToLowerInvariant().Contains(searchLower) ||
+				t.Description.ToLowerInvariant().Contains(searchLower));
+		}
+
+		// Filter by selected priorities
+		if (criteria.SelectedPriorities.Any())
+		{
+			filtered = filtered.Where(t => criteria.SelectedPriorities.Contains(t.Priority));
+		}
+
+		// Filter by selected statuses
+		if (criteria.SelectedStatuses.Any())
+		{
+			filtered = filtered.Where(t => criteria.SelectedStatuses.Contains(t.Status));
+		}
+
+		// Sort
+		return criteria.Sort switch
+		{
+			SortOption.Priority => filtered.OrderByDescending(t => t.Priority),
+			SortOption.Status => filtered.OrderBy(t => t.Status),
+			_ => filtered.OrderByDescending(t => t.CreatedAt)
+		};
+	}
 
     public int GetActiveCount(Guid? projectId = null)
     {

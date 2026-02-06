@@ -1,0 +1,185 @@
+@using TodoList.Models
+
+@if (IsVisible)
+{
+    <div class="modal-overlay" @onclick="Close">
+        <div class="modal-container" @onclick:stopPropagation="true">
+            <div class="modal-header">
+                <h2 class="modal-title">
+                    @if (IsEditing)
+                    {
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+                            <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+                        </svg>
+                        <span>Edit Task</span>
+                    }
+                    else
+                    {
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <rect x="3" y="3" width="18" height="18" rx="2"/>
+                            <path d="M12 8v8M8 12h8"/>
+                        </svg>
+                        <span>New Task</span>
+                    }
+                </h2>
+                <button class="modal-close" @onclick="Close" aria-label="Close">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M18 6L6 18M6 6l12 12"/>
+                    </svg>
+                </button>
+            </div>
+            <div class="modal-body">
+                <TodoForm Todo="@_todo"
+                          IsEditing="@IsEditing"
+                          ShowCard="false"
+                          OnSubmit="HandleSubmit"
+                          OnCancel="Close" />
+            </div>
+        </div>
+    </div>
+}
+
+<style>
+    .modal-overlay {
+        position: fixed;
+        inset: 0;
+        background: rgba(15, 23, 42, 0.6);
+        backdrop-filter: blur(4px);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 1000;
+        padding: var(--space-4);
+        animation: fadeIn var(--transition-fast) ease-out;
+    }
+    
+    .modal-container {
+        background: var(--surface);
+        border-radius: var(--radius-xl);
+        box-shadow: var(--shadow-xl);
+        width: 100%;
+        max-width: 500px;
+        max-height: 90vh;
+        overflow: hidden;
+        animation: scaleIn var(--transition-base) ease-out;
+    }
+    
+    @@keyframes fadeIn {
+        from { opacity: 0; }
+        to { opacity: 1; }
+    }
+    
+    @@keyframes scaleIn {
+        from { opacity: 0; transform: scale(0.95) translateY(10px); }
+        to { opacity: 1; transform: scale(1) translateY(0); }
+    }
+    
+    .modal-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: var(--space-5) var(--space-6);
+        border-bottom: 1px solid var(--border-light);
+    }
+    
+    .modal-title {
+        display: flex;
+        align-items: center;
+        gap: var(--space-3);
+        font-size: 1.125rem;
+        font-weight: 600;
+        color: var(--text-primary);
+        margin: 0;
+    }
+    
+    .modal-title svg {
+        color: var(--primary);
+    }
+    
+    .modal-close {
+        width: 36px;
+        height: 36px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: transparent;
+        border: none;
+        border-radius: var(--radius-md);
+        color: var(--text-muted);
+        cursor: pointer;
+        transition: all var(--transition-fast);
+    }
+    
+    .modal-close:hover {
+        background: var(--gray-100);
+        color: var(--text-primary);
+    }
+    
+    .modal-body {
+        padding: var(--space-6);
+        overflow-y: auto;
+        max-height: calc(90vh - 80px);
+    }
+</style>
+
+@code {
+    [Parameter]
+    public bool IsVisible { get; set; }
+
+    [Parameter]
+    public bool IsEditing { get; set; }
+
+    [Parameter]
+    public TodoItem? EditingTodo { get; set; }
+
+    [Parameter]
+    public Guid? DefaultProjectId { get; set; }
+
+    [Parameter]
+    public EventCallback OnClose { get; set; }
+
+    [Parameter]
+    public EventCallback<TodoItem> OnSubmit { get; set; }
+
+    private TodoItem _todo = new();
+
+    protected override void OnParametersSet()
+    {
+        if (IsVisible)
+        {
+            if (IsEditing && EditingTodo != null)
+            {
+                _todo = new TodoItem
+                {
+                    Id = EditingTodo.Id,
+                    Title = EditingTodo.Title,
+                    Description = EditingTodo.Description,
+                    Priority = EditingTodo.Priority,
+                    Status = EditingTodo.Status,
+                    CreatedAt = EditingTodo.CreatedAt,
+                    ProjectId = EditingTodo.ProjectId
+                };
+            }
+            else
+            {
+                _todo = new TodoItem();
+                if (DefaultProjectId.HasValue)
+                {
+                    _todo.ProjectId = DefaultProjectId.Value;
+                }
+            }
+        }
+    }
+
+    private async Task HandleSubmit(TodoItem todo)
+    {
+        await OnSubmit.InvokeAsync(todo);
+        await Close();
+    }
+
+    private async Task Close()
+    {
+        await OnClose.InvokeAsync();
+    }
+}

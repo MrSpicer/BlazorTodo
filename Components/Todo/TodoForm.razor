@@ -2,51 +2,21 @@
 @using TodoList.Models.Enums
 @using Microsoft.AspNetCore.Components.Forms
 
-<div class="card mb-4">
-    <div class="card-header">
-        <h5 class="mb-0">@(IsEditing ? "✏️ Edit Todo" : "➕ Add New Todo")</h5>
+@if (ShowCard)
+{
+    <div class="form-card">
+        <div class="form-card-header">
+            <h5>@(IsEditing ? "Edit Task" : "Add New Task")</h5>
+        </div>
+        <div class="form-card-body">
+            @FormContent
+        </div>
     </div>
-    <div class="card-body">
-        <EditForm Model="@Todo" OnValidSubmit="HandleValidSubmit">
-            <DataAnnotationsValidator />
-
-            <div class="row">
-                <div class="col-md-6 mb-3">
-                    <label for="TodoTitle" class="form-label">📌 Title</label>
-                    <InputText id="TodoTitle" class="form-control" @bind-Value="Todo.Title"
-                               placeholder="Enter title" />
-                    <ValidationMessage For="@(() => Todo.Title)" class="text-danger" />
-                </div>
-
-                <div class="col-md-6 mb-3">
-                    <label for="TodoPriority" class="form-label">🎯 Priority</label>
-                    <InputSelect id="TodoPriority" class="form-select" @bind-Value="Todo.Priority">
-                        @foreach (var priority in Enum.GetValues<Priority>())
-                        {
-                            <option value="@priority">@priority</option>
-                        }
-                    </InputSelect>
-                </div>
-            </div>
-
-            <div class="mb-3">
-                <label for="TodoDescription" class="form-label">📝 Description</label>
-                <InputTextArea id="TodoDescription" class="form-control" rows="2"
-                               @bind-Value="Todo.Description" placeholder="Enter description" />
-                <ValidationMessage For="@(() => Todo.Description)" class="text-danger" />
-            </div>
-
-            <div class="d-flex gap-2">
-                <button type="submit" class="btn btn-primary">
-                    @(IsEditing ? "💾 Update" : "➕ Add") Todo
-                </button>
-                <button type="button" class="btn btn-outline-secondary" @onclick="HandleCancel">
-                    ❌ Cancel
-                </button>
-            </div>
-        </EditForm>
-    </div>
-</div>
+}
+else
+{
+    @FormContent
+}
 
 @code {
     [Parameter, EditorRequired]
@@ -56,10 +26,214 @@
     public bool IsEditing { get; set; }
 
     [Parameter]
+    public bool ShowCard { get; set; } = true;
+
+    [Parameter]
     public EventCallback<TodoItem> OnSubmit { get; set; }
 
     [Parameter]
     public EventCallback OnCancel { get; set; }
+
+    private RenderFragment FormContent => __builder =>
+    {
+        <EditForm Model="@Todo" OnValidSubmit="HandleValidSubmit" class="task-form">
+            <DataAnnotationsValidator />
+
+            <div class="form-group">
+                <label for="TodoTitle" class="form-label">Title</label>
+                <InputText id="TodoTitle" class="form-input" @bind-Value="Todo.Title"
+                           placeholder="What needs to be done?" />
+                <ValidationMessage For="@(() => Todo.Title)" class="validation-error" />
+            </div>
+
+            <div class="form-group">
+                <label for="TodoDescription" class="form-label">Description</label>
+                <InputTextArea id="TodoDescription" class="form-input form-textarea" rows="3"
+                               @bind-Value="Todo.Description" placeholder="Add some details..." />
+                <ValidationMessage For="@(() => Todo.Description)" class="validation-error" />
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">Priority</label>
+                <div class="priority-options">
+                    @foreach (var priority in Enum.GetValues<Priority>())
+                    {
+                        <label class="priority-option @(Todo.Priority == priority ? "selected" : "") priority-@priority.ToString().ToLower()">
+                            <input type="radio" name="priority" value="@priority" 
+                                   checked="@(Todo.Priority == priority)"
+                                   @onchange="() => Todo.Priority = priority" />
+                            <span class="priority-dot"></span>
+                            <span class="priority-label">@priority</span>
+                        </label>
+                    }
+                </div>
+            </div>
+
+            <div class="form-actions">
+                <button type="button" class="btn btn-ghost" @onclick="HandleCancel">
+                    Cancel
+                </button>
+                <button type="submit" class="btn btn-primary">
+                    @if (IsEditing)
+                    {
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/>
+                            <polyline points="17 21 17 13 7 13 7 21"/>
+                            <polyline points="7 3 7 8 15 8"/>
+                        </svg>
+                        <span>Save Changes</span>
+                    }
+                    else
+                    {
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M12 5v14M5 12h14"/>
+                        </svg>
+                        <span>Add Task</span>
+                    }
+                </button>
+            </div>
+        </EditForm>
+
+        <style>
+            .task-form {
+                display: flex;
+                flex-direction: column;
+                gap: var(--space-5);
+            }
+            
+            .form-group {
+                display: flex;
+                flex-direction: column;
+                gap: var(--space-2);
+            }
+            
+            .form-label {
+                font-size: 0.875rem;
+                font-weight: 600;
+                color: var(--text-primary);
+            }
+            
+            .form-input {
+                padding: var(--space-3) var(--space-4);
+                border: 1.5px solid var(--border);
+                border-radius: var(--radius-lg);
+                font-size: 0.9375rem;
+                transition: all var(--transition-fast);
+                background: var(--surface);
+                width: 100%;
+            }
+            
+            .form-input:focus {
+                outline: none;
+                border-color: var(--primary);
+                box-shadow: 0 0 0 3px var(--primary-light);
+            }
+            
+            .form-input::placeholder {
+                color: var(--text-muted);
+            }
+            
+            .form-textarea {
+                resize: vertical;
+                min-height: 80px;
+            }
+            
+            .validation-error {
+                font-size: 0.8125rem;
+                color: var(--danger);
+            }
+            
+            .priority-options {
+                display: flex;
+                gap: var(--space-2);
+                flex-wrap: wrap;
+            }
+            
+            .priority-option {
+                display: flex;
+                align-items: center;
+                gap: var(--space-2);
+                padding: var(--space-2) var(--space-3);
+                border: 1.5px solid var(--border);
+                border-radius: var(--radius-lg);
+                cursor: pointer;
+                transition: all var(--transition-fast);
+                font-size: 0.875rem;
+                font-weight: 500;
+            }
+            
+            .priority-option input {
+                display: none;
+            }
+            
+            .priority-option:hover {
+                border-color: var(--gray-300);
+                background: var(--surface-hover);
+            }
+            
+            .priority-dot {
+                width: 10px;
+                height: 10px;
+                border-radius: var(--radius-full);
+            }
+            
+            .priority-low .priority-dot { background: var(--priority-low); }
+            .priority-medium .priority-dot { background: var(--priority-medium); }
+            .priority-high .priority-dot { background: var(--priority-high); }
+            .priority-emergency .priority-dot { background: var(--priority-emergency); }
+            
+            .priority-option.selected.priority-low { 
+                background: var(--success-light); 
+                border-color: var(--priority-low); 
+                color: #065f46;
+            }
+            .priority-option.selected.priority-medium { 
+                background: var(--warning-light); 
+                border-color: var(--priority-medium); 
+                color: #92400e;
+            }
+            .priority-option.selected.priority-high { 
+                background: #ffedd5; 
+                border-color: var(--priority-high); 
+                color: #c2410c;
+            }
+            .priority-option.selected.priority-emergency { 
+                background: var(--danger-light); 
+                border-color: var(--priority-emergency); 
+                color: #991b1b;
+            }
+            
+            .form-actions {
+                display: flex;
+                justify-content: flex-end;
+                gap: var(--space-3);
+                padding-top: var(--space-4);
+                border-top: 1px solid var(--border-light);
+            }
+            
+            .form-card {
+                background: var(--surface);
+                border: 1px solid var(--border-light);
+                border-radius: var(--radius-xl);
+                overflow: hidden;
+                box-shadow: var(--shadow-sm);
+            }
+            
+            .form-card-header {
+                padding: var(--space-4) var(--space-5);
+                border-bottom: 1px solid var(--border-light);
+            }
+            
+            .form-card-header h5 {
+                margin: 0;
+                font-weight: 600;
+            }
+            
+            .form-card-body {
+                padding: var(--space-5);
+            }
+        </style>
+    };
 
     private async Task HandleValidSubmit()
     {

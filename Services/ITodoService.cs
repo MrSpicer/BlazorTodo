@@ -48,14 +48,22 @@ public interface ITodoService
     /// </summary>
     Task ClearAllAsync();
 
-    /// <summary>
-    /// Gets todos filtered and sorted by the specified options.
-    /// </summary>
-    /// <param name="filter">The filter option.</param>
-    /// <param name="sort">The sort option.</param>
-    /// <param name="projectId">Optional project ID to filter by.</param>
-    /// <returns>Filtered and sorted todos.</returns>
-    IEnumerable<TodoItem> GetFilteredAndSorted(FilterOption filter, SortOption sort, Guid? projectId = null);
+	/// <summary>
+	/// Gets todos filtered and sorted by the specified options (legacy method).
+	/// </summary>
+	/// <param name="filter">The filter option.</param>
+	/// <param name="sort">The sort option.</param>
+	/// <param name="projectId">Optional project ID to filter by.</param>
+	/// <returns>Filtered and sorted todos.</returns>
+	IEnumerable<TodoItem> GetFilteredAndSorted(FilterOption filter, SortOption sort, Guid? projectId = null);
+
+	/// <summary>
+	/// Gets todos filtered and sorted by comprehensive filter criteria.
+	/// </summary>
+	/// <param name="criteria">The filter criteria.</param>
+	/// <param name="projectId">Optional project ID to filter by.</param>
+	/// <returns>Filtered and sorted todos.</returns>
+	IEnumerable<TodoItem> GetFilteredAndSorted(TodoFilterCriteria criteria, Guid? projectId = null);
 
     /// <summary>
     /// Gets the count of active (not done) todos.

@@ -1,54 +1,428 @@
+@using TodoList.Models
 @using TodoList.Models.Enums
 
-<div class="card mb-4">
-    <div class="card-body">
-        <div class="row align-items-end">
-            <div class="col-md-4 mb-2 mb-md-0">
-                <label for="FilterStatus" class="form-label">🔍 Filter by Status</label>
-                <select class="form-select" id="FilterStatus" value="@Filter"
-                        @onchange="OnFilterChanged">
-                    <option value="@FilterOption.All">📋 All (@TotalCount)</option>
-                    <option value="@FilterOption.Active">⏳ Active (@ActiveCount)</option>
-                    <option value="@FilterOption.Completed">✅ Completed (@CompletedCount)</option>
-                </select>
-            </div>
-            <div class="col-md-4 mb-2 mb-md-0">
-                <label for="SortBy" class="form-label">📊 Sort by</label>
-                <select class="form-select" id="SortBy" value="@Sort"
-                        @onchange="OnSortChanged">
-                    <option value="@SortOption.CreatedDate">📅 Created Date</option>
-                    <option value="@SortOption.Priority">🎯 Priority</option>
-                    <option value="@SortOption.Status">📌 Status</option>
-                </select>
-            </div>
-            <div class="col-md-4">
-                <div class="text-muted">
-                    👁️ Showing <strong>@FilteredCount</strong> of <strong>@TotalCount</strong> items
+<div class="filters-panel @(_isExpanded ? "expanded" : "collapsed")">
+    <button class="filters-toggle" @onclick="ToggleExpanded">
+        <div class="toggle-left">
+            <svg class="toggle-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M3 4h18M3 12h18M3 20h18"/>
+            </svg>
+            <span class="toggle-label">Filters</span>
+            @if (FilterCriteria.HasActiveFilters)
+            {
+                <span class="active-filters-badge">@GetActiveFilterCount()</span>
+            }
+        </div>
+        <div class="toggle-right">
+            <span class="items-count">@FilteredCount of @TotalCount items</span>
+            <svg class="chevron @(_isExpanded ? "rotated" : "")" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M6 9l6 6 6-6"/>
+            </svg>
+        </div>
+    </button>
+    
+    @if (_isExpanded)
+    {
+        <div class="filters-content">
+            <!-- Search -->
+            <div class="filter-section">
+                <div class="search-input-wrapper">
+                    <svg class="search-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="11" cy="11" r="8"/>
+                        <path d="M21 21l-4.35-4.35"/>
+                    </svg>
+                    <input type="text" 
+                           class="search-input" 
+                           placeholder="Search todos..."
+                           value="@FilterCriteria.SearchText"
+                           @oninput="OnSearchChanged" />
+                    @if (!string.IsNullOrEmpty(FilterCriteria.SearchText))
+                    {
+                        <button class="search-clear" @onclick="ClearSearch">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M18 6L6 18M6 6l12 12"/>
+                            </svg>
+                        </button>
+                    }
                 </div>
             </div>
+            
+            <!-- Filter Groups -->
+            <div class="filter-groups">
+                <!-- Priority -->
+                <div class="filter-group">
+                    <span class="filter-group-label">Priority</span>
+                    <div class="filter-chips">
+                        @foreach (Priority priority in Enum.GetValues(typeof(Priority)))
+                        {
+                            var isSelected = FilterCriteria.SelectedPriorities.Contains(priority);
+                            <button class="filter-chip priority-@priority.ToString().ToLower() @(isSelected ? "selected" : "")"
+                                    @onclick="() => OnPriorityToggle(priority)">
+                                <span class="chip-dot"></span>
+                                @priority
+                            </button>
+                        }
+                    </div>
+                </div>
+                
+                <!-- Status -->
+                <div class="filter-group">
+                    <span class="filter-group-label">Status</span>
+                    <div class="filter-chips">
+                        @foreach (TodoItemStatus status in Enum.GetValues(typeof(TodoItemStatus)))
+                        {
+                            var isSelected = FilterCriteria.SelectedStatuses.Contains(status);
+                            <button class="filter-chip status-@status.ToString().ToLower() @(isSelected ? "selected" : "")"
+                                    @onclick="() => OnStatusToggle(status)">
+                                @GetStatusLabel(status)
+                            </button>
+                        }
+                    </div>
+                </div>
+                
+                <!-- Sort -->
+                <div class="filter-group">
+                    <span class="filter-group-label">Sort by</span>
+                    <select class="sort-select" value="@FilterCriteria.Sort" @onchange="OnSortChanged">
+                        <option value="@SortOption.CreatedDate">Created Date</option>
+                        <option value="@SortOption.Priority">Priority</option>
+                        <option value="@SortOption.Status">Status</option>
+                    </select>
+                </div>
+            </div>
+            
+            @if (FilterCriteria.HasActiveFilters)
+            {
+                <button class="clear-all-btn" @onclick="OnClearFilters">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M18 6L6 18M6 6l12 12"/>
+                    </svg>
+                    Clear all filters
+                </button>
+            }
         </div>
-    </div>
+    }
 </div>
 
-@code {
-    [Parameter] public FilterOption Filter { get; set; }
-    [Parameter] public SortOption Sort { get; set; }
-    [Parameter] public int TotalCount { get; set; }
-    [Parameter] public int ActiveCount { get; set; }
-    [Parameter] public int CompletedCount { get; set; }
-    [Parameter] public int FilteredCount { get; set; }
-    [Parameter] public EventCallback<FilterOption> FilterChanged { get; set; }
-    [Parameter] public EventCallback<SortOption> SortChanged { get; set; }
+<style>
+    .filters-panel {
+        background: var(--surface);
+        border: 1px solid var(--border-light);
+        border-radius: var(--radius-xl);
+        margin-bottom: var(--space-5);
+        overflow: hidden;
+        box-shadow: var(--shadow-sm);
+    }
+    
+    .filters-toggle {
+        width: 100%;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: var(--space-4) var(--space-5);
+        background: transparent;
+        border: none;
+        cursor: pointer;
+        transition: background var(--transition-fast);
+    }
+    
+    .filters-toggle:hover {
+        background: var(--surface-hover);
+    }
+    
+    .toggle-left, .toggle-right {
+        display: flex;
+        align-items: center;
+        gap: var(--space-3);
+    }
+    
+    .toggle-icon {
+        color: var(--text-secondary);
+    }
+    
+    .toggle-label {
+        font-weight: 600;
+        font-size: 0.9375rem;
+        color: var(--text-primary);
+    }
+    
+    .active-filters-badge {
+        background: var(--primary);
+        color: var(--text-inverse);
+        font-size: 0.75rem;
+        font-weight: 600;
+        padding: 0.125rem 0.5rem;
+        border-radius: var(--radius-full);
+    }
+    
+    .items-count {
+        font-size: 0.8125rem;
+        color: var(--text-muted);
+    }
+    
+    .chevron {
+        color: var(--text-muted);
+        transition: transform var(--transition-fast);
+    }
+    
+    .chevron.rotated {
+        transform: rotate(180deg);
+    }
+    
+    .filters-content {
+        padding: 0 var(--space-5) var(--space-5);
+        animation: slideDown var(--transition-fast) ease-out;
+    }
+    
+    @@keyframes slideDown {
+        from { opacity: 0; transform: translateY(-10px); }
+        to { opacity: 1; transform: translateY(0); }
+    }
+    
+    .filter-section {
+        margin-bottom: var(--space-4);
+    }
+    
+    .search-input-wrapper {
+        position: relative;
+        display: flex;
+        align-items: center;
+    }
+    
+    .search-icon {
+        position: absolute;
+        left: var(--space-4);
+        color: var(--text-muted);
+        pointer-events: none;
+    }
+    
+    .search-input {
+        width: 100%;
+        padding: var(--space-3) var(--space-4) var(--space-3) 2.75rem;
+        border: 1.5px solid var(--border);
+        border-radius: var(--radius-lg);
+        font-size: 0.9375rem;
+        transition: all var(--transition-fast);
+        background: var(--gray-50);
+    }
+    
+    .search-input:focus {
+        outline: none;
+        border-color: var(--primary);
+        background: var(--surface);
+        box-shadow: 0 0 0 3px var(--primary-light);
+    }
+    
+    .search-input::placeholder {
+        color: var(--text-muted);
+    }
+    
+    .search-clear {
+        position: absolute;
+        right: var(--space-3);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 24px;
+        height: 24px;
+        background: var(--gray-200);
+        border: none;
+        border-radius: var(--radius-full);
+        color: var(--text-secondary);
+        cursor: pointer;
+        transition: all var(--transition-fast);
+    }
+    
+    .search-clear:hover {
+        background: var(--gray-300);
+        color: var(--text-primary);
+    }
+    
+    .filter-groups {
+        display: flex;
+        flex-wrap: wrap;
+        gap: var(--space-5);
+        margin-bottom: var(--space-4);
+    }
+    
+    .filter-group {
+        display: flex;
+        flex-direction: column;
+        gap: var(--space-2);
+    }
+    
+    .filter-group-label {
+        font-size: 0.75rem;
+        font-weight: 600;
+        color: var(--text-muted);
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+    }
+    
+    .filter-chips {
+        display: flex;
+        flex-wrap: wrap;
+        gap: var(--space-2);
+    }
+    
+    .filter-chip {
+        display: flex;
+        align-items: center;
+        gap: var(--space-1);
+        padding: var(--space-1) var(--space-3);
+        border: 1.5px solid var(--border);
+        border-radius: var(--radius-full);
+        background: var(--surface);
+        font-size: 0.8125rem;
+        font-weight: 500;
+        color: var(--text-secondary);
+        cursor: pointer;
+        transition: all var(--transition-fast);
+    }
+    
+    .filter-chip:hover {
+        border-color: var(--gray-300);
+        background: var(--surface-hover);
+    }
+    
+    .filter-chip.selected {
+        background: var(--primary-50);
+        border-color: var(--primary);
+        color: var(--primary);
+    }
+    
+    .chip-dot {
+        width: 8px;
+        height: 8px;
+        border-radius: var(--radius-full);
+    }
+    
+    .priority-low .chip-dot { background: var(--priority-low); }
+    .priority-medium .chip-dot { background: var(--priority-medium); }
+    .priority-high .chip-dot { background: var(--priority-high); }
+    .priority-emergency .chip-dot { background: var(--priority-emergency); }
+    
+    .priority-low.selected { background: var(--success-light); border-color: var(--priority-low); color: #065f46; }
+    .priority-medium.selected { background: var(--warning-light); border-color: var(--priority-medium); color: #92400e; }
+    .priority-high.selected { background: #ffedd5; border-color: var(--priority-high); color: #c2410c; }
+    .priority-emergency.selected { background: var(--danger-light); border-color: var(--priority-emergency); color: #991b1b; }
+    
+    .sort-select {
+        padding: var(--space-2) var(--space-3);
+        border: 1.5px solid var(--border);
+        border-radius: var(--radius-md);
+        font-size: 0.8125rem;
+        background: var(--surface);
+        color: var(--text-primary);
+        cursor: pointer;
+        min-width: 140px;
+    }
+    
+    .sort-select:focus {
+        outline: none;
+        border-color: var(--primary);
+        box-shadow: 0 0 0 3px var(--primary-light);
+    }
+    
+    .clear-all-btn {
+        display: inline-flex;
+        align-items: center;
+        gap: var(--space-2);
+        padding: var(--space-2) var(--space-3);
+        background: transparent;
+        border: none;
+        color: var(--danger);
+        font-size: 0.8125rem;
+        font-weight: 500;
+        cursor: pointer;
+        transition: all var(--transition-fast);
+        border-radius: var(--radius-md);
+    }
+    
+    .clear-all-btn:hover {
+        background: var(--danger-light);
+    }
+    
+    @@media (max-width: 640px) {
+        .filter-groups {
+            flex-direction: column;
+            gap: var(--space-4);
+        }
+        
+        .toggle-right .items-count {
+            display: none;
+        }
+    }
+</style>
 
-    private async Task OnFilterChanged(ChangeEventArgs e)
+@code {
+    [Parameter, EditorRequired]
+    public TodoFilterCriteria FilterCriteria { get; set; } = new();
+
+    [Parameter]
+    public int TotalCount { get; set; }
+
+    [Parameter]
+    public int FilteredCount { get; set; }
+
+    [Parameter]
+    public EventCallback FilterChanged { get; set; }
+    
+    private bool _isExpanded = false;
+    
+    private void ToggleExpanded() => _isExpanded = !_isExpanded;
+
+    private async Task OnSearchChanged(ChangeEventArgs e)
     {
-        if (Enum.TryParse<FilterOption>(e.Value?.ToString(), out var filter))
-            await FilterChanged.InvokeAsync(filter);
+        FilterCriteria.SearchText = e.Value?.ToString() ?? string.Empty;
+        await FilterChanged.InvokeAsync();
+    }
+    
+    private async Task ClearSearch()
+    {
+        FilterCriteria.SearchText = string.Empty;
+        await FilterChanged.InvokeAsync();
+    }
+
+    private async Task OnPriorityToggle(Priority priority)
+    {
+        FilterCriteria.TogglePriority(priority);
+        await FilterChanged.InvokeAsync();
+    }
+
+    private async Task OnStatusToggle(TodoItemStatus status)
+    {
+        FilterCriteria.ToggleStatus(status);
+        await FilterChanged.InvokeAsync();
     }
 
     private async Task OnSortChanged(ChangeEventArgs e)
     {
         if (Enum.TryParse<SortOption>(e.Value?.ToString(), out var sort))
-            await SortChanged.InvokeAsync(sort);
+        {
+            FilterCriteria.Sort = sort;
+            await FilterChanged.InvokeAsync();
+        }
+    }
+
+    private async Task OnClearFilters()
+    {
+        FilterCriteria.Clear();
+        await FilterChanged.InvokeAsync();
+    }
+
+    private string GetStatusLabel(TodoItemStatus status) => status switch
+    {
+        TodoItemStatus.InProgress => "In Progress",
+        _ => status.ToString()
+    };
+    
+    private int GetActiveFilterCount()
+    {
+        int count = 0;
+        if (!string.IsNullOrEmpty(FilterCriteria.SearchText)) count++;
+        count += FilterCriteria.SelectedPriorities.Count;
+        count += FilterCriteria.SelectedStatuses.Count;
+        return count;
     }
 }

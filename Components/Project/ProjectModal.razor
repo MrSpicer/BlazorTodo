@@ -3,78 +3,257 @@
 
 @if (IsVisible)
 {
-    <div class="modal fade show d-block" tabindex="-1" style="background-color: rgba(0,0,0,0.5);">
-        <div class="modal-dialog modal-dialog-centered">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title">@(IsEditing ? "✏️ Edit Project" : "📁 Create New Project")</h5>
-                    <button type="button" class="btn-close" @onclick="Close" aria-label="Close"></button>
-                </div>
-                <EditForm Model="@_project" OnValidSubmit="HandleValidSubmit">
-                    <DataAnnotationsValidator />
-                    <div class="modal-body">
-                        <div class="mb-3">
-                            <label for="projectName" class="form-label">📌 Project Name</label>
-                            <InputText id="projectName" class="form-control" @bind-Value="_project.Name"
-                                       placeholder="Enter project name" />
-                            <ValidationMessage For="@(() => _project.Name)" class="text-danger" />
-                        </div>
-
-                        <div class="mb-3">
-                            <label for="projectDescription" class="form-label">📝 Description (optional)</label>
-                            <InputTextArea id="projectDescription" class="form-control" rows="2"
-                                           @bind-Value="_project.Description"
-                                           placeholder="Enter project description" />
-                            <ValidationMessage For="@(() => _project.Description)" class="text-danger" />
-                        </div>
-
-                        <div class="mb-3">
-                            <label for="projectColor" class="form-label">🎨 Color</label>
-                            <div class="d-flex gap-2 align-items-center">
-                                <input type="color" id="projectColor" class="form-control form-control-color"
-                                       @bind="_project.Color" title="Choose project color" />
-                                <div class="color-presets d-flex gap-1">
-                                    @foreach (var color in _presetColors)
-                                    {
-                                        <button type="button" 
-                                                class="color-preset-btn @(_project.Color == color ? "selected" : "")"
-                                                style="background-color: @color;"
-                                                @onclick="() => _project.Color = color"
-                                                title="@color"></button>
-                                    }
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="modal-footer">
-                        <button type="button" class="btn btn-secondary" @onclick="Close">Cancel</button>
-                        <button type="submit" class="btn btn-primary">
-                            @(IsEditing ? "💾 Update" : "➕ Create") Project
-                        </button>
-                    </div>
-                </EditForm>
+    <div class="modal-overlay" @onclick="Close">
+        <div class="modal-container" @onclick:stopPropagation="true">
+            <div class="modal-header">
+                <h2 class="modal-title">
+                    @if (IsEditing)
+                    {
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+                            <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+                        </svg>
+                        <span>Edit Project</span>
+                    }
+                    else
+                    {
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
+                        </svg>
+                        <span>New Project</span>
+                    }
+                </h2>
+                <button class="modal-close" @onclick="Close" aria-label="Close">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M18 6L6 18M6 6l12 12"/>
+                    </svg>
+                </button>
             </div>
+            <EditForm Model="@_project" OnValidSubmit="HandleValidSubmit">
+                <DataAnnotationsValidator />
+                <div class="modal-body">
+                    <div class="form-group">
+                        <label for="projectName" class="form-label">Project Name</label>
+                        <InputText id="projectName" class="form-input" @bind-Value="_project.Name"
+                                   placeholder="e.g., Work, Personal, Side Project..." />
+                        <ValidationMessage For="@(() => _project.Name)" class="validation-error" />
+                    </div>
+
+                    <div class="form-group">
+                        <label for="projectDescription" class="form-label">Description <span class="optional">(optional)</span></label>
+                        <InputTextArea id="projectDescription" class="form-input form-textarea" rows="2"
+                                       @bind-Value="_project.Description"
+                                       placeholder="What is this project about?" />
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label">Project Color</label>
+                        <div class="color-picker">
+                            @foreach (var color in _presetColors)
+                            {
+                                <button type="button" 
+                                        class="color-option @(_project.Color == color ? "selected" : "")"
+                                        style="background-color: @color;"
+                                        @onclick="() => _project.Color = color"
+                                        title="Select color">
+                                    @if (_project.Color == color)
+                                    {
+                                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="3">
+                                            <path d="M5 12l5 5L20 7"/>
+                                        </svg>
+                                    }
+                                </button>
+                            }
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-ghost" @onclick="Close">Cancel</button>
+                    <button type="submit" class="btn btn-primary">
+                        @if (IsEditing)
+                        {
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/>
+                            </svg>
+                            <span>Save Changes</span>
+                        }
+                        else
+                        {
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M12 5v14M5 12h14"/>
+                            </svg>
+                            <span>Create Project</span>
+                        }
+                    </button>
+                </div>
+            </EditForm>
         </div>
     </div>
 }
 
 <style>
-    .color-preset-btn {
-        width: 28px;
-        height: 28px;
-        border-radius: 4px;
-        border: 2px solid transparent;
+    .modal-overlay {
+        position: fixed;
+        inset: 0;
+        background: rgba(15, 23, 42, 0.6);
+        backdrop-filter: blur(4px);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 1000;
+        padding: var(--space-4);
+        animation: fadeIn var(--transition-fast) ease-out;
+    }
+    
+    .modal-container {
+        background: var(--surface);
+        border-radius: var(--radius-xl);
+        box-shadow: var(--shadow-xl);
+        width: 100%;
+        max-width: 440px;
+        animation: scaleIn var(--transition-base) ease-out;
+    }
+    
+    @@keyframes fadeIn {
+        from { opacity: 0; }
+        to { opacity: 1; }
+    }
+    
+    @@keyframes scaleIn {
+        from { opacity: 0; transform: scale(0.95) translateY(10px); }
+        to { opacity: 1; transform: scale(1) translateY(0); }
+    }
+    
+    .modal-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: var(--space-5) var(--space-6);
+        border-bottom: 1px solid var(--border-light);
+    }
+    
+    .modal-title {
+        display: flex;
+        align-items: center;
+        gap: var(--space-3);
+        font-size: 1.125rem;
+        font-weight: 600;
+        color: var(--text-primary);
+        margin: 0;
+    }
+    
+    .modal-title svg {
+        color: var(--primary);
+    }
+    
+    .modal-close {
+        width: 36px;
+        height: 36px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: transparent;
+        border: none;
+        border-radius: var(--radius-md);
+        color: var(--text-muted);
         cursor: pointer;
-        transition: all 0.2s ease;
+        transition: all var(--transition-fast);
     }
     
-    .color-preset-btn:hover {
+    .modal-close:hover {
+        background: var(--gray-100);
+        color: var(--text-primary);
+    }
+    
+    .modal-body {
+        padding: var(--space-6);
+        display: flex;
+        flex-direction: column;
+        gap: var(--space-5);
+    }
+    
+    .modal-footer {
+        display: flex;
+        justify-content: flex-end;
+        gap: var(--space-3);
+        padding: var(--space-4) var(--space-6);
+        border-top: 1px solid var(--border-light);
+        background: var(--gray-50);
+    }
+    
+    .form-group {
+        display: flex;
+        flex-direction: column;
+        gap: var(--space-2);
+    }
+    
+    .form-label {
+        font-size: 0.875rem;
+        font-weight: 600;
+        color: var(--text-primary);
+    }
+    
+    .optional {
+        font-weight: 400;
+        color: var(--text-muted);
+    }
+    
+    .form-input {
+        padding: var(--space-3) var(--space-4);
+        border: 1.5px solid var(--border);
+        border-radius: var(--radius-lg);
+        font-size: 0.9375rem;
+        transition: all var(--transition-fast);
+        background: var(--surface);
+        width: 100%;
+    }
+    
+    .form-input:focus {
+        outline: none;
+        border-color: var(--primary);
+        box-shadow: 0 0 0 3px var(--primary-light);
+    }
+    
+    .form-input::placeholder {
+        color: var(--text-muted);
+    }
+    
+    .form-textarea {
+        resize: vertical;
+        min-height: 60px;
+    }
+    
+    .validation-error {
+        font-size: 0.8125rem;
+        color: var(--danger);
+    }
+    
+    .color-picker {
+        display: flex;
+        flex-wrap: wrap;
+        gap: var(--space-2);
+    }
+    
+    .color-option {
+        width: 36px;
+        height: 36px;
+        border-radius: var(--radius-lg);
+        border: 3px solid transparent;
+        cursor: pointer;
+        transition: all var(--transition-fast);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+    
+    .color-option:hover {
         transform: scale(1.1);
+        box-shadow: var(--shadow-md);
     }
     
-    .color-preset-btn.selected {
-        border-color: #212529;
-        box-shadow: 0 0 0 2px rgba(0,0,0,0.2);
+    .color-option.selected {
+        border-color: var(--text-primary);
+        transform: scale(1.05);
     }
 </style>
 
@@ -98,15 +277,15 @@
 
     private readonly string[] _presetColors = new[]
     {
-        "#0d6efd", // Blue
-        "#198754", // Green
-        "#dc3545", // Red
-        "#ffc107", // Yellow
-        "#6f42c1", // Purple
-        "#fd7e14", // Orange
-        "#20c997", // Teal
-        "#e91e63", // Pink
-        "#6c757d"  // Gray
+        "#6366f1", // Indigo
+        "#3b82f6", // Blue
+        "#10b981", // Green
+        "#f59e0b", // Amber
+        "#ef4444", // Red
+        "#8b5cf6", // Purple
+        "#ec4899", // Pink
+        "#14b8a6", // Teal
+        "#64748b"  // Slate
     };
 
     protected override void OnParametersSet()
