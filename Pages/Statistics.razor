@@ -1,0 +1,312 @@
+@page "/statistics"
+@implements IDisposable
+@inject ITodoService TodoService
+@inject IProjectService ProjectService
+
+<PageTitle>TaskFlow - Statistics</PageTitle>
+
+@if (!_initialized)
+{
+    <p>Loading...</p>
+}
+else if (!ProjectService.Projects.Any())
+{
+    <div class="empty-state">
+        <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+            <path d="M18 20V10M12 20V4M6 20v-6"/>
+        </svg>
+        <h2>No Projects Yet</h2>
+        <p>Create a project and add some todos to see statistics here.</p>
+        <a class="btn btn-primary" href="/">Go to Todos</a>
+    </div>
+}
+else
+{
+    <h1 class="page-title">Statistics</h1>
+
+    <!-- Summary Cards -->
+    <div class="stats-dashboard">
+        <div class="stat-card">
+            <div class="stat-icon total">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M2 20h20M4 20V10l8-6 8 6v10"/>
+                </svg>
+            </div>
+            <div class="stat-info">
+                <span class="stat-value">@ProjectService.Projects.Count</span>
+                <span class="stat-label">Total Projects</span>
+            </div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-icon completed">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M22 11.08V12a10 10 0 11-5.93-9.14"/>
+                    <path d="M22 4L12 14.01l-3-3"/>
+                </svg>
+            </div>
+            <div class="stat-info">
+                <span class="stat-value">@GetAverageCompleted()</span>
+                <span class="stat-label">Avg Completed / Project</span>
+            </div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-icon pending">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <circle cx="12" cy="12" r="10"/>
+                    <path d="M12 6v6l4 2"/>
+                </svg>
+            </div>
+            <div class="stat-info">
+                <span class="stat-value">@GetAverageUncompleted()</span>
+                <span class="stat-label">Avg Uncompleted / Project</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Per-Project Breakdown -->
+    <div class="breakdown-section">
+        <h2 class="section-title">Per-Project Breakdown</h2>
+        <div class="breakdown-table">
+            <div class="breakdown-header">
+                <span class="col-project">Project</span>
+                <span class="col-num">Completed</span>
+                <span class="col-num">Uncompleted</span>
+                <span class="col-num">Total</span>
+            </div>
+            @foreach (var project in ProjectService.Projects)
+            {
+                var todos = TodoService.Todos.Where(t => t.ProjectId == project.Id).ToList();
+                var completed = todos.Count(t => t.IsDone);
+                var uncompleted = todos.Count(t => !t.IsDone);
+                <div class="breakdown-row">
+                    <span class="col-project">
+                        <span class="color-dot" style="background-color: @project.Color;"></span>
+                        @project.Name
+                    </span>
+                    <span class="col-num">@completed</span>
+                    <span class="col-num">@uncompleted</span>
+                    <span class="col-num">@todos.Count</span>
+                </div>
+            }
+        </div>
+    </div>
+}
+
+<style>
+    .page-title {
+        font-size: 1.5rem;
+        font-weight: 700;
+        color: var(--text-primary);
+        margin: 0 0 var(--space-5);
+    }
+
+    .empty-state {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        min-height: 50vh;
+        text-align: center;
+        color: var(--text-secondary);
+        gap: var(--space-3);
+    }
+
+    .empty-state h2 {
+        font-size: 1.25rem;
+        font-weight: 600;
+        color: var(--text-primary);
+        margin: 0;
+    }
+
+    .empty-state p {
+        margin: 0;
+        max-width: 360px;
+    }
+
+    .stats-dashboard {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+        gap: var(--space-4);
+        margin-bottom: var(--space-6);
+    }
+
+    .stat-card {
+        background: var(--surface);
+        border: 1px solid var(--border-light);
+        border-radius: var(--radius-lg);
+        padding: var(--space-4);
+        display: flex;
+        align-items: center;
+        gap: var(--space-3);
+        transition: all var(--transition-fast);
+    }
+
+    .stat-card:hover {
+        border-color: var(--border);
+        box-shadow: var(--shadow-sm);
+    }
+
+    .stat-icon {
+        width: 44px;
+        height: 44px;
+        border-radius: var(--radius-lg);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex-shrink: 0;
+    }
+
+    .stat-icon.total {
+        background: var(--primary-50);
+        color: var(--primary);
+    }
+
+    .stat-icon.pending {
+        background: var(--warning-light);
+        color: #d97706;
+    }
+
+    .stat-icon.completed {
+        background: var(--success-light);
+        color: var(--success);
+    }
+
+    .stat-info {
+        display: flex;
+        flex-direction: column;
+    }
+
+    .stat-value {
+        font-size: 1.5rem;
+        font-weight: 700;
+        color: var(--text-primary);
+        line-height: 1;
+    }
+
+    .stat-label {
+        font-size: 0.75rem;
+        color: var(--text-muted);
+        margin-top: var(--space-1);
+    }
+
+    .section-title {
+        font-size: 1.125rem;
+        font-weight: 600;
+        color: var(--text-primary);
+        margin: 0 0 var(--space-4);
+    }
+
+    .breakdown-table {
+        background: var(--surface);
+        border: 1px solid var(--border-light);
+        border-radius: var(--radius-lg);
+        overflow: hidden;
+    }
+
+    .breakdown-header,
+    .breakdown-row {
+        display: grid;
+        grid-template-columns: 1fr 100px 100px 80px;
+        padding: var(--space-3) var(--space-4);
+        align-items: center;
+    }
+
+    .breakdown-header {
+        background: var(--gray-50, #f9fafb);
+        font-size: 0.75rem;
+        font-weight: 600;
+        color: var(--text-muted);
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        border-bottom: 1px solid var(--border-light);
+    }
+
+    .breakdown-row {
+        border-bottom: 1px solid var(--border-light);
+        font-size: 0.875rem;
+        color: var(--text-primary);
+    }
+
+    .breakdown-row:last-child {
+        border-bottom: none;
+    }
+
+    .breakdown-row:hover {
+        background: var(--gray-50, #f9fafb);
+    }
+
+    .col-project {
+        display: flex;
+        align-items: center;
+        gap: var(--space-2);
+        font-weight: 500;
+    }
+
+    .col-num {
+        text-align: center;
+        font-variant-numeric: tabular-nums;
+    }
+
+    .color-dot {
+        width: 10px;
+        height: 10px;
+        border-radius: var(--radius-full);
+        flex-shrink: 0;
+    }
+
+    @@media (max-width: 640px) {
+        .stats-dashboard {
+            grid-template-columns: 1fr;
+        }
+
+        .breakdown-header,
+        .breakdown-row {
+            grid-template-columns: 1fr 70px 70px 60px;
+            padding: var(--space-2) var(--space-3);
+            font-size: 0.8125rem;
+        }
+    }
+</style>
+
+@code {
+    private bool _initialized;
+
+    protected override void OnInitialized()
+    {
+        TodoService.OnTodosChanged += StateHasChanged;
+        ProjectService.OnProjectsChanged += StateHasChanged;
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender && !_initialized)
+        {
+            _initialized = true;
+            await ProjectService.InitializeAsync();
+            await TodoService.InitializeAsync();
+            StateHasChanged();
+        }
+    }
+
+    private string GetAverageCompleted()
+    {
+        var projectCount = ProjectService.Projects.Count;
+        if (projectCount == 0) return "0";
+        var total = (double)TodoService.Todos.Count(t => t.IsDone);
+        return (total / projectCount).ToString("F1");
+    }
+
+    private string GetAverageUncompleted()
+    {
+        var projectCount = ProjectService.Projects.Count;
+        if (projectCount == 0) return "0";
+        var total = (double)TodoService.Todos.Count(t => !t.IsDone);
+        return (total / projectCount).ToString("F1");
+    }
+
+    public void Dispose()
+    {
+        TodoService.OnTodosChanged -= StateHasChanged;
+        ProjectService.OnProjectsChanged -= StateHasChanged;
+    }
+}

@@ -50,7 +50,6 @@ else
                 <label for="TodoDescription" class="form-label">Description</label>
                 <InputTextArea id="TodoDescription" class="form-input form-textarea" rows="3"
                                @bind-Value="Todo.Description" placeholder="Add some details..." />
-                <ValidationMessage For="@(() => Todo.Description)" class="validation-error" />
             </div>
 
             <div class="form-group">

@@ -1,22 +1,45 @@
-﻿<div class="top-row ps-3 navbar navbar-dark">
-    <div class="container-fluid">
-        <a class="navbar-brand" href="">@(IsCollapsed ? "✅" : "✅ TodoList")</a>
-    </div>
+﻿<div class="sidebar-header">
+    <button class="collapse-btn" @onclick="OnToggleSidebar" title="@(IsCollapsed ? "Expand" : "Collapse")">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            @if (IsCollapsed)
+            {
+                <polyline points="9 18 15 12 9 6"/>
+            }
+            else
+            {
+                <polyline points="15 18 9 12 15 6"/>
+            }
+        </svg>
+    </button>
 </div>
 
-<div class="nav-scrollable">
-    <nav class="flex-column">
-        <div class="nav-item px-3">
-            <NavLink class="nav-link" href="" Match="NavLinkMatch.All">
-                <span aria-hidden="true">📝</span>
-                @if (!IsCollapsed)
-                {
-                    <span class="nav-text">My Todos</span>
-                }
-            </NavLink>
-        </div>
-    </nav>
-</div>
+<nav class="sidebar-nav">
+    <NavLink class="nav-link" href="" Match="NavLinkMatch.All">
+        <span class="nav-icon">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M9 11l3 3L22 4"/>
+                <path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/>
+            </svg>
+        </span>
+        @if (!IsCollapsed)
+        {
+            <span class="nav-text">My Todos</span>
+        }
+    </NavLink>
+    <NavLink class="nav-link" href="statistics">
+        <span class="nav-icon">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <line x1="18" y1="20" x2="18" y2="10"/>
+                <line x1="12" y1="20" x2="12" y2="4"/>
+                <line x1="6" y1="20" x2="6" y2="14"/>
+            </svg>
+        </span>
+        @if (!IsCollapsed)
+        {
+            <span class="nav-text">Statistics</span>
+        }
+    </NavLink>
+</nav>
 
 @code {
     [Parameter]

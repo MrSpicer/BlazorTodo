@@ -314,7 +314,7 @@ a:hover, .btn-link:hover {
 .app-header {
     background: linear-gradient(135deg, #6366f1 0%, #4f46e5 100%);
     color: #ffffff;
-    padding: 1rem 1.5rem;
+    padding: 0.75rem 1.5rem;
     box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
     position: sticky;
     top: 0;
@@ -358,17 +358,188 @@ a:hover, .btn-link:hover {
     font-weight: 400;
 }
 
+/* Sidebar Toggle Button in Header */
+.sidebar-toggle {
+    display: none;
+    background: rgba(255, 255, 255, 0.1);
+    border: none;
+    border-radius: var(--radius-md);
+    padding: 0.5rem;
+    color: white;
+    cursor: pointer;
+    transition: background var(--transition-fast);
+    margin-right: var(--space-3);
+}
+
+.sidebar-toggle:hover {
+    background: rgba(255, 255, 255, 0.2);
+}
+
+/* ========================================
+   App Body (Sidebar + Main)
+   ======================================== */
+.app-body {
+    display: flex;
+    flex: 1;
+    overflow: hidden;
+}
+
+/* ========================================
+   Sidebar
+   ======================================== */
+.sidebar {
+    width: 240px;
+    background: var(--gray-800);
+    color: white;
+    display: flex;
+    flex-direction: column;
+    transition: width var(--transition-base);
+    flex-shrink: 0;
+    overflow: hidden;
+}
+
+.sidebar.collapsed {
+    width: 64px;
+}
+
+.sidebar-header {
+    display: flex;
+    justify-content: flex-end;
+    padding: var(--space-3);
+    border-bottom: 1px solid var(--gray-700);
+}
+
+.collapse-btn {
+    background: transparent;
+    border: none;
+    color: var(--gray-400);
+    cursor: pointer;
+    padding: var(--space-2);
+    border-radius: var(--radius-md);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all var(--transition-fast);
+}
+
+.collapse-btn:hover {
+    background: var(--gray-700);
+    color: white;
+}
+
+.sidebar-nav {
+    display: flex;
+    flex-direction: column;
+    padding: var(--space-2);
+    gap: var(--space-1);
+}
+
+.sidebar-nav .nav-link {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    padding: var(--space-3);
+    color: var(--gray-300);
+    border-radius: var(--radius-md);
+    text-decoration: none;
+    transition: all var(--transition-fast);
+    white-space: nowrap;
+}
+
+.sidebar-nav .nav-link:hover {
+    background: var(--gray-700);
+    color: white;
+}
+
+.sidebar-nav .nav-link.active {
+    background: var(--primary);
+    color: white;
+}
+
+.sidebar-nav .nav-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+.sidebar-nav .nav-text {
+    font-size: 0.9375rem;
+    font-weight: 500;
+}
+
+.sidebar.collapsed .sidebar-header {
+    justify-content: center;
+}
+
+.sidebar.collapsed .sidebar-nav .nav-link {
+    justify-content: center;
+    padding: var(--space-3);
+}
+
+/* Sidebar Overlay for Mobile */
+.sidebar-overlay {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.5);
+    z-index: 199;
+}
+
 /* ========================================
    App Main Content
    ======================================== */
 .app-main {
     flex: 1;
     padding: 1.5rem 1rem;
+    overflow-y: auto;
 }
 
 .main-content {
     max-width: 1200px;
     margin: 0 auto;
+}
+
+/* ========================================
+   Responsive Sidebar
+   ======================================== */
+@media (max-width: 768px) {
+    .sidebar-toggle {
+        display: flex;
+    }
+    
+    .header-tagline {
+        display: none;
+    }
+    
+    .sidebar {
+        position: fixed;
+        top: 0;
+        left: 0;
+        bottom: 0;
+        z-index: 200;
+        transform: translateX(-100%);
+        width: 260px;
+    }
+    
+    .sidebar.mobile-open {
+        transform: translateX(0);
+    }
+    
+    .sidebar.collapsed {
+        width: 260px;
+    }
+    
+    .sidebar-overlay {
+        display: block;
+    }
+    
+    .collapse-btn {
+        display: none;
+    }
 }
 
 .badge.bg-secondary {
