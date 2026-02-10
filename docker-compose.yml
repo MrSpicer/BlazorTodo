@@ -1,0 +1,21 @@
+services:
+  todolist:
+    image: taskflow:latest
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: taskflow
+    ports:
+      - "5217:8080"
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Production
+      - ASPNETCORE_URLS=http://+:8080
+      - ASPNETCORE_HTTP_PORTS=8080
+      - DisableHttpsRedirect=true
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s

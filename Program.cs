@@ -23,7 +23,11 @@ if (!app.Environment.IsDevelopment())
     app.UseHsts();
 }
 
-app.UseHttpsRedirection();
+// Only redirect to HTTPS when not disabled (e.g., in container environments)
+if (!builder.Configuration.GetValue<bool>("DisableHttpsRedirect"))
+{
+	app.UseHttpsRedirection();
+}
 
 app.UseStaticFiles();
 

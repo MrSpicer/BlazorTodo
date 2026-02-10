@@ -1,0 +1,51 @@
+# Build artifacts
+**/bin/
+**/obj/
+**/out/
+**/publish/
+
+# IDE files
+**/.vs/
+**/.vscode/
+**/.idea/
+**/.fleet/
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+
+# Git
+**/.git/
+**/.gitignore
+**/.gitattributes
+
+# Node modules (if any)
+**/node_modules/
+package.json
+package-lock.json
+
+# OS files
+.DS_Store
+Thumbs.db
+*.swp
+*~
+
+# Test results and coverage
+**/TestResults/
+**/*.trx
+**/*.coverage
+
+# Docker files
+**/Dockerfile*
+**/docker-compose*
+**/.dockerignore
+
+# Documentation (keeping CLAUDE.md out of image)
+README.md
+LICENSE
+*.md
+
+# Temporary and log files
+**/logs/
+**/*.log
+**/*.tmp

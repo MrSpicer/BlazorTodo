@@ -1,0 +1,7 @@
+services:
+  todolist:
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+    volumes:
+      # Mount static files for hot-reload during development
+      - ./wwwroot:/app/wwwroot:ro

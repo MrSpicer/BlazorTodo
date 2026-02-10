@@ -13,6 +13,9 @@ dotnet build
 
 # Watch mode (auto-rebuild on changes)
 dotnet watch
+
+# Publish
+dotnet publish TodoList.csproj
 ```
 
 This is a .NET 9 Blazor Server application. There are no tests configured.
@@ -47,3 +50,14 @@ This is a .NET 9 Blazor Server application. There are no tests configured.
 ### Namespace
 
 Root namespace is `TodoList` (despite repo name BlazorTodo).
+
+## Code Style
+
+- **Indentation**: Tabs, not spaces
+- **Namespaces**: File-scoped (`namespace TodoList.Services;`)
+- **Private fields**: `_camelCase` with underscore prefix
+- **Async methods**: Always suffix with `Async` (`SaveTodoAsync`, `InitializeAsync`)
+- **Nullable reference types**: Enabled; use `?` for nullable types, initialize strings to `string.Empty`
+- **Collections**: Expose as `IReadOnlyList<T>`, use `Task<bool>` for fallible operations
+- **Error handling**: Try-catch at service/repository boundaries, log with `ILogger<T>`, return `false`/empty rather than throwing
+- **Components**: `[Parameter, EditorRequired]` for required inputs, `EventCallback<T>` for callbacks, implement `IDisposable` to unsubscribe from service events
