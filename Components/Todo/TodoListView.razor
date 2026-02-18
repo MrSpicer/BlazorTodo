@@ -3,82 +3,83 @@
 
 @if (!Items.Any())
 {
-    <div class="empty-state">
-        <div class="empty-icon">
-            <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-                <rect x="3" y="3" width="18" height="18" rx="2"/>
-                <path d="M9 12l2 2 4-4"/>
-            </svg>
-        </div>
-        <h3 class="empty-title">No todos yet</h3>
-        <p class="empty-description">Create your first todo to get started with organizing your tasks.</p>
-    </div>
+	<div class="empty-state">
+		<div class="empty-icon">
+			<svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+				<rect x="3" y="3" width="18" height="18" rx="2"/>
+				<path d="M9 12l2 2 4-4"/>
+			</svg>
+		</div>
+		<h3 class="empty-title">No todos yet</h3>
+		<p class="empty-description">Create your first todo to get started with organizing your tasks.</p>
+	</div>
 }
 else
 {
-    <div class="todo-list">
-        @foreach (var item in Items)
-        {
-            <TodoItemRow Item="@item"
-                         OnEdit="OnEdit"
-                         OnDelete="OnDelete"
-                         OnStatusChange="OnStatusChange" />
-        }
-    </div>
+	<div class="todo-list">
+		@foreach (var item in Items)
+		{
+			<TodoItemRow @key="item.Id"
+			             Item="@item"
+			             Depth="0"
+			             OnEdit="OnEdit"
+			             OnDelete="OnDelete"
+			             OnSave="OnSave" />
+		}
+	</div>
 }
 
 <style>
-    .todo-list {
-        display: flex;
-        flex-direction: column;
-    }
-    
-    .empty-state {
-        text-align: center;
-        padding: var(--space-12) var(--space-6);
-        background: var(--surface);
-        border: 2px dashed var(--border);
-        border-radius: var(--radius-xl);
-    }
-    
-    .empty-icon {
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        width: 100px;
-        height: 100px;
-        background: var(--primary-50);
-        border-radius: var(--radius-full);
-        color: var(--primary);
-        margin-bottom: var(--space-5);
-    }
-    
-    .empty-title {
-        font-size: 1.25rem;
-        font-weight: 600;
-        color: var(--text-primary);
-        margin: 0 0 var(--space-2);
-    }
-    
-    .empty-description {
-        font-size: 0.9375rem;
-        color: var(--text-secondary);
-        margin: 0;
-        max-width: 300px;
-        margin: 0 auto;
-    }
+	.todo-list {
+		display: flex;
+		flex-direction: column;
+	}
+
+	.empty-state {
+		text-align: center;
+		padding: var(--space-12) var(--space-6);
+		background: var(--surface);
+		border: 2px dashed var(--border);
+		border-radius: var(--radius-xl);
+	}
+
+	.empty-icon {
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		width: 100px;
+		height: 100px;
+		background: var(--primary-50);
+		border-radius: var(--radius-full);
+		color: var(--primary);
+		margin-bottom: var(--space-5);
+	}
+
+	.empty-title {
+		font-size: 1.25rem;
+		font-weight: 600;
+		color: var(--text-primary);
+		margin: 0 0 var(--space-2);
+	}
+
+	.empty-description {
+		font-size: 0.9375rem;
+		color: var(--text-secondary);
+		margin: 0 auto;
+		max-width: 300px;
+	}
 </style>
 
 @code {
-    [Parameter, EditorRequired]
-    public IEnumerable<TodoItem> Items { get; set; } = Enumerable.Empty<TodoItem>();
+	[Parameter, EditorRequired]
+	public IEnumerable<TodoItem> Items { get; set; } = Enumerable.Empty<TodoItem>();
 
-    [Parameter]
-    public EventCallback<TodoItem> OnEdit { get; set; }
+	[Parameter]
+	public EventCallback<TodoItem> OnEdit { get; set; }
 
-    [Parameter]
-    public EventCallback<TodoItem> OnDelete { get; set; }
+	[Parameter]
+	public EventCallback<TodoItem> OnDelete { get; set; }
 
-    [Parameter]
-    public EventCallback<(TodoItem, TodoItemStatus)> OnStatusChange { get; set; }
+	[Parameter]
+	public EventCallback<TodoItem> OnSave { get; set; }
 }

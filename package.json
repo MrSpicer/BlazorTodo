@@ -1,5 +1,11 @@
 {
-  "dependencies": {
-    "playwright": "^1.58.2"
+  "scripts": {
+    "test": "npx playwright test",
+    "test:rubric": "npx playwright test tests/rubric/",
+    "test:report": "npx playwright show-report"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.50.0",
+    "typescript": "^5.0.0"
   }
 }

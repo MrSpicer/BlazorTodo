@@ -132,7 +132,7 @@ else
     <TodoListView Items="@GetFilteredTodos()"
                   OnEdit="HandleEdit"
                   OnDelete="HandleDelete"
-                  OnStatusChange="HandleStatusChange" />
+                  OnSave="HandleSave" />
 }
 
 <!-- Modals -->
@@ -424,9 +424,9 @@ else
             await TodoService.DeleteTodoAsync(todo);
     }
 
-    private async Task HandleStatusChange((TodoItem todo, TodoItemStatus status) args)
+    private async Task HandleSave(TodoItem todo)
     {
-        await TodoService.UpdateStatusAsync(args.todo, args.status);
+        await TodoService.SaveTodoAsync(todo);
     }
 
     private async Task HandleClearAll()

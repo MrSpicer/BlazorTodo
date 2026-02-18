@@ -22,7 +22,13 @@ public class TodoItem
 	public DateTime? CompletedAt { get; set; }
 	public Guid ProjectId { get; set; }
 
+	public List<TodoItem> SubTasks { get; set; } = new();
+
 	public bool IsDone => Status == TodoItemStatus.Done;
+
+	public bool HasSubTasks => SubTasks.Count > 0;
+	public int SubTaskCount => SubTasks.Count;
+	public int SubTaskDoneCount => SubTasks.Count(t => t.IsDone);
 
 	public bool IsValid()
 	{
