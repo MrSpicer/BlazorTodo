@@ -20,12 +20,18 @@ public class TodoFilterCriteria
 	/// <summary>
 	/// Selected statuses to filter by. Empty list means no status filtering.
 	/// </summary>
-	public List<TodoItemStatus> SelectedStatuses { get; set; } = new();
+	public List<TodoItemStatus> SelectedStatuses { get; set; } =
+		[TodoItemStatus.None, TodoItemStatus.New, TodoItemStatus.InProgress];
 
 	/// <summary>
-	/// Sort option for ordering results.
+	/// Ordered list of sort criteria applied in sequence.
 	/// </summary>
-	public SortOption Sort { get; set; } = SortOption.CreatedDate;
+	// Status asc (sensible default), Priority desc (highest first)
+	public List<SortCriterion> SortCriteria { get; set; } =
+		[new(SortOption.Status, false), new(SortOption.Priority, true)];
+
+	public IEnumerable<SortOption> AvailableSortOptions =>
+		Enum.GetValues<SortOption>().Except(SortCriteria.Select(c => c.Option));
 
 	/// <summary>
 	/// Gets whether any filters are currently active (excluding sort).

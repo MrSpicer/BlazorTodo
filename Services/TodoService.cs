@@ -153,13 +153,28 @@ public class TodoService : ITodoService
 		}
 
 		// Sort
-		return criteria.Sort switch
-		{
-			SortOption.Priority => filtered.OrderByDescending(t => t.Priority),
-			SortOption.Status => filtered.OrderBy(t => t.Status),
-			_ => filtered.OrderByDescending(t => t.CreatedAt)
-		};
+		var sortList = criteria.SortCriteria.Count > 0 ? criteria.SortCriteria : [new SortCriterion(SortOption.CreatedDate, true)];
+		IOrderedEnumerable<TodoItem> sorted = ApplyFirstSort(filtered, sortList[0]);
+		foreach (var c in sortList.Skip(1))
+			sorted = ApplyThenSort(sorted, c);
+		return sorted;
 	}
+
+	private static IOrderedEnumerable<TodoItem> ApplyFirstSort(IEnumerable<TodoItem> source, SortCriterion c) =>
+		c.Option switch
+		{
+			SortOption.Priority => c.Descending ? source.OrderByDescending(t => t.Priority) : source.OrderBy(t => t.Priority),
+			SortOption.Status   => c.Descending ? source.OrderByDescending(t => t.Status)   : source.OrderBy(t => t.Status),
+			_                   => c.Descending ? source.OrderByDescending(t => t.CreatedAt) : source.OrderBy(t => t.CreatedAt),
+		};
+
+	private static IOrderedEnumerable<TodoItem> ApplyThenSort(IOrderedEnumerable<TodoItem> source, SortCriterion c) =>
+		c.Option switch
+		{
+			SortOption.Priority => c.Descending ? source.ThenByDescending(t => t.Priority) : source.ThenBy(t => t.Priority),
+			SortOption.Status   => c.Descending ? source.ThenByDescending(t => t.Status)   : source.ThenBy(t => t.Status),
+			_                   => c.Descending ? source.ThenByDescending(t => t.CreatedAt) : source.ThenBy(t => t.CreatedAt),
+		};
 
     public int GetActiveCount(Guid? projectId = null)
     {

@@ -81,13 +81,53 @@
                 </div>
                 
                 <!-- Sort -->
-                <div class="filter-group">
+                <div class="filter-group sort-group">
                     <span class="filter-group-label">Sort by</span>
-                    <select class="sort-select" value="@FilterCriteria.Sort" @onchange="OnSortChanged">
-                        <option value="@SortOption.CreatedDate">Created Date</option>
-                        <option value="@SortOption.Priority">Priority</option>
-                        <option value="@SortOption.Status">Status</option>
-                    </select>
+                    <div class="sort-criteria-list">
+                        @for (int i = 0; i < FilterCriteria.SortCriteria.Count; i++)
+                        {
+                            var idx = i;
+                            var criterion = FilterCriteria.SortCriteria[idx];
+                            <div class="sort-criterion-row">
+                                <span class="sort-criterion-label">@GetSortLabel(criterion.Option)</span>
+                                <div class="sort-criterion-actions">
+                                    <button class="sort-action-btn sort-dir-btn" title="@(criterion.Descending ? "Descending" : "Ascending")"
+                                            @onclick="() => ToggleSortDirection(idx)">
+                                        @if (criterion.Descending)
+                                        {
+                                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 5v14M5 12l7 7 7-7"/></svg>
+                                        }
+                                        else
+                                        {
+                                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 19V5M5 12l7-7 7 7"/></svg>
+                                        }
+                                    </button>
+                                    <button class="sort-action-btn" disabled="@(idx == 0)" title="Move up"
+                                            @onclick="() => MoveSortUp(idx)">
+                                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M18 15l-6-6-6 6"/></svg>
+                                    </button>
+                                    <button class="sort-action-btn" disabled="@(idx == FilterCriteria.SortCriteria.Count - 1)" title="Move down"
+                                            @onclick="() => MoveSortDown(idx)">
+                                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M6 9l6 6 6-6"/></svg>
+                                    </button>
+                                    <button class="sort-action-btn sort-remove-btn" disabled="@(FilterCriteria.SortCriteria.Count <= 1)" title="Remove"
+                                            @onclick="() => RemoveSortCriterion(idx)">
+                                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg>
+                                    </button>
+                                </div>
+                            </div>
+                        }
+                        @if (FilterCriteria.AvailableSortOptions.Any())
+                        {
+                            <select class="sort-add-select" @onchange="AddSortCriterion">
+                                <option value="">+ Add sort...</option>
+                                @foreach (var option in FilterCriteria.AvailableSortOptions)
+                                {
+                                    <option value="@option">@GetSortLabel(option)</option>
+                                }
+                            </select>
+                        }
+                    </div>
                 </div>
             </div>
             
@@ -307,21 +347,88 @@
     .priority-high.selected { background: #ffedd5; border-color: var(--priority-high); color: #c2410c; }
     .priority-emergency.selected { background: var(--danger-light); border-color: var(--priority-emergency); color: #991b1b; }
     
-    .sort-select {
-        padding: var(--space-2) var(--space-3);
-        border: 1.5px solid var(--border);
+    .sort-group { min-width: 180px; }
+
+    .sort-criteria-list {
+        display: flex;
+        flex-direction: column;
+        gap: var(--space-1);
+    }
+
+    .sort-criterion-row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: var(--space-1) var(--space-2);
+        background: var(--gray-50);
+        border: 1px solid var(--border-light);
+        border-radius: var(--radius-md);
+        gap: var(--space-2);
+    }
+
+    .sort-criterion-label {
+        font-size: 0.8125rem;
+        font-weight: 500;
+        color: var(--text-primary);
+        flex: 1;
+    }
+
+    .sort-criterion-actions {
+        display: flex;
+        align-items: center;
+        gap: 2px;
+    }
+
+    .sort-action-btn {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 22px;
+        height: 22px;
+        padding: 0;
+        background: transparent;
+        border: none;
+        border-radius: var(--radius-md);
+        color: var(--text-secondary);
+        cursor: pointer;
+        transition: all var(--transition-fast);
+    }
+
+    .sort-action-btn:hover:not(:disabled) {
+        background: var(--gray-100);
+        color: var(--text-primary);
+    }
+
+    .sort-action-btn:disabled {
+        opacity: 0.3;
+        cursor: default;
+    }
+
+    .sort-remove-btn:hover:not(:disabled) {
+        background: #fee2e2;
+        color: var(--danger);
+    }
+
+    .sort-dir-btn {
+        color: var(--primary);
+        margin-right: var(--space-1);
+    }
+
+    .sort-add-select {
+        padding: var(--space-1) var(--space-2);
+        border: 1.5px dashed var(--border);
         border-radius: var(--radius-md);
         font-size: 0.8125rem;
         background: var(--surface);
-        color: var(--text-primary);
+        color: var(--text-secondary);
         cursor: pointer;
-        min-width: 140px;
+        width: 100%;
     }
-    
-    .sort-select:focus {
+
+    .sort-add-select:focus {
         outline: none;
         border-color: var(--primary);
-        box-shadow: 0 0 0 3px var(--primary-light);
+        border-style: solid;
     }
     
     .clear-all-btn {
@@ -396,14 +503,52 @@
         await FilterChanged.InvokeAsync();
     }
 
-    private async Task OnSortChanged(ChangeEventArgs e)
+    private async Task AddSortCriterion(ChangeEventArgs e)
     {
-        if (Enum.TryParse<SortOption>(e.Value?.ToString(), out var sort))
+        if (Enum.TryParse<SortOption>(e.Value?.ToString(), out var option))
         {
-            FilterCriteria.Sort = sort;
+            FilterCriteria.SortCriteria.Add(new SortCriterion(option, true));
             await FilterChanged.InvokeAsync();
         }
     }
+
+    private async Task ToggleSortDirection(int index)
+    {
+        var c = FilterCriteria.SortCriteria[index];
+        FilterCriteria.SortCriteria[index] = c with { Descending = !c.Descending };
+        await FilterChanged.InvokeAsync();
+    }
+
+    private async Task RemoveSortCriterion(int index)
+    {
+        if (FilterCriteria.SortCriteria.Count <= 1) return;
+        FilterCriteria.SortCriteria.RemoveAt(index);
+        await FilterChanged.InvokeAsync();
+    }
+
+    private async Task MoveSortUp(int index)
+    {
+        if (index <= 0) return;
+        (FilterCriteria.SortCriteria[index], FilterCriteria.SortCriteria[index - 1]) =
+            (FilterCriteria.SortCriteria[index - 1], FilterCriteria.SortCriteria[index]);
+        await FilterChanged.InvokeAsync();
+    }
+
+    private async Task MoveSortDown(int index)
+    {
+        if (index >= FilterCriteria.SortCriteria.Count - 1) return;
+        (FilterCriteria.SortCriteria[index], FilterCriteria.SortCriteria[index + 1]) =
+            (FilterCriteria.SortCriteria[index + 1], FilterCriteria.SortCriteria[index]);
+        await FilterChanged.InvokeAsync();
+    }
+
+    private string GetSortLabel(SortOption option) => option switch
+    {
+        SortOption.CreatedDate => "Created Date",
+        SortOption.Priority    => "Priority",
+        SortOption.Status      => "Status",
+        _                      => option.ToString()
+    };
 
     private async Task OnClearFilters()
     {
