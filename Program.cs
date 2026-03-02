@@ -11,6 +11,7 @@ builder.Services.AddServerSideBlazor();
 builder.Services.AddBlazoredLocalStorage();
 
 // Application services
+builder.Services.AddMemoryCache();
 builder.Services.AddTodoServices();
 
 var app = builder.Build();

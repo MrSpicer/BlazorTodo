@@ -1,0 +1,336 @@
+@using Blazored.LocalStorage
+@implements IDisposable
+@inject ISyncService SyncService
+@inject NavigationManager NavigationManager
+@inject ILocalStorageService LocalStorage
+@inject IJSRuntime JS
+
+@if (IsVisible)
+{
+	<div class="modal fade show d-block" tabindex="-1" style="background-color: rgba(0,0,0,0.5);">
+		<div class="modal-dialog modal-dialog-centered">
+			<div class="modal-content">
+				<div class="modal-header">
+					<h5 class="modal-title">
+						<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right: 8px; vertical-align: middle;">
+							<path d="M18 20V10"/>
+							<path d="M12 20V4"/>
+							<path d="M6 20v-6"/>
+						</svg>
+						Sync
+					</h5>
+					<button type="button" class="btn-close" @onclick="Close" aria-label="Close"></button>
+				</div>
+				<div class="modal-body">
+					<!-- Tabs -->
+					<ul class="nav nav-tabs mb-3">
+						<li class="nav-item">
+							<button class="nav-link @(_activeTab == "sync" ? "active" : "")" @onclick='() => _activeTab = "sync"'>
+								Sync to Server
+							</button>
+						</li>
+						<li class="nav-item">
+							<button class="nav-link @(_activeTab == "restore" ? "active" : "")" @onclick='() => _activeTab = "restore"'>
+								Restore from Server
+							</button>
+						</li>
+					</ul>
+
+					@if (_activeTab == "sync")
+					{
+						<!-- Sync Tab -->
+						@if (!string.IsNullOrEmpty(_syncMessage))
+						{
+							<div class="alert @(_syncIsError ? "alert-danger" : "alert-success") py-2 mb-3">
+								<small>@_syncMessage</small>
+							</div>
+						}
+
+						<div class="mb-3">
+							<label class="form-label fw-semibold">Session ID</label>
+							<div class="input-group">
+								<input type="text" class="form-control font-monospace" value="@_sessionId" readonly />
+								<button class="btn btn-outline-secondary" @onclick="RegenerateSessionId" title="Generate new session ID">
+									<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+										<path d="M21 2v6h-6"/>
+										<path d="M3 12a9 9 0 0 1 15-6.7L21 8"/>
+										<path d="M3 22v-6h6"/>
+										<path d="M21 12a9 9 0 0 1-15 6.7L3 16"/>
+									</svg>
+									Regenerate
+								</button>
+							</div>
+							<div class="form-text">Share this ID to restore your data on another device.</div>
+						</div>
+
+						<button class="btn btn-primary" @onclick="HandleSync"
+								disabled="@(_isSyncing || _debounceSecondsLeft > 0)">
+							@if (_isSyncing)
+							{
+								<span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+								<span>Syncing...</span>
+							}
+							else if (_debounceSecondsLeft > 0)
+							{
+								<span>Sync again in @_debounceSecondsLeft s</span>
+							}
+							else
+							{
+								<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="me-1">
+									<path d="M18 20V10"/>
+									<path d="M12 20V4"/>
+									<path d="M6 20v-6"/>
+								</svg>
+								<span>Sync to Server</span>
+							}
+						</button>
+
+						@if (!string.IsNullOrEmpty(_restoreUrl))
+						{
+							<hr />
+							<div class="mb-2">
+								<label class="form-label fw-semibold">Restore URL</label>
+								<div class="input-group">
+									<input type="text" class="form-control font-monospace small" value="@_restoreUrl" readonly />
+									<button class="btn btn-outline-secondary" @onclick="CopyUrl" title="Copy to clipboard">
+										<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+											<rect x="9" y="9" width="13" height="13" rx="2" ry="2"/>
+											<path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+										</svg>
+										@(_urlCopied ? "Copied!" : "Copy")
+									</button>
+								</div>
+							</div>
+							@if (!string.IsNullOrEmpty(_qrSvg))
+							{
+								<div class="text-center mt-3">
+									<div class="d-inline-block border rounded p-2 bg-white">
+										@((MarkupString)_qrSvg)
+									</div>
+									<div class="form-text mt-1">Scan to restore on another device</div>
+								</div>
+							}
+						}
+					}
+					else
+					{
+						<!-- Restore Tab -->
+						<div class="alert alert-warning py-2 mb-3">
+							<small>
+								<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="me-1">
+									<path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+									<line x1="12" y1="9" x2="12" y2="13"/>
+									<line x1="12" y1="17" x2="12.01" y2="17"/>
+								</svg>
+								This will replace all your current data with data from the server.
+							</small>
+						</div>
+
+						@if (!string.IsNullOrEmpty(_restoreMessage))
+						{
+							<div class="alert @(_restoreIsError ? "alert-danger" : "alert-success") py-2 mb-3">
+								<small>@_restoreMessage</small>
+							</div>
+						}
+
+						<div class="mb-3">
+							<label class="form-label fw-semibold">Session ID</label>
+							<input type="text" class="form-control font-monospace" @bind="_restoreSessionInput" placeholder="Paste session ID here" />
+						</div>
+
+						<button class="btn btn-success" @onclick="HandleRestore"
+								disabled="@(_isRestoring || string.IsNullOrWhiteSpace(_restoreSessionInput))">
+							@if (_isRestoring)
+							{
+								<span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+								<span>Restoring...</span>
+							}
+							else
+							{
+								<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="me-1">
+									<path d="M3 12a9 9 0 0 1 15-6.7L21 8"/>
+									<path d="M21 22v-6h-6"/>
+									<path d="M21 12a9 9 0 0 1-15 6.7L3 16"/>
+								</svg>
+								<span>Restore Data</span>
+							}
+						</button>
+					}
+				</div>
+				<div class="modal-footer">
+					<button type="button" class="btn btn-secondary" @onclick="Close">Close</button>
+				</div>
+			</div>
+		</div>
+	</div>
+}
+
+@code {
+	[Parameter, EditorRequired]
+	public bool IsVisible { get; set; }
+
+	[Parameter, EditorRequired]
+	public EventCallback OnClose { get; set; }
+
+	[Parameter]
+	public string InitialTab { get; set; } = "sync";
+
+	private string _activeTab = "sync";
+	private string _sessionId = string.Empty;
+	private bool _wasVisible;
+
+	// Sync tab
+	private bool _isSyncing;
+	private string? _syncMessage;
+	private bool _syncIsError;
+	private string? _restoreUrl;
+	private string? _qrSvg;
+	private int _debounceSecondsLeft;
+	private System.Threading.Timer? _debounceTimer;
+	private bool _urlCopied;
+
+	// Restore tab
+	private string _restoreSessionInput = string.Empty;
+	private bool _isRestoring;
+	private string? _restoreMessage;
+	private bool _restoreIsError;
+
+	protected override async Task OnParametersSetAsync()
+	{
+		if (IsVisible && !_wasVisible)
+		{
+			_wasVisible = true;
+			_activeTab = InitialTab;
+			if (string.IsNullOrEmpty(_sessionId))
+				await LoadOrCreateSessionId();
+		}
+		else if (!IsVisible)
+		{
+			_wasVisible = false;
+		}
+	}
+
+	private async Task LoadOrCreateSessionId()
+	{
+		var stored = await LocalStorage.GetItemAsStringAsync("SyncSessionId");
+		if (string.IsNullOrEmpty(stored))
+		{
+			stored = Guid.NewGuid().ToString("N");
+			await LocalStorage.SetItemAsStringAsync("SyncSessionId", stored);
+		}
+		_sessionId = stored;
+	}
+
+	private async Task RegenerateSessionId()
+	{
+		_sessionId = Guid.NewGuid().ToString("N");
+		await LocalStorage.SetItemAsStringAsync("SyncSessionId", _sessionId);
+		_restoreUrl = null;
+		_qrSvg = null;
+		_syncMessage = null;
+		StopDebounceTimer();
+		_debounceSecondsLeft = 0;
+	}
+
+	private async Task HandleSync()
+	{
+		if (_isSyncing || _debounceSecondsLeft > 0) return;
+
+		_isSyncing = true;
+		_syncMessage = null;
+		_urlCopied = false;
+
+		var result = await SyncService.SyncToServerAsync(_sessionId);
+
+		_isSyncing = false;
+
+		if (result.Success)
+		{
+			_restoreUrl = $"{NavigationManager.BaseUri}restore/{_sessionId}";
+			_qrSvg = SyncService.GenerateQrCodeSvg(_restoreUrl);
+			_syncMessage = "Synced successfully! Data will be available for 48 hours.";
+			_syncIsError = false;
+			StartDebounceTimer(900);
+		}
+		else if (result.RateLimited)
+		{
+			_syncMessage = $"Please wait {result.SecondsUntilRetry} seconds before syncing again.";
+			_syncIsError = true;
+			StartDebounceTimer(result.SecondsUntilRetry);
+		}
+		else
+		{
+			_syncMessage = result.ErrorMessage ?? "Sync failed.";
+			_syncIsError = true;
+		}
+	}
+
+	private async Task HandleRestore()
+	{
+		var sessionId = _restoreSessionInput.Trim();
+		if (string.IsNullOrEmpty(sessionId)) return;
+
+		_isRestoring = true;
+		_restoreMessage = null;
+
+		var result = await SyncService.RestoreFromServerAsync(sessionId);
+
+		_isRestoring = false;
+
+		if (result.Success)
+		{
+			_restoreMessage = $"Restored {result.ImportedCount} item(s) successfully!";
+			_restoreIsError = false;
+		}
+		else
+		{
+			_restoreMessage = result.ErrorMessage ?? "Restore failed.";
+			_restoreIsError = true;
+		}
+	}
+
+	private async Task CopyUrl()
+	{
+		if (string.IsNullOrEmpty(_restoreUrl)) return;
+		await JS.InvokeVoidAsync("navigator.clipboard.writeText", _restoreUrl);
+		_urlCopied = true;
+		StateHasChanged();
+	}
+
+	private void StartDebounceTimer(int seconds)
+	{
+		StopDebounceTimer();
+		_debounceSecondsLeft = seconds;
+		_debounceTimer = new System.Threading.Timer(_ =>
+		{
+			if (_debounceSecondsLeft > 0)
+			{
+				_debounceSecondsLeft--;
+				InvokeAsync(StateHasChanged);
+			}
+			if (_debounceSecondsLeft <= 0)
+			{
+				StopDebounceTimer();
+			}
+		}, null, TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(1));
+	}
+
+	private void StopDebounceTimer()
+	{
+		_debounceTimer?.Dispose();
+		_debounceTimer = null;
+	}
+
+	private async Task Close()
+	{
+		_syncMessage = null;
+		_restoreMessage = null;
+		_urlCopied = false;
+		await OnClose.InvokeAsync();
+	}
+
+	public void Dispose()
+	{
+		StopDebounceTimer();
+	}
+}

@@ -22,6 +22,7 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IDialogService, DialogService>();
         services.AddScoped<IFileService, FileService>();
         services.AddScoped<IImportExportService, ImportExportService>();
+        services.AddScoped<ISyncService, SyncService>();
         return services;
     }
 }

@@ -97,5 +97,6 @@ public class TodoRepository : ITodoRepository
 		}
 
 		await _localStorage.RemoveItemAsync($"{_storageName}_Ids");
+		TodoIds.Clear();
 	}
 }

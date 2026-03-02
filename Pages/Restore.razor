@@ -1,0 +1,114 @@
+@page "/restore/{SessionId}"
+@implements IDisposable
+@inject ISyncService SyncService
+@inject ITodoService TodoService
+@inject IProjectService ProjectService
+@inject NavigationManager NavigationManager
+
+<PageTitle>Restore Data - TaskFlow</PageTitle>
+
+<div style="display: flex; align-items: center; justify-content: center; min-height: 60vh; padding: var(--space-6);">
+	<div style="max-width: 480px; width: 100%; text-align: center;">
+		@if (_state == PageState.Loading)
+		{
+			<div class="spinner-border text-primary mb-3" role="status">
+				<span class="visually-hidden">Loading...</span>
+			</div>
+			<p style="color: var(--text-secondary);">Restoring your data...</p>
+		}
+		else if (_state == PageState.Success)
+		{
+			<div style="color: var(--success); margin-bottom: var(--space-4);">
+				<svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+					<path d="M22 11.08V12a10 10 0 11-5.93-9.14"/>
+					<path d="M22 4L12 14.01l-3-3"/>
+				</svg>
+			</div>
+			<h2 style="font-size: 1.5rem; font-weight: 700; color: var(--text-primary); margin-bottom: var(--space-2);">Data Restored!</h2>
+			<p style="color: var(--text-secondary); margin-bottom: var(--space-6);">
+				Successfully restored @_importedCount item(s) from the server.
+			</p>
+			<a href="/" class="btn btn-primary">Go to My Todos</a>
+		}
+		else if (_state == PageState.NotFound)
+		{
+			<div style="color: var(--text-muted); margin-bottom: var(--space-4);">
+				<svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+					<circle cx="12" cy="12" r="10"/>
+					<line x1="12" y1="8" x2="12" y2="12"/>
+					<line x1="12" y1="16" x2="12.01" y2="16"/>
+				</svg>
+			</div>
+			<h2 style="font-size: 1.5rem; font-weight: 700; color: var(--text-primary); margin-bottom: var(--space-2);">Session Not Found</h2>
+			<p style="color: var(--text-secondary); margin-bottom: var(--space-6);">
+				No data was found for this session ID. It may have expired (data is kept for 48 hours) or the ID may be invalid.
+			</p>
+			<a href="/" class="btn btn-outline-secondary">Go to My Todos</a>
+		}
+		else
+		{
+			<div style="color: var(--danger); margin-bottom: var(--space-4);">
+				<svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+					<path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+					<line x1="12" y1="9" x2="12" y2="13"/>
+					<line x1="12" y1="17" x2="12.01" y2="17"/>
+				</svg>
+			</div>
+			<h2 style="font-size: 1.5rem; font-weight: 700; color: var(--text-primary); margin-bottom: var(--space-2);">Restore Failed</h2>
+			<p style="color: var(--text-secondary); margin-bottom: var(--space-6);">@_errorMessage</p>
+			<a href="/" class="btn btn-outline-secondary">Go to My Todos</a>
+		}
+	</div>
+</div>
+
+@code {
+	[Parameter]
+	public string SessionId { get; set; } = string.Empty;
+
+	private enum PageState { Loading, Success, NotFound, Error }
+	private PageState _state = PageState.Loading;
+	private int _importedCount;
+	private string? _errorMessage;
+	private bool _initialized;
+
+	protected override void OnInitialized()
+	{
+		ProjectService.OnProjectsChanged += StateHasChanged;
+		TodoService.OnTodosChanged += StateHasChanged;
+	}
+
+	protected override async Task OnAfterRenderAsync(bool firstRender)
+	{
+		if (firstRender && !_initialized)
+		{
+			_initialized = true;
+			await ProjectService.InitializeAsync();
+			await TodoService.InitializeAsync();
+
+			var result = await SyncService.RestoreFromServerAsync(SessionId);
+
+			if (result.Success)
+			{
+				_importedCount = result.ImportedCount;
+				_state = PageState.Success;
+			}
+			else if (result.NotFound)
+			{
+				_state = PageState.NotFound;
+			}
+			else
+			{
+				_errorMessage = result.ErrorMessage ?? "An unexpected error occurred.";
+				_state = PageState.Error;
+			}
+
+			StateHasChanged();
+		}
+	}
+
+	public void Dispose()
+	{
+		ProjectService.OnProjectsChanged -= StateHasChanged;
+		TodoService.OnTodosChanged -= StateHasChanged;
+	}
+}
