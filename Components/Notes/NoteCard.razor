@@ -1,0 +1,130 @@
+@using TodoList.Models
+
+<div class="note-card">
+	<div class="note-card-body">
+		<h3 class="note-title">@Note.Title</h3>
+		@if (!string.IsNullOrWhiteSpace(Note.Content))
+		{
+			<p class="note-content">@Note.Content</p>
+		}
+		<div class="note-meta">
+			<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+				<circle cx="12" cy="12" r="10"/>
+				<path d="M12 6v6l4 2"/>
+			</svg>
+			<span>@Note.CreatedAt.ToString("MMM d, yyyy")</span>
+		</div>
+	</div>
+	<div class="note-actions">
+		<button class="note-action-btn" @onclick="() => OnEdit.InvokeAsync(Note)" title="Edit note" aria-label="Edit note">
+			<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+				<path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+				<path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+			</svg>
+		</button>
+		<button class="note-action-btn danger" @onclick="() => OnDelete.InvokeAsync(Note)" title="Delete note" aria-label="Delete note">
+			<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+				<path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+			</svg>
+		</button>
+	</div>
+</div>
+
+<style>
+	.note-card {
+		background: var(--surface);
+		border: 1px solid var(--border-light);
+		border-radius: var(--radius-lg);
+		padding: var(--space-4) var(--space-5);
+		display: flex;
+		align-items: flex-start;
+		gap: var(--space-3);
+		transition: all var(--transition-fast);
+		margin-bottom: var(--space-3);
+	}
+
+	.note-card:hover {
+		border-color: var(--border);
+		box-shadow: var(--shadow-sm);
+		transform: translateY(-1px);
+	}
+
+	.note-card:hover .note-actions {
+		opacity: 1;
+	}
+
+	.note-card-body {
+		flex: 1;
+		min-width: 0;
+	}
+
+	.note-title {
+		font-size: 0.9375rem;
+		font-weight: 600;
+		color: var(--text-primary);
+		margin: 0 0 var(--space-2);
+	}
+
+	.note-content {
+		font-size: 0.875rem;
+		color: var(--text-secondary);
+		margin: 0 0 var(--space-2);
+		white-space: pre-wrap;
+		overflow: hidden;
+		display: -webkit-box;
+		-webkit-line-clamp: 3;
+		-webkit-box-orient: vertical;
+		line-height: 1.5;
+	}
+
+	.note-meta {
+		display: flex;
+		align-items: center;
+		gap: var(--space-1);
+		font-size: 0.75rem;
+		color: var(--text-muted);
+	}
+
+	.note-actions {
+		display: flex;
+		gap: var(--space-1);
+		opacity: 0;
+		transition: opacity var(--transition-fast);
+		flex-shrink: 0;
+	}
+
+	.note-action-btn {
+		width: 30px;
+		height: 30px;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		background: transparent;
+		border: none;
+		border-radius: var(--radius-md);
+		color: var(--text-muted);
+		cursor: pointer;
+		transition: all var(--transition-fast);
+	}
+
+	.note-action-btn:hover {
+		background: var(--gray-100);
+		color: var(--text-primary);
+	}
+
+	.note-action-btn.danger:hover {
+		background: var(--danger-light);
+		color: var(--danger);
+	}
+</style>
+
+@code {
+	[Parameter, EditorRequired]
+	public ProjectNote Note { get; set; } = null!;
+
+	[Parameter]
+	public EventCallback<ProjectNote> OnEdit { get; set; }
+
+	[Parameter]
+	public EventCallback<ProjectNote> OnDelete { get; set; }
+}

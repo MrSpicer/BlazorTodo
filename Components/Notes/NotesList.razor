@@ -1,0 +1,82 @@
+@using TodoList.Models
+
+@if (!Items.Any())
+{
+	<div class="empty-state">
+		<div class="empty-icon">
+			<svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+				<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+				<polyline points="14 2 14 8 20 8"/>
+				<line x1="16" y1="13" x2="8" y2="13"/>
+				<line x1="16" y1="17" x2="8" y2="17"/>
+				<polyline points="10 9 9 9 8 9"/>
+			</svg>
+		</div>
+		<h3 class="empty-title">No notes yet</h3>
+		<p class="empty-description">Add your first note to capture ideas, links, or information for this project.</p>
+	</div>
+}
+else
+{
+	<div class="notes-list">
+		@foreach (var note in Items)
+		{
+			<NoteCard @key="note.Id"
+			          Note="@note"
+			          OnEdit="OnEdit"
+			          OnDelete="OnDelete" />
+		}
+	</div>
+}
+
+<style>
+	.notes-list {
+		display: flex;
+		flex-direction: column;
+	}
+
+	.empty-state {
+		text-align: center;
+		padding: var(--space-12) var(--space-6);
+		background: var(--surface);
+		border: 2px dashed var(--border);
+		border-radius: var(--radius-xl);
+	}
+
+	.empty-icon {
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		width: 100px;
+		height: 100px;
+		background: var(--primary-50);
+		border-radius: var(--radius-full);
+		color: var(--primary);
+		margin-bottom: var(--space-5);
+	}
+
+	.empty-title {
+		font-size: 1.25rem;
+		font-weight: 600;
+		color: var(--text-primary);
+		margin: 0 0 var(--space-2);
+	}
+
+	.empty-description {
+		font-size: 0.9375rem;
+		color: var(--text-secondary);
+		margin: 0 auto;
+		max-width: 300px;
+	}
+</style>
+
+@code {
+	[Parameter, EditorRequired]
+	public IReadOnlyList<ProjectNote> Items { get; set; } = Array.Empty<ProjectNote>();
+
+	[Parameter]
+	public EventCallback<ProjectNote> OnEdit { get; set; }
+
+	[Parameter]
+	public EventCallback<ProjectNote> OnDelete { get; set; }
+}

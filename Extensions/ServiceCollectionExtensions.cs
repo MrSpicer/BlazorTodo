@@ -15,7 +15,9 @@ public static class ServiceCollectionExtensions
     {
         services.AddScoped<ITodoRepository, TodoRepository>();
         services.AddScoped<IProjectRepository, ProjectRepository>();
+        services.AddScoped<INoteRepository, NoteRepository>();
         services.AddScoped<ITodoService, TodoService>();
+        services.AddScoped<INoteService, NoteService>();
         services.AddScoped<IProjectService, ProjectService>();
         services.AddScoped<IDialogService, DialogService>();
         services.AddScoped<IFileService, FileService>();
