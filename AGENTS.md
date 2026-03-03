@@ -44,7 +44,7 @@ Currently no test projects exist. When adding tests:
 
 ## Technology Stack
 
-- .NET 9.0
+- .NET 10.0
 - Blazor Server
 - Blazored.LocalStorage (data persistence)
 - Bootstrap 5 (UI framework)

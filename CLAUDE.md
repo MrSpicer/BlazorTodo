@@ -18,7 +18,7 @@ dotnet watch
 dotnet publish TodoList.csproj
 ```
 
-This is a .NET 9 Blazor Server application. There are no tests configured.
+This is a .NET 10 Blazor Server application. There are no tests configured.
 
 ## Architecture Overview
 
