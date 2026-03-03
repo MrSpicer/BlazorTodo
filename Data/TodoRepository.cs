@@ -1,6 +1,5 @@
 using System;
 using TodoList.Models;
-using TodoList.Models.Enums;
 using Blazored.LocalStorage;
 using System.Threading.Tasks;
 
@@ -38,7 +37,6 @@ public class TodoRepository : ITodoRepository
 		{
 			if (!TodoIds.Contains(todo.Id))
 			{
-				todo.Status = TodoItemStatus.New;
 				TodoIds.Add(todo.Id);
 				await this.PersistToStorage();
 			}

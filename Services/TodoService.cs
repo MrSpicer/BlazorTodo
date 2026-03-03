@@ -24,11 +24,43 @@ public class TodoService : ITodoService
     {
         await _repository.InitializeAsync();
         _todos = await _repository.GetTodos();
+        await ResetStaleTodosAsync();
         NotifyStateChanged();
+    }
+
+    private async Task ResetStaleTodosAsync()
+    {
+        var cutoff = DateTime.Now.AddDays(-7);
+
+        foreach (var todo in _todos)
+        {
+            var dirty = false;
+
+            if (todo.Status == TodoItemStatus.New && todo.CreatedAt < cutoff)
+            {
+                todo.Status = TodoItemStatus.None;
+                dirty = true;
+            }
+
+            foreach (var sub in todo.SubTasks)
+            {
+                if (sub.Status == TodoItemStatus.New && sub.CreatedAt < cutoff)
+                {
+                    sub.Status = TodoItemStatus.None;
+                    dirty = true;
+                }
+            }
+
+            if (dirty)
+                await _repository.AddOrUpdate(todo);
+        }
     }
 
     public async Task<bool> SaveTodoAsync(TodoItem todo)
     {
+        if (todo.Status == TodoItemStatus.None && !_todos.Any(t => t.Id == todo.Id))
+            todo.Status = TodoItemStatus.New;
+
         var success = await _repository.AddOrUpdate(todo);
         if (success)
         {

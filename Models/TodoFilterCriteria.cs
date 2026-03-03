@@ -26,7 +26,7 @@ public class TodoFilterCriteria
 	/// <summary>
 	/// Ordered list of sort criteria applied in sequence.
 	/// </summary>
-	// Status asc (sensible default), Priority desc (highest first)
+	// Status asc (sensible default), Priority asc (lowest first)
 	public List<SortCriterion> SortCriteria { get; set; } =
 		[new(SortOption.Status, false), new(SortOption.Priority, true)];
 
