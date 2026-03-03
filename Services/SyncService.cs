@@ -11,6 +11,8 @@ public class SyncService : ISyncService
 
 	private static readonly TimeSpan DataExpiry = TimeSpan.FromHours(48);
 	private static readonly TimeSpan RateLimitWindow = TimeSpan.FromMinutes(15);
+	private static readonly TimeSpan RestoreRateLimitWindow = TimeSpan.FromMinutes(2);
+	private const int MaxRestoreAttempts = 5;
 
 	public SyncService(IImportExportService importExportService, IMemoryCache cache, ILogger<SyncService> logger)
 	{
@@ -63,6 +65,24 @@ public class SyncService : ISyncService
 	{
 		try
 		{
+			if (!Guid.TryParseExact(sessionId, "N", out _))
+			{
+				return new RestoreResult(false, "Invalid session ID format.");
+			}
+
+			var restoreRateLimitKey = $"restoreattempt:{sessionId}";
+			if (!_cache.TryGetValue(restoreRateLimitKey, out int attempts))
+			{
+				attempts = 0;
+			}
+
+			if (attempts >= MaxRestoreAttempts)
+			{
+				return new RestoreResult(false, "Too many restore attempts. Please wait before trying again.");
+			}
+
+			_cache.Set(restoreRateLimitKey, attempts + 1, RestoreRateLimitWindow);
+
 			var dataKey = $"syncdata:{sessionId}";
 			if (!_cache.TryGetValue(dataKey, out string? json) || json is null)
 			{
