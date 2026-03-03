@@ -4,9 +4,13 @@
 @if (IsVisible)
 {
 	<div class="modal-overlay" @onclick="Close">
-		<div class="modal-container" @onclick:stopPropagation="true">
+		<div class="modal-container"
+		     role="dialog"
+		     aria-modal="true"
+		     aria-labelledby="todo-modal-title"
+		     @onclick:stopPropagation="true">
 			<div class="modal-header">
-				<h2 class="modal-title">
+				<h2 class="modal-title" id="todo-modal-title">
 					@if (IsEditing)
 					{
 						<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">

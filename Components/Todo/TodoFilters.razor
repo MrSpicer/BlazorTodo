@@ -4,7 +4,7 @@
 <div class="filters-panel @(_isExpanded ? "expanded" : "collapsed")">
     <button class="filters-toggle" @onclick="ToggleExpanded">
         <div class="toggle-left">
-            <svg class="toggle-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <svg class="toggle-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
                 <path d="M3 4h18M3 12h18M3 20h18"/>
             </svg>
             <span class="toggle-label">Filters</span>
@@ -15,7 +15,7 @@
         </div>
         <div class="toggle-right">
             <span class="items-count">@FilteredCount of @TotalCount items</span>
-            <svg class="chevron @(_isExpanded ? "rotated" : "")" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <svg class="chevron @(_isExpanded ? "rotated" : "")" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
                 <path d="M6 9l6 6 6-6"/>
             </svg>
         </div>
@@ -27,7 +27,7 @@
             <!-- Search -->
             <div class="filter-section">
                 <div class="search-input-wrapper">
-                    <svg class="search-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <svg class="search-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
                         <circle cx="11" cy="11" r="8"/>
                         <path d="M21 21l-4.35-4.35"/>
                     </svg>
@@ -562,12 +562,16 @@
         _ => status.ToString()
     };
     
+    private static readonly HashSet<TodoItemStatus> _defaultStatuses =
+        [TodoItemStatus.None, TodoItemStatus.New, TodoItemStatus.InProgress];
+
     private int GetActiveFilterCount()
     {
         int count = 0;
         if (!string.IsNullOrEmpty(FilterCriteria.SearchText)) count++;
         count += FilterCriteria.SelectedPriorities.Count;
-        count += FilterCriteria.SelectedStatuses.Count;
+        if (!new HashSet<TodoItemStatus>(FilterCriteria.SelectedStatuses).SetEquals(_defaultStatuses))
+            count += FilterCriteria.SelectedStatuses.Count;
         return count;
     }
 }

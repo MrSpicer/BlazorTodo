@@ -213,7 +213,7 @@ public class TodoService : ITodoService
         var todos = projectId.HasValue 
             ? _todos.Where(t => t.ProjectId == projectId.Value) 
             : _todos;
-        return todos.Count(t => !t.IsDone);
+        return todos.Count(t => !t.IsDone && t.Status != TodoItemStatus.Abandoned && t.Status != TodoItemStatus.Archived);
     }
     
     public int GetCompletedCount(Guid? projectId = null)
@@ -221,7 +221,7 @@ public class TodoService : ITodoService
         var todos = projectId.HasValue 
             ? _todos.Where(t => t.ProjectId == projectId.Value) 
             : _todos;
-        return todos.Count(t => t.IsDone);
+        return todos.Count(t => t.IsDone && t.Status != TodoItemStatus.Abandoned && t.Status != TodoItemStatus.Archived);
     }
 
     private void NotifyStateChanged() => OnTodosChanged?.Invoke();

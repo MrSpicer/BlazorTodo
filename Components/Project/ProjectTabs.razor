@@ -200,6 +200,9 @@
 
     private int GetTodoCount(Guid projectId)
     {
-        return Todos.Count(t => t.ProjectId == projectId);
+        return Todos.Count(t => t.Status != TodoItemStatus.Done && 
+                                t.Status != TodoItemStatus.Abandoned && 
+                                t.Status != TodoItemStatus.Archived && 
+                                t.ProjectId == projectId);
     }
 }

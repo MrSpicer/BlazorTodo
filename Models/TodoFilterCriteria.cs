@@ -33,13 +33,16 @@ public class TodoFilterCriteria
 	public IEnumerable<SortOption> AvailableSortOptions =>
 		Enum.GetValues<SortOption>().Except(SortCriteria.Select(c => c.Option));
 
+	private static readonly HashSet<TodoItemStatus> _defaultStatuses =
+		[TodoItemStatus.None, TodoItemStatus.New, TodoItemStatus.InProgress];
+
 	/// <summary>
 	/// Gets whether any filters are currently active (excluding sort).
 	/// </summary>
 	public bool HasActiveFilters =>
 		!string.IsNullOrWhiteSpace(SearchText) ||
 		SelectedPriorities.Any() ||
-		SelectedStatuses.Any();
+		!new HashSet<TodoItemStatus>(SelectedStatuses).SetEquals(_defaultStatuses);
 
 	/// <summary>
 	/// Clears all filter criteria (resets to default state).
@@ -48,7 +51,7 @@ public class TodoFilterCriteria
 	{
 		SearchText = string.Empty;
 		SelectedPriorities.Clear();
-		SelectedStatuses.Clear();
+		SelectedStatuses = [TodoItemStatus.None, TodoItemStatus.New, TodoItemStatus.InProgress];
 	}
 
 	/// <summary>
