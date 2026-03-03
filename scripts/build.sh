@@ -1,4 +1,4 @@
 #!/usr/bin/env bash
 set -euo pipefail
 cd "$(dirname "$0")/.."
-docker build -t blazortodo:latest .
+docker build --build-arg BUILD_CONFIGURATION=Release -t blazortodo:latest .

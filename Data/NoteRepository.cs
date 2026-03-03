@@ -25,7 +25,7 @@ public class NoteRepository : INoteRepository
 	{
 		if (note == null || !note.IsValid())
 		{
-			_logger.Log(LogLevel.Debug, "Malformed note");
+			_logger.LogWarning("Malformed note");
 			return false;
 		}
 
@@ -41,7 +41,7 @@ public class NoteRepository : INoteRepository
 		}
 		catch (Exception ex)
 		{
-			_logger.Log(LogLevel.Error, $"Error updating note: {ex.Message}");
+			_logger.LogError(ex, "Error updating note");
 			return false;
 		}
 	}
@@ -63,7 +63,7 @@ public class NoteRepository : INoteRepository
 		}
 		catch (Exception ex)
 		{
-			_logger.Log(LogLevel.Error, $"Error retrieving notes: {ex.Message}");
+			_logger.LogError(ex, "Error retrieving notes");
 			return new List<ProjectNote>();
 		}
 	}

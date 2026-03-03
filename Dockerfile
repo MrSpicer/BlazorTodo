@@ -8,11 +8,13 @@ RUN dotnet restore TodoList.csproj
 
 # Copy source code and build
 COPY . .
-RUN dotnet build TodoList.csproj -c Release -o /app/build
+ARG BUILD_CONFIGURATION=Release
+RUN dotnet build TodoList.csproj -c ${BUILD_CONFIGURATION} -o /app/build
 
 # Publish stage
 FROM build AS publish
-RUN dotnet publish TodoList.csproj -c Release -o /app/publish /p:UseAppHost=false
+ARG BUILD_CONFIGURATION=Release
+RUN dotnet publish TodoList.csproj -c ${BUILD_CONFIGURATION} -o /app/publish /p:UseAppHost=false
 
 # Runtime stage
 FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS final

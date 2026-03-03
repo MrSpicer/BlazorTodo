@@ -4,6 +4,8 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+      args:
+        BUILD_CONFIGURATION: Release
     container_name: BlazorTodo
     ports:
       - "5217:8080"

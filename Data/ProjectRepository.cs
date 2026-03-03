@@ -26,7 +26,7 @@ public class ProjectRepository : IProjectRepository
     {
         if (project == null || !project.IsValid())
         {
-            _logger.Log(LogLevel.Debug, "Malformed project");
+            _logger.LogWarning("Malformed project");
             return false;
         }
 
@@ -42,7 +42,7 @@ public class ProjectRepository : IProjectRepository
         }
         catch (Exception ex)
         {
-            _logger.Log(LogLevel.Error, $"Error updating project: {ex.Message}");
+            _logger.LogError(ex, "Error updating project");
             return false;
         }
     }
@@ -64,7 +64,7 @@ public class ProjectRepository : IProjectRepository
         }
         catch (Exception ex)
         {
-            _logger.Log(LogLevel.Error, $"Error retrieving projects: {ex.Message}");
+            _logger.LogError(ex, "Error retrieving projects");
             return new List<Project>();
         }
     }
@@ -77,7 +77,7 @@ public class ProjectRepository : IProjectRepository
         }
         catch (Exception ex)
         {
-            _logger.Log(LogLevel.Error, $"Error retrieving project: {ex.Message}");
+            _logger.LogError(ex, "Error retrieving project");
             return null;
         }
     }

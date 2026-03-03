@@ -28,7 +28,7 @@ public class TodoRepository : ITodoRepository
 	{
 		if (todo == null || !todo.IsValid())
 		{
-			_logger.Log(LogLevel.Debug, $"Malformed todo");
+			_logger.LogWarning("Malformed todo");
 			return false;
 		}
 
@@ -45,7 +45,7 @@ public class TodoRepository : ITodoRepository
 		}
 		catch (Exception ex)
 		{
-			_logger.Log(LogLevel.Error, $"Error updating todo: {ex.Message}");
+			_logger.LogError(ex, "Error updating todo");
 			return false;
 		}
 	}
@@ -67,7 +67,7 @@ public class TodoRepository : ITodoRepository
 		}
 		catch (Exception ex)
 		{
-			_logger.Log(LogLevel.Error, $"Error retrieving todos: {ex.Message}");
+			_logger.LogError(ex, "Error retrieving todos");
 			return new List<TodoItem>();
 		}
 	}

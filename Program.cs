@@ -7,6 +7,11 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddRazorPages();
 builder.Services.AddServerSideBlazor();
 
+builder.Services.AddHsts(options =>
+{
+	options.MaxAge = TimeSpan.FromDays(365);
+});
+
 // Third party
 builder.Services.AddBlazoredLocalStorage();
 
@@ -31,6 +36,15 @@ if (!builder.Configuration.GetValue<bool>("DisableHttpsRedirect"))
 }
 
 app.UseStaticFiles();
+
+app.Use(async (context, next) =>
+{
+	context.Response.Headers.Append("X-Content-Type-Options", "nosniff");
+	context.Response.Headers.Append("X-Frame-Options", "SAMEORIGIN");
+	context.Response.Headers.Append("X-XSS-Protection", "1; mode=block");
+	context.Response.Headers.Append("Referrer-Policy", "strict-origin-when-cross-origin");
+	await next();
+});
 
 app.UseRouting();
 
