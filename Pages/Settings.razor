@@ -1,0 +1,240 @@
+@page "/settings"
+@using Blazored.LocalStorage
+@inject IImportExportService ImportExportService
+@inject IFileService FileService
+@inject IDialogService DialogService
+@inject ILocalStorageService LocalStorage
+@inject NavigationManager NavigationManager
+
+<PageTitle>BlazorTodo - Settings</PageTitle>
+
+<h1 class="page-title">Settings</h1>
+
+<div class="settings-sections">
+
+	<!-- Import / Export -->
+	<div class="settings-card">
+		<div class="settings-card-header">
+			<div class="settings-card-icon">
+				<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+					<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+					<polyline points="17 8 12 3 7 8"/>
+					<line x1="12" y1="3" x2="12" y2="15"/>
+				</svg>
+			</div>
+			<div>
+				<h2 class="settings-card-title">Import / Export</h2>
+				<p class="settings-card-description">Download all your todos as a JSON file, or import from a previously exported file.</p>
+			</div>
+		</div>
+		<div class="settings-card-actions">
+			<button class="btn btn-outline-secondary" @onclick="ShowImportExportModal">
+				<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+					<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+					<polyline points="17 8 12 3 7 8"/>
+					<line x1="12" y1="3" x2="12" y2="15"/>
+				</svg>
+				Import / Export
+			</button>
+		</div>
+	</div>
+
+	<!-- Sync -->
+	<div class="settings-card">
+		<div class="settings-card-header">
+			<div class="settings-card-icon">
+				<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+					<path d="M18 20V10"/>
+					<path d="M12 20V4"/>
+					<path d="M6 20v-6"/>
+				</svg>
+			</div>
+			<div>
+				<h2 class="settings-card-title">Sync</h2>
+				<p class="settings-card-description">Sync your todos to another device or restore from a sync point.</p>
+			</div>
+		</div>
+		<div class="settings-card-actions">
+			<button class="btn btn-outline-secondary" @onclick="ShowSyncModal">
+				<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+					<path d="M18 20V10"/>
+					<path d="M12 20V4"/>
+					<path d="M6 20v-6"/>
+				</svg>
+				Sync
+			</button>
+		</div>
+	</div>
+
+	<!-- Danger Zone -->
+	<div class="settings-card danger-zone">
+		<div class="settings-card-header">
+			<div class="settings-card-icon danger">
+				<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+					<path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+					<line x1="12" y1="9" x2="12" y2="13"/>
+					<line x1="12" y1="17" x2="12.01" y2="17"/>
+				</svg>
+			</div>
+			<div>
+				<h2 class="settings-card-title">Danger Zone</h2>
+				<p class="settings-card-description">Permanently delete all todos, projects, notes, and sync data from this browser. This cannot be undone.</p>
+			</div>
+		</div>
+		<div class="settings-card-actions">
+			<button class="btn btn-ghost danger" @onclick="HandleClearLocalStorage">
+				<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+					<path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+				</svg>
+				Clear All Local Storage
+			</button>
+		</div>
+	</div>
+
+</div>
+
+<!-- Modals -->
+<ImportExportModal IsVisible="@_showImportExportModal"
+                   OnClose="HideImportExportModal"
+                   OnExport="HandleExport"
+                   OnImport="HandleImport"
+                   @ref="_importExportModal" />
+
+<SyncModal IsVisible="@_showSyncModal" InitialTab="sync" OnClose="HideSyncModal" />
+
+<style>
+	.settings-sections {
+		display: flex;
+		flex-direction: column;
+		gap: var(--space-4);
+		max-width: 700px;
+	}
+
+	.settings-card {
+		background: var(--surface);
+		border: 1px solid var(--border-light);
+		border-radius: var(--radius-lg);
+		padding: var(--space-5) var(--space-6);
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		gap: var(--space-6);
+		transition: border-color var(--transition-fast);
+	}
+
+	.settings-card:hover {
+		border-color: var(--border);
+	}
+
+	.settings-card.danger-zone {
+		border-color: var(--danger-light);
+	}
+
+	.settings-card.danger-zone:hover {
+		border-color: var(--danger);
+	}
+
+	.settings-card-header {
+		display: flex;
+		align-items: flex-start;
+		gap: var(--space-4);
+	}
+
+	.settings-card-icon {
+		width: 44px;
+		height: 44px;
+		border-radius: var(--radius-lg);
+		background: var(--primary-50);
+		color: var(--primary);
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		flex-shrink: 0;
+	}
+
+	.settings-card-icon.danger {
+		background: var(--danger-light);
+		color: var(--danger);
+	}
+
+	.settings-card-title {
+		font-size: 1rem;
+		font-weight: 600;
+		color: var(--text-primary);
+		margin: 0 0 var(--space-1);
+	}
+
+	.settings-card-description {
+		font-size: 0.875rem;
+		color: var(--text-secondary);
+		margin: 0;
+		line-height: 1.5;
+	}
+
+	.settings-card-actions {
+		flex-shrink: 0;
+	}
+
+	.btn-ghost.danger {
+		color: var(--danger);
+	}
+
+	.btn-ghost.danger:hover {
+		background: var(--danger-light);
+	}
+
+	@@media (max-width: 640px) {
+		.settings-card {
+			flex-direction: column;
+			align-items: stretch;
+		}
+
+		.settings-card-actions {
+			display: flex;
+		}
+	}
+</style>
+
+@code {
+	private bool _showImportExportModal;
+	private bool _showSyncModal;
+	private ImportExportModal? _importExportModal;
+
+	private void ShowImportExportModal() => _showImportExportModal = true;
+	private void HideImportExportModal() => _showImportExportModal = false;
+	private void ShowSyncModal() => _showSyncModal = true;
+	private void HideSyncModal() => _showSyncModal = false;
+
+	private async Task HandleExport()
+	{
+		var json = await ImportExportService.ExportToJsonAsync();
+		var fileName = $"todos-export-{DateTime.Now:yyyy-MM-dd-HHmmss}.json";
+		await FileService.DownloadFileAsync(fileName, json);
+	}
+
+	private async Task HandleImport((string Content, bool ReplaceExisting) args)
+	{
+		var result = await ImportExportService.ImportFromJsonAsync(args.Content, args.ReplaceExisting);
+
+		if (result.Success)
+		{
+			var message = $"Successfully imported {result.ImportedCount} todo(s).";
+			if (result.SkippedCount > 0)
+				message += $" Skipped {result.SkippedCount} duplicate(s).";
+			_importExportModal?.ShowMessage(message, false);
+		}
+		else
+		{
+			_importExportModal?.ShowMessage(result.ErrorMessage ?? "Import failed.", true);
+		}
+	}
+
+	private async Task HandleClearLocalStorage()
+	{
+		if (await DialogService.ConfirmAsync("Clear ALL local storage? This permanently deletes all todos, projects, notes, and sync data. This cannot be undone."))
+		{
+			await LocalStorage.ClearAsync();
+			NavigationManager.NavigateTo("/", forceLoad: true);
+		}
+	}
+}

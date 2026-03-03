@@ -22,7 +22,7 @@ This is a .NET 9 Blazor Server application. There are no tests configured.
 
 ## Architecture Overview
 
-**TaskFlow** is a todo management app with projects, using Blazor Server with browser local storage persistence via Blazored.LocalStorage.
+**BlazorTodo** is a todo management app with projects, using Blazor Server with browser local storage persistence via Blazored.LocalStorage.
 
 ### Layer Structure
 

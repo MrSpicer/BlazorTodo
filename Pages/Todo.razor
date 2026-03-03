@@ -4,10 +4,9 @@
 @inject IProjectService ProjectService
 @inject INoteService NoteService
 @inject IDialogService DialogService
-@inject IImportExportService ImportExportService
-@inject IFileService FileService
+@inject NavigationManager NavigationManager
 
-<PageTitle>TaskFlow - Todo Management</PageTitle>
+<PageTitle>BlazorTodo - Todo Management</PageTitle>
 
 @if (!ProjectService.Projects.Any())
 {
@@ -19,7 +18,7 @@
                     <path d="M22 4L12 14.01l-3-3"/>
                 </svg>
             </div>
-            <h1 class="welcome-title">Welcome to TaskFlow</h1>
+            <h1 class="welcome-title">Welcome to BlazorTodo</h1>
             <p class="welcome-description">
                 Get started by creating your first project. Projects help you organize your tasks 
                 and stay focused on what matters most.
@@ -30,7 +29,7 @@
                 </svg>
                 Create Your First Project
             </button>
-            <button class="btn btn-outline-secondary btn-lg" @onclick="ShowRestoreModal">
+            <button class="btn btn-outline-secondary btn-lg" @onclick='() => NavigationManager.NavigateTo("/settings")'>
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <path d="M3 12a9 9 0 0 1 15-6.7L21 8"/>
                     <path d="M21 22v-6h-6"/>
@@ -135,22 +134,6 @@ else
                 </button>
             </div>
             <div class="action-bar-right">
-                <button class="btn btn-outline-secondary" @onclick="ShowImportExportModal">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
-                        <polyline points="17 8 12 3 7 8"/>
-                        <line x1="12" y1="3" x2="12" y2="15"/>
-                    </svg>
-                    Import / Export
-                </button>
-                <button class="btn btn-outline-secondary" @onclick="ShowSyncModal">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <path d="M18 20V10"/>
-                        <path d="M12 20V4"/>
-                        <path d="M6 20v-6"/>
-                    </svg>
-                    Sync
-                </button>
                 @if (GetProjectTodoCount() > 0)
                 {
                     <button class="btn btn-ghost danger" @onclick="HandleClearAll">
@@ -202,12 +185,6 @@ else
               OnClose="HideProjectModal"
               OnSave="HandleSaveProject" />
 
-<ImportExportModal IsVisible="@_showImportExportModal"
-                   OnClose="HideImportExportModal"
-                   OnExport="HandleExport"
-                   OnImport="HandleImport"
-                   @ref="_importExportModal" />
-
 <TodoFormModal IsVisible="@_showTodoModal"
                IsEditing="@_isEditing"
                EditingTodo="@_currentTodo"
@@ -221,8 +198,6 @@ else
                DefaultProjectId="@ProjectService.SelectedProject?.Id"
                OnClose="HideNoteModal"
                OnSubmit="HandleNoteFormSubmit" />
-
-<SyncModal IsVisible="@_showSyncModal" InitialTab="@_syncModalInitialTab" OnClose="HideSyncModal" />
 
 <style>
     /* Welcome Screen */
@@ -470,12 +445,8 @@ else
     private bool _isEditing;
     private TodoFilterCriteria _filterCriteria = new();
     private bool _initialized;
-    private bool _showImportExportModal;
     private bool _showProjectModal;
     private bool _showTodoModal;
-    private bool _showSyncModal;
-    private string _syncModalInitialTab = "sync";
-    private ImportExportModal? _importExportModal;
 
     private string _activeTab = "tasks";
     private ProjectNote _currentNote = new();
@@ -589,11 +560,6 @@ else
         _isEditing = false;
     }
 
-    private void ShowImportExportModal() => _showImportExportModal = true;
-    private void HideImportExportModal() => _showImportExportModal = false;
-    private void ShowSyncModal() { _syncModalInitialTab = "sync"; _showSyncModal = true; }
-    private void ShowRestoreModal() { _syncModalInitialTab = "restore"; _showSyncModal = true; }
-    private void HideSyncModal() => _showSyncModal = false;
     private void ShowProjectModal() => _showProjectModal = true;
     private void HideProjectModal() => _showProjectModal = false;
     private void ShowTodoModal() => _showTodoModal = true;
@@ -623,30 +589,6 @@ else
             await TodoService.DeleteTodosByProjectAsync(project.Id);
             await NoteService.DeleteNotesByProjectAsync(project.Id);
             await ProjectService.DeleteProjectAsync(project);
-        }
-    }
-
-    private async Task HandleExport()
-    {
-        var json = await ImportExportService.ExportToJsonAsync();
-        var fileName = $"todos-export-{DateTime.Now:yyyy-MM-dd-HHmmss}.json";
-        await FileService.DownloadFileAsync(fileName, json);
-    }
-
-    private async Task HandleImport((string Content, bool ReplaceExisting) args)
-    {
-        var result = await ImportExportService.ImportFromJsonAsync(args.Content, args.ReplaceExisting);
-
-        if (result.Success)
-        {
-            var message = $"Successfully imported {result.ImportedCount} todo(s).";
-            if (result.SkippedCount > 0)
-                message += $" Skipped {result.SkippedCount} duplicate(s).";
-            _importExportModal?.ShowMessage(message, false);
-        }
-        else
-        {
-            _importExportModal?.ShowMessage(result.ErrorMessage ?? "Import failed.", true);
         }
     }
 
