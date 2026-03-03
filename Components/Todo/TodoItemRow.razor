@@ -33,20 +33,7 @@
 
 	<div class="todo-card-content">
 		<div class="todo-header">
-			@if (_isEditingTitle && Depth > 0)
-			{
-				<input @ref="_titleInputRef"
-				       class="title-edit-input"
-				       @bind="_editingTitleValue"
-				       @bind:event="oninput"
-				       @onkeydown="HandleTitleKeyDown"
-				       data-testid="subtask-title-input"
-				       aria-label="Edit subtask title" />
-			}
-			else
-			{
-				<h3 class="todo-title @(Item.Status == TodoItemStatus.Done ? "done" : "")">@Item.Title</h3>
-			}
+			<h3 class="todo-title @(Item.Status == TodoItemStatus.Done ? "done" : "")">@Item.Title</h3>
 			<div class="todo-badges">
 				<span class="priority-badge priority-@Item.Priority.ToString().ToLower()">
 					@Item.Priority
@@ -106,9 +93,9 @@
 		<div class="action-buttons">
 			@if (Depth > 0)
 			{
-				<button class="action-btn edit-btn" @onclick="StartEditTitle"
-				        title="Edit subtask title"
-				        aria-label="Edit subtask title"
+				<button class="action-btn edit-btn" @onclick="() => OnEdit.InvokeAsync(Item)"
+				        title="Edit subtask"
+				        aria-label="Edit subtask"
 				        data-testid="subtask-edit-btn">
 					<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
 						<path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
@@ -137,46 +124,38 @@
 	</div>
 </div>
 
-@if (_isExpanded && Depth == 0)
+@if (_isExpanded)
 {
 	<div class="subtask-tree" data-testid="subtask-tree">
 		@foreach (var sub in Item.SubTasks)
 		{
 			<div class="subtask-item-wrapper" @key="sub.Id">
-				<TodoItemRow Item="sub" Depth="1"
+				<TodoItemRow Item="sub" Depth="Depth + 1"
 				             OnSave="HandleSubTaskSave"
 				             OnDelete="HandleSubTaskDelete"
-				             OnEdit="OnEdit" />
+				             OnEdit="HandleEditSubTask" />
 			</div>
 		}
 
-		@if (_showAddSubTask)
-		{
-			<div class="add-subtask-form">
-				<input @ref="_addSubTaskInputRef"
-				       class="add-subtask-input"
-				       placeholder="New subtask title..."
-				       @bind="_newSubTaskTitle"
-				       @bind:event="oninput"
-				       @onkeydown="HandleAddSubTaskKeyDown"
-				       data-testid="add-subtask-input"
-				       aria-label="New subtask title" />
-			</div>
-		}
-		else
-		{
-			<button class="add-subtask-trigger"
-			        @onclick="ShowAddSubTask"
-			        data-testid="add-subtask-trigger"
-			        aria-label="Add subtask">
-				<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
-					<path d="M12 5v14M5 12h14"/>
-				</svg>
-				Add subtask
-			</button>
-		}
+		<button class="add-subtask-trigger"
+		        @onclick="ShowAddSubTaskModal"
+		        data-testid="add-subtask-trigger"
+		        aria-label="Add subtask">
+			<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+				<path d="M12 5v14M5 12h14"/>
+			</svg>
+			Add subtask
+		</button>
 	</div>
 }
+
+<TodoFormModal
+    IsVisible="_showSubTaskModal"
+    IsEditing="_isEditingSubTask"
+    EditingTodo="_editingSubTask"
+    DefaultProjectId="Item.ProjectId"
+    OnClose="HandleSubTaskModalClose"
+    OnSubmit="HandleSubTaskModalSubmit" />
 
 <style>
 	.todo-card {
@@ -334,20 +313,6 @@
 	.todo-title.done {
 		text-decoration: line-through;
 		color: var(--text-muted);
-	}
-
-	.title-edit-input {
-		flex: 1;
-		font-size: 0.875rem;
-		font-weight: 500;
-		padding: var(--space-1) var(--space-2);
-		border: 1px solid var(--primary);
-		border-radius: var(--radius-sm);
-		background: var(--surface);
-		color: var(--text-primary);
-		outline: none;
-		box-shadow: 0 0 0 2px var(--primary-50);
-		min-width: 0;
 	}
 
 	.todo-badges {
@@ -564,23 +529,6 @@
 		transform: translateY(-1px);
 	}
 
-	.add-subtask-form {
-		margin-top: var(--space-2);
-	}
-
-	.add-subtask-input {
-		width: 100%;
-		padding: var(--space-2) var(--space-3);
-		border: 1px solid var(--primary);
-		border-radius: var(--radius-md);
-		font-size: 0.8125rem;
-		background: var(--surface);
-		color: var(--text-primary);
-		outline: none;
-		box-shadow: 0 0 0 3px var(--primary-50);
-		box-sizing: border-box;
-	}
-
 	/* Responsive */
 	@@media (max-width: 640px) {
 		.todo-card {
@@ -633,28 +581,9 @@
 	public EventCallback<TodoItem> OnSave { get; set; }
 
 	private bool _isExpanded = true;
-	private bool _isEditingTitle = false;
-	private string _editingTitleValue = string.Empty;
-	private string _newSubTaskTitle = string.Empty;
-	private bool _showAddSubTask = false;
-	private bool _focusTitleInput = false;
-	private bool _focusAddInput = false;
-	private ElementReference _titleInputRef;
-	private ElementReference _addSubTaskInputRef;
-
-	protected override async Task OnAfterRenderAsync(bool firstRender)
-	{
-		if (_focusTitleInput)
-		{
-			_focusTitleInput = false;
-			try { await _titleInputRef.FocusAsync(); } catch { }
-		}
-		if (_focusAddInput)
-		{
-			_focusAddInput = false;
-			try { await _addSubTaskInputRef.FocusAsync(); } catch { }
-		}
-	}
+	private bool _showSubTaskModal;
+	private bool _isEditingSubTask;
+	private TodoItem? _editingSubTask;
 
 	private async Task HandleEdit() => await OnEdit.InvokeAsync(Item);
 
@@ -692,61 +621,44 @@
 		await OnSave.InvokeAsync(Item);
 	}
 
-	private void ShowAddSubTask()
+	private void ShowAddSubTaskModal()
 	{
-		_showAddSubTask = true;
-		_newSubTaskTitle = string.Empty;
-		_focusAddInput = true;
+		_editingSubTask = null;
+		_isEditingSubTask = false;
+		_showSubTaskModal = true;
 	}
 
-	private async Task CommitAddSubTask()
+	private void HandleEditSubTask(TodoItem sub)
 	{
-		if (string.IsNullOrWhiteSpace(_newSubTaskTitle))
+		_editingSubTask = sub;
+		_isEditingSubTask = true;
+		_showSubTaskModal = true;
+	}
+
+	private async Task HandleSubTaskModalSubmit(TodoItem submitted)
+	{
+		if (_isEditingSubTask && _editingSubTask != null)
 		{
-			_showAddSubTask = false;
-			return;
+			submitted.SubTasks = _editingSubTask.SubTasks;
+			var idx = Item.SubTasks.FindIndex(s => s.Id == submitted.Id);
+			if (idx >= 0) Item.SubTasks[idx] = submitted;
 		}
-		Item.SubTasks.Add(new TodoItem
+		else
 		{
-			Title = _newSubTaskTitle.Trim(),
-			ProjectId = Item.ProjectId,
-			Status = TodoItemStatus.New
-		});
-		_newSubTaskTitle = string.Empty;
-		_showAddSubTask = false;
+			submitted.ProjectId = Item.ProjectId;
+			Item.SubTasks.Add(submitted);
+		}
+		_showSubTaskModal = false;
+		_isEditingSubTask = false;
+		_editingSubTask = null;
 		await OnSave.InvokeAsync(Item);
 	}
 
-	private async Task HandleAddSubTaskKeyDown(KeyboardEventArgs e)
+	private void HandleSubTaskModalClose()
 	{
-		if (e.Key == "Enter") await CommitAddSubTask();
-		else if (e.Key == "Escape")
-		{
-			_showAddSubTask = false;
-			_newSubTaskTitle = string.Empty;
-		}
-	}
-
-	private void StartEditTitle()
-	{
-		_editingTitleValue = Item.Title;
-		_isEditingTitle = true;
-		_focusTitleInput = true;
-	}
-
-	private async Task CommitEditTitle()
-	{
-		if (!_isEditingTitle) return;
-		if (!string.IsNullOrWhiteSpace(_editingTitleValue))
-			Item.Title = _editingTitleValue.Trim();
-		_isEditingTitle = false;
-		await OnSave.InvokeAsync(Item);
-	}
-
-	private async Task HandleTitleKeyDown(KeyboardEventArgs e)
-	{
-		if (e.Key == "Enter") await CommitEditTitle();
-		else if (e.Key == "Escape") _isEditingTitle = false;
+		_showSubTaskModal = false;
+		_isEditingSubTask = false;
+		_editingSubTask = null;
 	}
 
 	private string GetStatusClass() => Item.Status switch
