@@ -2,195 +2,765 @@
 
 @if (IsVisible)
 {
-    <div class="modal fade show d-block" tabindex="-1" style="background-color: rgba(0,0,0,0.5);">
-        <div class="modal-dialog modal-dialog-centered">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title">📦 Import / Export Todos</h5>
-                    <button type="button" class="btn-close" @onclick="Close" aria-label="Close"></button>
-                </div>
-                <div class="modal-body">
-                    @if (!string.IsNullOrEmpty(_message))
-                    {
-                        <div class="alert @(_isError ? "alert-danger" : "alert-success") alert-dismissible fade show" role="alert">
-                            @_message
-                            <button type="button" class="btn-close" @onclick="ClearMessage" aria-label="Close"></button>
-                        </div>
-                    }
+	<div class="ie-backdrop" @onclick="Close">
+		<div class="ie-modal" @onclick:stopPropagation="true">
 
-                    <!-- Export Section -->
-                    <div class="card mb-3">
-                        <div class="card-header">
-                            <h6 class="mb-0">📤 Export</h6>
-                        </div>
-                        <div class="card-body">
-                            <p class="card-text text-muted small">
-                                Download all your todos as a JSON file that can be imported later.
-                            </p>
-                            <button class="btn btn-primary" @onclick="HandleExport" disabled="@_isProcessing">
-                                @if (_isProcessing && _isExporting)
-                                {
-                                    <span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
-                                }
-                                📥 Download JSON
-                            </button>
-                        </div>
-                    </div>
+			<!-- Header -->
+			<div class="ie-header">
+				<div class="ie-header-icon">
+					<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+						<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+						<polyline points="7 10 12 15 17 10"/>
+						<line x1="12" y1="15" x2="12" y2="3"/>
+					</svg>
+				</div>
+				<div class="ie-header-text">
+					<h2 class="ie-title">Import / Export</h2>
+					<p class="ie-subtitle">Backup and restore your data</p>
+				</div>
+				<button class="ie-close" @onclick="Close" aria-label="Close">
+					<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+						<line x1="18" y1="6" x2="6" y2="18"/>
+						<line x1="6" y1="6" x2="18" y2="18"/>
+					</svg>
+				</button>
+			</div>
 
-                    <!-- Import Section -->
-                    <div class="card">
-                        <div class="card-header">
-                            <h6 class="mb-0">📥 Import</h6>
-                        </div>
-                        <div class="card-body">
-                            <p class="card-text text-muted small">
-                                Import todos from a previously exported JSON file.
-                            </p>
-                            
-                            <div class="mb-3">
-                                <label for="importFile" class="form-label">Select JSON file</label>
-                                <InputFile id="importFile" class="form-control" OnChange="HandleFileSelected" accept=".json" />
-                            </div>
+			<!-- Body -->
+			<div class="ie-body">
 
-                            @if (_selectedFile != null)
-                            {
-                                <div class="alert alert-info py-2 mb-3">
-                                    <small>📄 Selected: @_selectedFile.Name (@FormatFileSize(_selectedFile.Size))</small>
-                                </div>
-                            }
+				<!-- Banner -->
+				@if (!string.IsNullOrEmpty(_message))
+				{
+					<div class="ie-banner @(_isError ? "ie-banner-error" : "ie-banner-success")">
+						<span class="ie-banner-icon">
+							@if (_isError)
+							{
+								<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+									<circle cx="12" cy="12" r="10"/>
+									<line x1="15" y1="9" x2="9" y2="15"/>
+									<line x1="9" y1="9" x2="15" y2="15"/>
+								</svg>
+							}
+							else
+							{
+								<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+									<polyline points="20 6 9 17 4 12"/>
+								</svg>
+							}
+						</span>
+						<span class="ie-banner-text">@_message</span>
+						<button class="ie-banner-dismiss" @onclick="ClearMessage" aria-label="Dismiss">
+							<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+								<line x1="18" y1="6" x2="6" y2="18"/>
+								<line x1="6" y1="6" x2="18" y2="18"/>
+							</svg>
+						</button>
+					</div>
+				}
 
-                            <div class="form-check mb-3">
-                                <input class="form-check-input" type="checkbox" id="replaceExisting" @bind="_replaceExisting">
-                                <label class="form-check-label" for="replaceExisting">
-                                    Replace all existing todos
-                                </label>
-                                <div class="form-text text-warning small">
-                                    ⚠️ This will delete all current todos before importing!
-                                </div>
-                            </div>
+				<!-- Export Section -->
+				<div class="ie-section ie-export-section">
+					<div class="ie-section-icon">
+						<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+							<polyline points="8 17 12 21 16 17"/>
+							<line x1="12" y1="12" x2="12" y2="21"/>
+							<path d="M20.88 18.09A5 5 0 0 0 18 9h-1.26A8 8 0 1 0 3 16.29"/>
+						</svg>
+					</div>
+					<div class="ie-section-content">
+						<h3 class="ie-section-title">Export Your Data</h3>
+						<p class="ie-section-desc">Download a complete backup as JSON</p>
+					</div>
+					<button class="ie-btn ie-btn-primary" @onclick="HandleExport" disabled="@_isProcessing">
+						@if (_isProcessing && _isExporting)
+						{
+							<span class="ie-spinner"></span>
+							<span>Exporting...</span>
+						}
+						else
+						{
+							<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+								<polyline points="8 17 12 21 16 17"/>
+								<line x1="12" y1="12" x2="12" y2="21"/>
+								<path d="M20.88 18.09A5 5 0 0 0 18 9h-1.26A8 8 0 1 0 3 16.29"/>
+							</svg>
+							<span>Download Backup</span>
+						}
+					</button>
+				</div>
 
-                            <button class="btn btn-success" @onclick="HandleImport" 
-                                    disabled="@(_isProcessing || _selectedFile == null)">
-                                @if (_isProcessing && !_isExporting)
-                                {
-                                    <span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
-                                }
-                                📤 Import Todos
-                            </button>
-                        </div>
-                    </div>
-                </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" @onclick="Close">Close</button>
-                </div>
-            </div>
-        </div>
-    </div>
+				<!-- Divider -->
+				<div class="ie-divider"><span>or import</span></div>
+
+				<!-- Drop Zone -->
+				<div class="ie-dropzone @(_isDragOver ? "ie-dropzone-active" : "")"
+					 @ondragenter="OnDragEnter"
+					 @ondragleave="OnDragLeave"
+					 @ondragover:preventDefault="true">
+					<div class="ie-dropzone-icon">
+						<svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+							<polyline points="16 16 12 12 8 16"/>
+							<line x1="12" y1="12" x2="12" y2="21"/>
+							<path d="M20.39 18.39A5 5 0 0 0 18 9h-1.26A8 8 0 1 0 3 16.3"/>
+						</svg>
+					</div>
+					<p class="ie-dropzone-title">Drop your JSON file here</p>
+					<p class="ie-dropzone-hint">or click to browse files</p>
+					<InputFile OnChange="HandleFileSelected" accept=".json"
+							   style="position:absolute;inset:0;opacity:0;width:100%;height:100%;cursor:pointer;" />
+				</div>
+
+				<!-- File Preview -->
+				@if (_selectedFile != null)
+				{
+					<div class="ie-file-preview">
+						<span class="ie-file-icon">
+							<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+								<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+								<polyline points="14 2 14 8 20 8"/>
+								<line x1="16" y1="13" x2="8" y2="13"/>
+								<line x1="16" y1="17" x2="8" y2="17"/>
+								<polyline points="10 9 9 9 8 9"/>
+							</svg>
+						</span>
+						<span class="ie-file-name">@_selectedFile.Name</span>
+						<span class="ie-file-size">@FormatFileSize(_selectedFile.Size)</span>
+						<button class="ie-file-remove" @onclick="ClearFile" aria-label="Remove file">
+							<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+								<line x1="18" y1="6" x2="6" y2="18"/>
+								<line x1="6" y1="6" x2="18" y2="18"/>
+							</svg>
+						</button>
+					</div>
+
+					<!-- Danger Toggle -->
+					<div class="ie-danger-section">
+						<div class="ie-danger-header">
+							<span class="ie-danger-icon">
+								<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+									<path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+									<line x1="12" y1="9" x2="12" y2="13"/>
+									<line x1="12" y1="17" x2="12.01" y2="17"/>
+								</svg>
+							</span>
+							<span class="ie-danger-label">Replace all existing data</span>
+							<label class="ie-toggle">
+								<input type="checkbox" @bind="_replaceExisting" />
+								<span class="ie-toggle-slider">
+									<span class="ie-toggle-thumb"></span>
+								</span>
+							</label>
+						</div>
+						@if (_replaceExisting)
+						{
+							<p class="ie-danger-warning">This will permanently delete all your todos, projects, and notes before importing.</p>
+						}
+					</div>
+
+					<!-- Import Button -->
+					<button class="ie-btn ie-btn-primary ie-btn-full" @onclick="HandleImport" disabled="@_isProcessing">
+						@if (_isProcessing && !_isExporting)
+						{
+							<span class="ie-spinner"></span>
+							<span>Importing...</span>
+						}
+						else
+						{
+							<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+								<polyline points="16 16 12 12 8 16"/>
+								<line x1="12" y1="12" x2="12" y2="21"/>
+								<path d="M20.88 18.09A5 5 0 0 0 18 9h-1.26A8 8 0 1 0 3 16.29"/>
+							</svg>
+							<span>Import Data</span>
+						}
+					</button>
+				}
+
+			</div>
+		</div>
+	</div>
 }
 
+<style>
+	/* Backdrop */
+	.ie-backdrop {
+		position: fixed;
+		inset: 0;
+		z-index: 1050;
+		background: rgba(15, 23, 42, 0.55);
+		backdrop-filter: blur(4px);
+		-webkit-backdrop-filter: blur(4px);
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		padding: var(--space-4);
+		animation: ieBackdropIn 200ms ease forwards;
+	}
+
+	@@keyframes ieBackdropIn {
+		from { opacity: 0; }
+		to { opacity: 1; }
+	}
+
+	/* Modal */
+	.ie-modal {
+		background: var(--surface);
+		border-radius: var(--radius-xl);
+		box-shadow: var(--shadow-xl), 0 0 0 1px rgba(0,0,0,0.05);
+		width: 100%;
+		max-width: 480px;
+		overflow: hidden;
+		animation: ieModalIn 220ms cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+	}
+
+	@@keyframes ieModalIn {
+		from { opacity: 0; transform: scale(0.95) translateY(8px); }
+		to { opacity: 1; transform: scale(1) translateY(0); }
+	}
+
+	/* Header */
+	.ie-header {
+		background: linear-gradient(135deg, var(--primary) 0%, var(--primary-hover) 100%);
+		padding: var(--space-5) var(--space-6);
+		display: flex;
+		align-items: center;
+		gap: var(--space-3);
+	}
+
+	.ie-header-icon {
+		width: 40px;
+		height: 40px;
+		border-radius: var(--radius-lg);
+		background: rgba(255,255,255,0.2);
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		color: white;
+		flex-shrink: 0;
+	}
+
+	.ie-header-text {
+		flex: 1;
+	}
+
+	.ie-title {
+		font-size: 1.0625rem;
+		font-weight: 700;
+		color: white;
+		margin: 0;
+		line-height: 1.2;
+	}
+
+	.ie-subtitle {
+		font-size: 0.8125rem;
+		color: rgba(255,255,255,0.75);
+		margin: 0;
+	}
+
+	.ie-close {
+		width: 32px;
+		height: 32px;
+		border-radius: var(--radius-md);
+		background: rgba(255,255,255,0.15);
+		border: none;
+		color: white;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		cursor: pointer;
+		transition: background var(--transition-fast);
+		flex-shrink: 0;
+	}
+
+	.ie-close:hover {
+		background: rgba(255,255,255,0.25);
+	}
+
+	/* Body */
+	.ie-body {
+		padding: var(--space-6);
+		display: flex;
+		flex-direction: column;
+		gap: var(--space-4);
+	}
+
+	/* Banner */
+	.ie-banner {
+		border-radius: var(--radius-md);
+		padding: var(--space-3) var(--space-4);
+		display: flex;
+		align-items: center;
+		gap: var(--space-2);
+		animation: ieBannerIn 200ms ease forwards;
+		font-size: 0.875rem;
+		font-weight: 500;
+	}
+
+	@@keyframes ieBannerIn {
+		from { opacity: 0; transform: translateY(-6px); }
+		to { opacity: 1; transform: translateY(0); }
+	}
+
+	.ie-banner-success {
+		background: var(--success-light);
+		color: #065f46;
+		border: 1px solid #a7f3d0;
+	}
+
+	.ie-banner-error {
+		background: var(--danger-light);
+		color: #991b1b;
+		border: 1px solid #fca5a5;
+	}
+
+	.ie-banner-icon {
+		flex-shrink: 0;
+		display: flex;
+	}
+
+	.ie-banner-text {
+		flex: 1;
+	}
+
+	.ie-banner-dismiss {
+		background: none;
+		border: none;
+		cursor: pointer;
+		padding: 2px;
+		opacity: 0.6;
+		display: flex;
+		color: inherit;
+		border-radius: var(--radius-sm);
+		transition: opacity var(--transition-fast);
+	}
+
+	.ie-banner-dismiss:hover {
+		opacity: 1;
+	}
+
+	/* Export Section */
+	.ie-export-section {
+		background: var(--primary-50);
+		border: 1px solid var(--primary-light);
+		border-radius: var(--radius-lg);
+		padding: var(--space-4) var(--space-5);
+		display: flex;
+		align-items: center;
+		gap: var(--space-4);
+	}
+
+	.ie-section-icon {
+		width: 40px;
+		height: 40px;
+		border-radius: var(--radius-lg);
+		background: var(--primary-light);
+		color: var(--primary);
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		flex-shrink: 0;
+	}
+
+	.ie-section-content {
+		flex: 1;
+		min-width: 0;
+	}
+
+	.ie-section-title {
+		font-size: 0.9375rem;
+		font-weight: 600;
+		color: var(--text-primary);
+		margin: 0 0 2px;
+	}
+
+	.ie-section-desc {
+		font-size: 0.8125rem;
+		color: var(--text-secondary);
+		margin: 0;
+	}
+
+	/* Divider */
+	.ie-divider {
+		display: flex;
+		align-items: center;
+		gap: var(--space-3);
+		color: var(--text-muted);
+		font-size: 0.8125rem;
+	}
+
+	.ie-divider::before, .ie-divider::after {
+		content: '';
+		flex: 1;
+		height: 1px;
+		background: var(--border);
+	}
+
+	/* Drop Zone */
+	.ie-dropzone {
+		position: relative;
+		border: 2px dashed var(--border);
+		border-radius: var(--radius-lg);
+		background: var(--gray-50);
+		padding: var(--space-8) var(--space-6);
+		text-align: center;
+		transition: border-color var(--transition-base), background var(--transition-base);
+		cursor: pointer;
+	}
+
+	.ie-dropzone:hover, .ie-dropzone-active {
+		border-color: var(--primary);
+		background: var(--primary-50);
+	}
+
+	.ie-dropzone:hover .ie-dropzone-icon,
+	.ie-dropzone-active .ie-dropzone-icon {
+		color: var(--primary);
+		transform: translateY(-2px);
+	}
+
+	.ie-dropzone-icon {
+		color: var(--gray-400);
+		display: flex;
+		justify-content: center;
+		margin-bottom: var(--space-3);
+		transition: color var(--transition-base), transform var(--transition-base);
+	}
+
+	.ie-dropzone-title {
+		font-size: 0.9375rem;
+		font-weight: 600;
+		color: var(--text-primary);
+		margin: 0 0 var(--space-1);
+	}
+
+	.ie-dropzone-hint {
+		font-size: 0.8125rem;
+		color: var(--text-muted);
+		margin: 0;
+	}
+
+	/* File Preview */
+	.ie-file-preview {
+		background: var(--gray-50);
+		border: 1px solid var(--border);
+		border-radius: var(--radius-md);
+		padding: var(--space-3) var(--space-4);
+		display: flex;
+		align-items: center;
+		gap: var(--space-3);
+		animation: ieFileIn 180ms ease forwards;
+	}
+
+	@@keyframes ieFileIn {
+		from { opacity: 0; transform: scale(0.98); }
+		to { opacity: 1; transform: scale(1); }
+	}
+
+	.ie-file-icon {
+		color: var(--primary);
+		display: flex;
+		flex-shrink: 0;
+	}
+
+	.ie-file-name {
+		flex: 1;
+		font-size: 0.875rem;
+		font-weight: 500;
+		color: var(--text-primary);
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+	}
+
+	.ie-file-size {
+		font-size: 0.8125rem;
+		color: var(--text-muted);
+		flex-shrink: 0;
+	}
+
+	.ie-file-remove {
+		background: none;
+		border: none;
+		cursor: pointer;
+		padding: 4px;
+		color: var(--text-muted);
+		display: flex;
+		border-radius: var(--radius-sm);
+		transition: color var(--transition-fast), background var(--transition-fast);
+		flex-shrink: 0;
+	}
+
+	.ie-file-remove:hover {
+		color: var(--danger);
+		background: var(--danger-light);
+	}
+
+	/* Danger Section */
+	.ie-danger-section {
+		border: 1px solid #fca5a5;
+		border-radius: var(--radius-md);
+		padding: var(--space-3) var(--space-4);
+		background: #fff5f5;
+		animation: ieFileIn 180ms ease forwards;
+	}
+
+	.ie-danger-header {
+		display: flex;
+		align-items: center;
+		gap: var(--space-2);
+	}
+
+	.ie-danger-icon {
+		color: var(--danger);
+		display: flex;
+		flex-shrink: 0;
+	}
+
+	.ie-danger-label {
+		flex: 1;
+		font-size: 0.875rem;
+		font-weight: 600;
+		color: #991b1b;
+	}
+
+	.ie-danger-warning {
+		font-size: 0.8125rem;
+		color: #b91c1c;
+		margin: var(--space-2) 0 0;
+		padding-top: var(--space-2);
+		border-top: 1px solid #fca5a5;
+	}
+
+	/* Toggle Switch */
+	.ie-toggle {
+		position: relative;
+		display: inline-flex;
+		cursor: pointer;
+		flex-shrink: 0;
+	}
+
+	.ie-toggle input {
+		position: absolute;
+		opacity: 0;
+		width: 0;
+		height: 0;
+	}
+
+	.ie-toggle-slider {
+		width: 44px;
+		height: 24px;
+		background: var(--gray-300);
+		border-radius: var(--radius-full);
+		transition: background 200ms ease;
+		display: flex;
+		align-items: center;
+		padding: 2px;
+	}
+
+	.ie-toggle input:checked + .ie-toggle-slider {
+		background: var(--danger);
+	}
+
+	.ie-toggle-thumb {
+		width: 20px;
+		height: 20px;
+		background: white;
+		border-radius: var(--radius-full);
+		box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+		transition: transform 200ms ease;
+		flex-shrink: 0;
+	}
+
+	.ie-toggle input:checked + .ie-toggle-slider .ie-toggle-thumb {
+		transform: translateX(20px);
+	}
+
+	/* Buttons */
+	.ie-btn {
+		display: inline-flex;
+		align-items: center;
+		gap: var(--space-2);
+		padding: var(--space-2) var(--space-4);
+		border-radius: var(--radius-md);
+		border: none;
+		font-size: 0.875rem;
+		font-weight: 600;
+		cursor: pointer;
+		transition: background var(--transition-fast), opacity var(--transition-fast), transform var(--transition-fast);
+		white-space: nowrap;
+		flex-shrink: 0;
+	}
+
+	.ie-btn:active:not(:disabled) {
+		transform: scale(0.98);
+	}
+
+	.ie-btn-primary {
+		background: var(--primary);
+		color: white;
+	}
+
+	.ie-btn-primary:hover:not(:disabled) {
+		background: var(--primary-hover);
+	}
+
+	.ie-btn-primary:disabled {
+		opacity: 0.5;
+		cursor: not-allowed;
+	}
+
+	.ie-btn-full {
+		width: 100%;
+		justify-content: center;
+		padding: var(--space-3) var(--space-4);
+		font-size: 0.9375rem;
+	}
+
+	/* Spinner */
+	.ie-spinner {
+		width: 14px;
+		height: 14px;
+		border: 2px solid rgba(255,255,255,0.4);
+		border-top-color: white;
+		border-radius: 50%;
+		animation: ieSpin 600ms linear infinite;
+		flex-shrink: 0;
+	}
+
+	@@keyframes ieSpin {
+		to { transform: rotate(360deg); }
+	}
+</style>
+
 @code {
-    [Parameter]
-    public bool IsVisible { get; set; }
+	[Parameter]
+	public bool IsVisible { get; set; }
 
-    [Parameter]
-    public EventCallback OnClose { get; set; }
+	[Parameter]
+	public EventCallback OnClose { get; set; }
 
-    [Parameter]
-    public EventCallback<string> OnExport { get; set; }
+	[Parameter]
+	public EventCallback<string> OnExport { get; set; }
 
-    [Parameter]
-    public EventCallback<(string Content, bool ReplaceExisting)> OnImport { get; set; }
+	[Parameter]
+	public EventCallback<(string Content, bool ReplaceExisting)> OnImport { get; set; }
 
-    private IBrowserFile? _selectedFile;
-    private bool _replaceExisting;
-    private bool _isProcessing;
-    private bool _isExporting;
-    private string? _message;
-    private bool _isError;
+	private IBrowserFile? _selectedFile;
+	private bool _replaceExisting;
+	private bool _isProcessing;
+	private bool _isExporting;
+	private string? _message;
+	private bool _isError;
+	private bool _isDragOver;
+	private int _dragCounter;
 
-    private async Task HandleExport()
-    {
-        _isProcessing = true;
-        _isExporting = true;
-        ClearMessage();
+	private async Task HandleExport()
+	{
+		_isProcessing = true;
+		_isExporting = true;
+		ClearMessage();
 
-        try
-        {
-            await OnExport.InvokeAsync();
-            ShowMessage("Export completed successfully!", false);
-        }
-        catch (Exception ex)
-        {
-            ShowMessage($"Export failed: {ex.Message}", true);
-        }
-        finally
-        {
-            _isProcessing = false;
-            _isExporting = false;
-        }
-    }
+		try
+		{
+			await OnExport.InvokeAsync();
+			ShowMessage("Export completed successfully!", false);
+		}
+		catch (Exception ex)
+		{
+			ShowMessage($"Export failed: {ex.Message}", true);
+		}
+		finally
+		{
+			_isProcessing = false;
+			_isExporting = false;
+		}
+	}
 
-    private void HandleFileSelected(InputFileChangeEventArgs e)
-    {
-        _selectedFile = e.File;
-        ClearMessage();
-    }
+	private void HandleFileSelected(InputFileChangeEventArgs e)
+	{
+		_selectedFile = e.File;
+		ClearMessage();
+	}
 
-    private async Task HandleImport()
-    {
-        if (_selectedFile == null) return;
+	private void ClearFile()
+	{
+		_selectedFile = null;
+		_replaceExisting = false;
+		ClearMessage();
+	}
 
-        _isProcessing = true;
-        _isExporting = false;
-        ClearMessage();
+	private async Task HandleImport()
+	{
+		if (_selectedFile == null) return;
 
-        try
-        {
-            // Read file content (limit to 10MB)
-            using var stream = _selectedFile.OpenReadStream(maxAllowedSize: 10 * 1024 * 1024);
-            using var reader = new StreamReader(stream);
-            var content = await reader.ReadToEndAsync();
+		_isProcessing = true;
+		_isExporting = false;
+		ClearMessage();
 
-            await OnImport.InvokeAsync((content, _replaceExisting));
-            
-            _selectedFile = null;
-            _replaceExisting = false;
-        }
-        catch (Exception ex)
-        {
-            ShowMessage($"Failed to read file: {ex.Message}", true);
-        }
-        finally
-        {
-            _isProcessing = false;
-        }
-    }
+		try
+		{
+			using var stream = _selectedFile.OpenReadStream(maxAllowedSize: 10 * 1024 * 1024);
+			using var reader = new StreamReader(stream);
+			var content = await reader.ReadToEndAsync();
 
-    public void ShowMessage(string message, bool isError)
-    {
-        _message = message;
-        _isError = isError;
-        StateHasChanged();
-    }
+			await OnImport.InvokeAsync((content, _replaceExisting));
 
-    private void ClearMessage()
-    {
-        _message = null;
-        _isError = false;
-    }
+			_selectedFile = null;
+			_replaceExisting = false;
+		}
+		catch (Exception ex)
+		{
+			ShowMessage($"Failed to read file: {ex.Message}", true);
+		}
+		finally
+		{
+			_isProcessing = false;
+		}
+	}
 
-    private async Task Close()
-    {
-        ClearMessage();
-        _selectedFile = null;
-        _replaceExisting = false;
-        await OnClose.InvokeAsync();
-    }
+	public void ShowMessage(string message, bool isError)
+	{
+		_message = message;
+		_isError = isError;
+		StateHasChanged();
+	}
 
-    private static string FormatFileSize(long bytes)
-    {
-        if (bytes < 1024) return $"{bytes} B";
-        if (bytes < 1024 * 1024) return $"{bytes / 1024.0:F1} KB";
-        return $"{bytes / (1024.0 * 1024.0):F1} MB";
-    }
+	private void ClearMessage()
+	{
+		_message = null;
+		_isError = false;
+	}
+
+	private async Task Close()
+	{
+		ClearMessage();
+		_selectedFile = null;
+		_replaceExisting = false;
+		_isDragOver = false;
+		_dragCounter = 0;
+		await OnClose.InvokeAsync();
+	}
+
+	private void OnDragEnter(DragEventArgs e)
+	{
+		_dragCounter++;
+		_isDragOver = true;
+	}
+
+	private void OnDragLeave(DragEventArgs e)
+	{
+		if (--_dragCounter <= 0)
+		{
+			_isDragOver = false;
+			_dragCounter = 0;
+		}
+	}
+
+	private static string FormatFileSize(long bytes)
+	{
+		if (bytes < 1024) return $"{bytes} B";
+		if (bytes < 1024 * 1024) return $"{bytes / 1024.0:F1} KB";
+		return $"{bytes / (1024.0 * 1024.0):F1} MB";
+	}
 }
