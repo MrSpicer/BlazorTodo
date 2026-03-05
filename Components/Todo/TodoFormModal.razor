@@ -171,6 +171,9 @@
 	[Parameter]
 	public bool ShowParentSelector { get; set; }
 
+	[Parameter]
+	public Guid? DefaultParentId { get; set; }
+
 	private TodoItem _todo = new();
 	private Guid? _selectedParentId;
 	private Guid? _originalParentId;
@@ -218,7 +221,7 @@
 					_todo.ProjectId = DefaultProjectId.Value;
 				}
 				_originalParentId = null;
-				_selectedParentId = null;
+				_selectedParentId = DefaultParentId;
 			}
 		}
 	}

@@ -17,7 +17,7 @@
 				</svg>
 			}
 		</button>
-		@if (Item.HasSubTasks || Depth == 0)
+		@if (Item.HasSubTasks)
 		{
 			<button class="expand-toggle @(_isExpanded ? "expanded" : "")"
 			        @onclick="() => _isExpanded = !_isExpanded"
@@ -63,16 +63,6 @@
 					@Item.CreatedAt.ToString("MMM d, yyyy")
 				</span>
 			}
-			@if (Item.HasSubTasks)
-			{
-				<span class="meta-item subtask-progress">
-					<div class="subtask-progress-bar-track" data-testid="subtask-progress-bar">
-						<div class="subtask-progress-bar"
-						     style="width: @(Item.SubTaskCount > 0 ? (int)((double)Item.SubTaskDoneCount / Item.SubTaskCount * 100) : 0)%"></div>
-					</div>
-					@Item.SubTaskDoneCount/@Item.SubTaskCount
-				</span>
-			}
 		</div>
 	</div>
 
@@ -110,6 +100,16 @@
 					<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
 						<path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
 						<path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+					</svg>
+				</button>
+			}
+			@if (Depth == 0 && !Item.HasSubTasks)
+			{
+				<button class="action-btn add-subtask-btn" @onclick="ShowAddSubTaskModal"
+				        title="Add subtask"
+				        aria-label="Add subtask">
+					<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+						<path d="M12 5v14M5 12h14"/>
 					</svg>
 				</button>
 			}
@@ -155,8 +155,9 @@
     IsEditing="_isEditingSubTask"
     EditingTodo="_editingSubTask"
     DefaultProjectId="Item.ProjectId"
+	DefaultParentId="Item.Id"
     ShowParentSelector="true"
-    OnClose="HandleSubTaskModalClose"
+	OnClose="HandleSubTaskModalClose"
     OnSubmit="HandleSubTaskModalSubmit" />
 
 <style>
