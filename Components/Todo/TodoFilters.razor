@@ -110,11 +110,18 @@
                                             @onclick="() => MoveSortDown(idx)">
                                         <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M6 9l6 6 6-6"/></svg>
                                     </button>
-                                    <button class="sort-action-btn sort-remove-btn" disabled="@(FilterCriteria.SortCriteria.Count <= 1)" title="Remove"
+                                    <button class="sort-action-btn sort-remove-btn" title="Remove"
                                             @onclick="() => RemoveSortCriterion(idx)">
                                         <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg>
                                     </button>
                                 </div>
+                            </div>
+                        }
+                        @if (FilterCriteria.SortCriteria.Count == 0)
+                        {
+                            <div class="sort-empty-state">
+                                <span class="sort-empty-label">No sort applied</span>
+                                <button class="sort-restore-btn" @onclick="RestoreDefaultSorts">Restore defaults</button>
                             </div>
                         }
                         @if (FilterCriteria.AvailableSortOptions.Any())
@@ -430,6 +437,33 @@
         border-color: var(--primary);
         border-style: solid;
     }
+
+    .sort-empty-state {
+        display: flex;
+        align-items: center;
+        gap: var(--space-3);
+        padding: var(--space-2) 0;
+    }
+
+    .sort-empty-label {
+        font-size: 0.75rem;
+        color: var(--gray-400);
+        font-style: italic;
+    }
+
+    .sort-restore-btn {
+        font-size: 0.75rem;
+        color: var(--primary);
+        background: none;
+        border: none;
+        padding: 0;
+        cursor: pointer;
+        text-decoration: underline;
+    }
+
+    .sort-restore-btn:hover {
+        opacity: 0.8;
+    }
     
     .clear-all-btn {
         display: inline-flex;
@@ -521,8 +555,13 @@
 
     private async Task RemoveSortCriterion(int index)
     {
-        if (FilterCriteria.SortCriteria.Count <= 1) return;
         FilterCriteria.SortCriteria.RemoveAt(index);
+        await FilterChanged.InvokeAsync();
+    }
+
+    private async Task RestoreDefaultSorts()
+    {
+        FilterCriteria.RestoreDefaultSorts();
         await FilterChanged.InvokeAsync();
     }
 

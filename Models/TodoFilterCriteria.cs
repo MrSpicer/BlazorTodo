@@ -45,6 +45,14 @@ public class TodoFilterCriteria
 		!new HashSet<TodoItemStatus>(SelectedStatuses).SetEquals(_defaultStatuses);
 
 	/// <summary>
+	/// Restores default sort criteria (Status asc, Priority asc).
+	/// </summary>
+	public void RestoreDefaultSorts()
+	{
+		SortCriteria = [new(SortOption.Status, true), new(SortOption.Priority, true)];
+	}
+
+	/// <summary>
 	/// Clears all filter criteria (resets to default state).
 	/// </summary>
 	public void Clear()

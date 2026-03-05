@@ -185,9 +185,10 @@ public class TodoService : ITodoService
 		}
 
 		// Sort
-		var sortList = criteria.SortCriteria.Count > 0 ? criteria.SortCriteria : [new SortCriterion(SortOption.CreatedDate, true)];
-		IOrderedEnumerable<TodoItem> sorted = ApplyFirstSort(filtered, sortList[0]);
-		foreach (var c in sortList.Skip(1))
+		if (criteria.SortCriteria.Count == 0)
+			return filtered;
+		IOrderedEnumerable<TodoItem> sorted = ApplyFirstSort(filtered, criteria.SortCriteria[0]);
+		foreach (var c in criteria.SortCriteria.Skip(1))
 			sorted = ApplyThenSort(sorted, c);
 		return sorted;
 	}
