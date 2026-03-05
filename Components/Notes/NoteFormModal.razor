@@ -50,6 +50,16 @@
 						<ValidationMessage For="@(() => _note.Content)" class="validation-message" />
 					</div>
 					<div class="form-actions">
+						@if (IsEditing && OnConvertToTodo.HasDelegate)
+						{
+							<button type="button" class="btn btn-ghost" style="margin-right: auto" @onclick="async () => { await OnConvertToTodo.InvokeAsync(_note); await Close(); }">
+								<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+									<rect x="3" y="3" width="18" height="18" rx="2"/>
+									<path d="M9 12l2 2 4-4"/>
+								</svg>
+								Convert to Task
+							</button>
+						}
 						<button type="button" class="btn btn-outline-secondary" @onclick="Close">Cancel</button>
 						<button type="submit" class="btn btn-primary">
 							@(IsEditing ? "Save Changes" : "Add Note")
@@ -216,6 +226,9 @@
 
 	[Parameter]
 	public EventCallback<ProjectNote> OnSubmit { get; set; }
+
+	[Parameter]
+	public EventCallback<ProjectNote> OnConvertToTodo { get; set; }
 
 	private ProjectNote _note = new();
 

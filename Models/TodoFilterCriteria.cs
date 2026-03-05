@@ -28,7 +28,7 @@ public class TodoFilterCriteria
 	/// </summary>
 	// Status asc (sensible default), Priority asc (lowest first)
 	public List<SortCriterion> SortCriteria { get; set; } =
-		[new(SortOption.Status, false), new(SortOption.Priority, true)];
+		[new(SortOption.Status, true), new(SortOption.Priority, true)];
 
 	public IEnumerable<SortOption> AvailableSortOptions =>
 		Enum.GetValues<SortOption>().Except(SortCriteria.Select(c => c.Option));

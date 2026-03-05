@@ -1,5 +1,7 @@
 @using TodoList.Models
 @using TodoList.Models.Enums
+@using TodoList.Services
+@inject ITodoService TodoService
 
 @if (IsVisible)
 {
@@ -35,11 +37,27 @@
 				</button>
 			</div>
 			<div class="modal-body">
+				@if (ShowParentSelector)
+				{
+					<div class="form-group" style="margin-bottom: var(--space-5);">
+						<label class="form-label">Parent</label>
+						<select class="form-input"
+						        value="@(_selectedParentId?.ToString() ?? string.Empty)"
+						        @onchange="e => _selectedParentId = string.IsNullOrEmpty(e.Value?.ToString()) ? (Guid?)null : Guid.Parse(e.Value!.ToString()!)">
+							<option value="">None</option>
+							@foreach (var p in GetAvailableParents())
+							{
+								<option value="@p.Id">@p.Title</option>
+							}
+						</select>
+					</div>
+				}
 				<TodoForm Todo="@_todo"
 				          IsEditing="@IsEditing"
 				          ShowCard="false"
 				          OnSubmit="HandleSubmit"
-				          OnCancel="Close" />
+				          OnCancel="Close"
+				          OnConvertToNote="HandleConvertToNote" />
 			</div>
 		</div>
 	</div>
@@ -147,7 +165,15 @@
 	[Parameter]
 	public EventCallback<TodoItem> OnSubmit { get; set; }
 
+	[Parameter]
+	public EventCallback<TodoItem> OnConvertToNote { get; set; }
+
+	[Parameter]
+	public bool ShowParentSelector { get; set; }
+
 	private TodoItem _todo = new();
+	private Guid? _selectedParentId;
+	private Guid? _originalParentId;
 
 	protected override void OnParametersSet()
 	{
@@ -177,6 +203,12 @@
 						ProjectId = st.ProjectId,
 					}).ToList()
 				};
+				if (ShowParentSelector)
+				{
+					var parent = TodoService.Todos.FirstOrDefault(t => t.SubTasks.Any(st => st.Id == EditingTodo.Id));
+					_originalParentId = parent?.Id;
+					_selectedParentId = parent?.Id;
+				}
 			}
 			else
 			{
@@ -185,13 +217,71 @@
 				{
 					_todo.ProjectId = DefaultProjectId.Value;
 				}
+				_originalParentId = null;
+				_selectedParentId = null;
 			}
 		}
 	}
 
 	private async Task HandleSubmit(TodoItem todo)
 	{
-		await OnSubmit.InvokeAsync(todo);
+		var selectedParentId = _selectedParentId;
+		var originalParentId = _originalParentId;
+
+		if (!ShowParentSelector || selectedParentId == originalParentId)
+		{
+			await OnSubmit.InvokeAsync(todo);
+		}
+		else
+		{
+			// Remove from old parent if was a subtask
+			if (originalParentId.HasValue)
+			{
+				var oldParent = TodoService.Todos.FirstOrDefault(t => t.Id == originalParentId.Value);
+				if (oldParent != null)
+				{
+					oldParent.SubTasks.RemoveAll(st => st.Id == todo.Id);
+					await TodoService.SaveTodoAsync(oldParent);
+				}
+			}
+
+			if (selectedParentId.HasValue)
+			{
+				// Add to new parent
+				var newParent = TodoService.Todos.FirstOrDefault(t => t.Id == selectedParentId.Value);
+				if (newParent != null)
+				{
+					newParent.SubTasks.Add(todo);
+					await TodoService.SaveTodoAsync(newParent);
+				}
+				// If was top-level, delete the orphaned top-level entry
+				if (!originalParentId.HasValue)
+				{
+					var topLevel = TodoService.Todos.FirstOrDefault(t => t.Id == todo.Id);
+					if (topLevel != null)
+						await TodoService.DeleteTodoAsync(topLevel);
+				}
+			}
+			else
+			{
+				// Parent set to None → promote to top-level; save directly to avoid
+				// the subtask-modal's OnSubmit re-adding the todo as a subtask
+				await TodoService.SaveTodoAsync(todo);
+			}
+		}
+		await Close();
+	}
+
+	private IEnumerable<TodoItem> GetAvailableParents() =>
+		TodoService.Todos.Where(t =>
+			t.Id != (EditingTodo?.Id ?? _todo.Id) &&
+			t.Status != TodoItemStatus.Done &&
+			t.Status != TodoItemStatus.Abandoned &&
+			t.Status != TodoItemStatus.Archived);
+
+	private async Task HandleConvertToNote(TodoItem todo)
+	{
+		await OnConvertToNote.InvokeAsync(todo);
 		await Close();
 	}
 

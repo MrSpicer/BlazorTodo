@@ -189,15 +189,18 @@ else
                IsEditing="@_isEditing"
                EditingTodo="@_currentTodo"
                DefaultProjectId="@ProjectService.SelectedProject?.Id"
+               ShowParentSelector="true"
                OnClose="HideTodoModal"
-               OnSubmit="HandleFormSubmit" />
+               OnSubmit="HandleFormSubmit"
+               OnConvertToNote="HandleConvertTodoToNote" />
 
 <NoteFormModal IsVisible="@_showNoteModal"
                IsEditing="@_isEditingNote"
                EditingNote="@_currentNote"
                DefaultProjectId="@ProjectService.SelectedProject?.Id"
                OnClose="HideNoteModal"
-               OnSubmit="HandleNoteFormSubmit" />
+               OnSubmit="HandleNoteFormSubmit"
+               OnConvertToTodo="HandleConvertNoteToTodo" />
 
 <style>
     /* Welcome Screen */
@@ -624,6 +627,44 @@ else
             _currentNote.ProjectId = ProjectService.SelectedProject.Id;
         }
         _isEditingNote = false;
+    }
+
+    private async Task HandleConvertTodoToNote(TodoItem todo)
+    {
+        if (!await DialogService.ConfirmAsync(
+            "Convert this task to a note? Task status, priority, and subtasks will not be carried over.",
+            "Convert to Note"))
+            return;
+        var note = new ProjectNote
+        {
+            ProjectId = todo.ProjectId,
+            Title = todo.Title,
+            Content = todo.Description,
+        };
+        await NoteService.SaveNoteAsync(note);
+        await TodoService.DeleteTodoAsync(todo);
+        HideTodoModal();
+        ResetForm();
+        _activeTab = "notes";
+    }
+
+    private async Task HandleConvertNoteToTodo(ProjectNote note)
+    {
+        if (!await DialogService.ConfirmAsync(
+            "Convert this note to a task? Note content will become the task description.",
+            "Convert to Task"))
+            return;
+        var todo = new TodoItem
+        {
+            ProjectId = note.ProjectId,
+            Title = note.Title,
+            Description = note.Content,
+        };
+        await TodoService.SaveTodoAsync(todo);
+        await NoteService.DeleteNoteAsync(note);
+        HideNoteModal();
+        ResetNoteForm();
+        _activeTab = "tasks";
     }
 
     private void ShowNoteModal() => _showNoteModal = true;
