@@ -138,6 +138,14 @@
 							<input type="text" class="form-control font-monospace" @bind="_restoreSessionInput" placeholder="Paste session ID here" />
 						</div>
 
+						<div class="form-check mb-3">
+							<input class="form-check-input" type="checkbox" id="adoptSessionId"
+								   @bind="_adoptSessionId" />
+							<label class="form-check-label" for="adoptSessionId">
+								Use this as my session ID going forward
+							</label>
+						</div>
+
 						<button class="btn btn-success" @onclick="HandleRestore"
 								disabled="@(_isRestoring || string.IsNullOrWhiteSpace(_restoreSessionInput))">
 							@if (_isRestoring)
@@ -194,6 +202,7 @@
 	private bool _isRestoring;
 	private string? _restoreMessage;
 	private bool _restoreIsError;
+	private bool _adoptSessionId = true;
 
 	protected override async Task OnParametersSetAsync()
 	{
@@ -281,6 +290,14 @@
 		{
 			_restoreMessage = $"Restored {result.ImportedCount} item(s) successfully!";
 			_restoreIsError = false;
+
+			if (_adoptSessionId)
+			{
+				_sessionId = sessionId;
+				await LocalStorage.SetItemAsStringAsync("SyncSessionId", _sessionId);
+				_restoreUrl = null;
+				_qrSvg = null;
+			}
 		}
 		else
 		{

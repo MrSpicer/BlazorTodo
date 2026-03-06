@@ -1,9 +1,11 @@
 @page "/restore/{SessionId}"
+@using Blazored.LocalStorage
 @implements IDisposable
 @inject ISyncService SyncService
 @inject ITodoService TodoService
 @inject IProjectService ProjectService
 @inject NavigationManager NavigationManager
+@inject ILocalStorageService LocalStorage
 
 <PageTitle>Restore Data - BlazorTodo</PageTitle>
 
@@ -89,6 +91,7 @@
 
 			if (result.Success)
 			{
+				await LocalStorage.SetItemAsStringAsync("SyncSessionId", SessionId);
 				_importedCount = result.ImportedCount;
 				_state = PageState.Success;
 			}
