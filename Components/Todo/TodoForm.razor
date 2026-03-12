@@ -49,7 +49,7 @@ else
                 <ValidationMessage For="@(() => Todo.Title)" class="validation-error" />
             </div>
 
-            <div class="form-group">
+            <div class="form-group" style="flex: 1; display: flex; flex-direction: column">
                 <label for="TodoDescription" class="form-label">Description</label>
                 <InputTextArea id="TodoDescription" class="form-input form-textarea" rows="3"
                                @bind-Value="Todo.Description" placeholder="Add some details..." />
@@ -111,6 +111,7 @@ else
                 display: flex;
                 flex-direction: column;
                 gap: var(--space-5);
+                flex: 1;
             }
             
             .form-group {
@@ -147,7 +148,7 @@ else
             
             .form-textarea {
                 resize: vertical;
-                min-height: 80px;
+                flex: 1;
             }
             
             .validation-error {

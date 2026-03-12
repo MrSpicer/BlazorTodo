@@ -31,7 +31,7 @@
 				</button>
 			</div>
 			<div class="modal-body">
-				<EditForm Model="@_note" OnValidSubmit="HandleSubmit">
+				<EditForm Model="@_note" OnValidSubmit="HandleSubmit" style="display: flex; flex-direction: column; flex: 1">
 					<DataAnnotationsValidator />
 					<div class="form-field">
 						<label class="form-label" for="note-title">Title <span class="required">*</span></label>
@@ -41,7 +41,7 @@
 						           placeholder="Note title..." />
 						<ValidationMessage For="@(() => _note.Title)" class="validation-message" />
 					</div>
-					<div class="form-field">
+					<div class="form-field" style="flex: 1; display: flex; flex-direction: column">
 						<label class="form-label" for="note-content">Content</label>
 						<InputTextArea id="note-content"
 						               class="form-input form-textarea"
@@ -90,8 +90,10 @@
 		border-radius: var(--radius-xl);
 		box-shadow: var(--shadow-xl);
 		width: 100%;
-		max-width: 500px;
-		max-height: 90vh;
+		max-width: 75vw;
+		height: 75vh;
+		display: flex;
+		flex-direction: column;
 		overflow: hidden;
 		animation: scaleIn var(--transition-base) ease-out;
 	}
@@ -150,7 +152,9 @@
 	.modal-body {
 		padding: var(--space-6);
 		overflow-y: auto;
-		max-height: calc(90vh - 80px);
+		flex: 1;
+		display: flex;
+		flex-direction: column;
 	}
 
 	.form-field {
@@ -188,7 +192,7 @@
 	}
 
 	.form-textarea {
-		min-height: 140px;
+		flex: 1;
 		resize: vertical;
 		font-family: inherit;
 	}
