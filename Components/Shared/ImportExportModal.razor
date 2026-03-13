@@ -631,6 +631,18 @@
 	@@keyframes ieSpin {
 		to { transform: rotate(360deg); }
 	}
+
+	@@media (max-width: 640px) {
+		.ie-export-section {
+			flex-direction: column;
+			align-items: stretch;
+			text-align: center;
+		}
+		.ie-export-section .ie-btn {
+			width: 100%;
+			justify-content: center;
+		}
+	}
 </style>
 
 @code {

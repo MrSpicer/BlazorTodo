@@ -70,7 +70,7 @@ else
             <div class="breakdown-header">
                 <span class="col-project">Project</span>
                 <span class="col-num">Completed</span>
-                <span class="col-num">Uncompleted</span>
+                <span class="col-num">Open</span>
                 <span class="col-num">Total</span>
             </div>
             @foreach (var project in ProjectService.Projects)
@@ -185,7 +185,7 @@ else
 
     .stat-label {
         font-size: 0.75rem;
-        color: var(--text-muted);
+        color: var(--text-secondary);
         margin-top: var(--space-1);
     }
 
@@ -245,6 +245,8 @@ else
     .col-num {
         text-align: center;
         font-variant-numeric: tabular-nums;
+        overflow: hidden;
+        white-space: nowrap;
     }
 
     .color-dot {
@@ -261,7 +263,7 @@ else
 
         .breakdown-header,
         .breakdown-row {
-            grid-template-columns: 1fr 70px 70px 60px;
+            grid-template-columns: 1fr 90px 75px 65px;
             padding: var(--space-2) var(--space-3);
             font-size: 0.8125rem;
         }

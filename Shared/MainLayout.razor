@@ -30,7 +30,7 @@
     
     <div class="app-body">
         <aside class="sidebar @(_isCollapsed ? "collapsed" : "") @(_isMobileOpen ? "mobile-open" : "")">
-            <NavMenu IsCollapsed="@_isCollapsed" OnToggleSidebar="ToggleCollapse" />
+            <NavMenu IsCollapsed="@(_isMobileOpen ? false : _isCollapsed)" OnToggleSidebar="ToggleCollapse" />
         </aside>
         
         @if (_isMobileOpen)
