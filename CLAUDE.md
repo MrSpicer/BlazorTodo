@@ -5,17 +5,17 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Build and Run Commands
 
 ```bash
-# Run the application (hot reload enabled by default)
-dotnet run
+# Run the application (from git root)
+dotnet run --project src/TodoList.csproj
 
-# Build
-dotnet build
+# Build (from git root)
+dotnet build BlazorTodo.sln
 
-# Watch mode (auto-rebuild on changes)
-dotnet watch
+# Watch mode
+cd src && dotnet watch
 
 # Publish
-dotnet publish TodoList.csproj
+dotnet publish src/TodoList.csproj
 ```
 
 This is a .NET 10 Blazor Server application. There are no tests configured.
@@ -26,22 +26,23 @@ This is a .NET 10 Blazor Server application. There are no tests configured.
 
 ### Layer Structure
 
-- **Pages/** - Razor pages with routes:
+All source lives under `src/`. Non-source files (sln, Dockerfile, docs, scripts) stay at the git root.
+
+- **src/Components/Pages/** - Razor pages with routes:
   - `Todo.razor` (`/`) - Main todo list
   - `Statistics.razor` (`/statistics`) - Todo stats and charts
   - `Settings.razor` (`/settings`) - App settings
   - `About.razor` (`/about`) - App info
   - `Restore.razor` (`/restore`) - Restore data from a sync session ID
-- **Components/** - Reusable Blazor components organized by domain:
+- **src/Components/** - Reusable Blazor components organized by domain:
   - `Todo/` - TodoForm, TodoFilters, TodoListView, TodoItemRow, TodoFormModal
   - `Project/` - ProjectTabs, ProjectModal
   - `Notes/` - NoteCard, NotesList, NoteFormModal
   - `Shared/` - ImportExportModal, PriorityBadge, StatusBadge, SyncModal
-- **Shared/** (top-level) - MainLayout, NavMenu
-- **Services/** - Business logic layer with interfaces (ITodoService, IProjectService, IDialogService, IImportExportService, INoteService, ISyncService, IFileService)
-- **Data/** - Repository implementations for local storage persistence (TodoRepository, ProjectRepository, NoteRepository)
-- **Interfaces/** - Repository interfaces (ITodoRepository, IProjectRepository, INoteRepository)
-- **Models/** - Domain entities (TodoItem, Project, ProjectNote) and enums (Priority, TodoItemStatus, FilterOption, SortOption)
+  - `Layout/` - MainLayout, NavMenu
+- **src/Services/** - Business logic layer with interfaces (ITodoService, IProjectService, IDialogService, IImportExportService, INoteService, ISyncService, IFileService)
+- **src/Data/** - Repository implementations and interfaces (TodoRepository, ProjectRepository, NoteRepository + ITodo/IProject/INoteRepository)
+- **src/Models/** - Domain entities (TodoItem, Project, ProjectNote) and enums (Priority, TodoItemStatus, FilterOption, SortOption)
 
 ### Key Patterns
 

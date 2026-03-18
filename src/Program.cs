@@ -1,13 +1,14 @@
 using System.Threading.RateLimiting;
 using Blazored.LocalStorage;
 using Microsoft.AspNetCore.RateLimiting;
+using TodoList.Components;
 using TodoList.Extensions;
 
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
-builder.Services.AddRazorPages();
-builder.Services.AddServerSideBlazor();
+builder.Services.AddRazorComponents()
+	.AddInteractiveServerComponents();
 
 builder.Services.AddHsts(options =>
 {
@@ -99,10 +100,9 @@ app.Use(async (context, next) =>
 app.UseRateLimiter();
 
 app.UseRouting();
+app.UseAntiforgery();
 
-app.MapBlazorHub();
-app.MapFallbackToPage("/restore/{**slug}", "/_Host")
-	.RequireRateLimiting("strict");
-app.MapFallbackToPage("/_Host");
+app.MapRazorComponents<App>()
+	.AddInteractiveServerRenderMode();
 
 app.Run();

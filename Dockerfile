@@ -3,11 +3,11 @@ FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
 WORKDIR /src
 
 # Copy project file and restore dependencies (layer caching optimization)
-COPY TodoList.csproj .
+COPY src/TodoList.csproj .
 RUN dotnet restore TodoList.csproj
 
 # Copy source code and build
-COPY . .
+COPY src/ .
 ARG BUILD_CONFIGURATION=Release
 RUN dotnet build TodoList.csproj -c ${BUILD_CONFIGURATION} -o /app/build
 
