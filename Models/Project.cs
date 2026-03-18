@@ -14,6 +14,7 @@ public class Project
     [StringLength(200, ErrorMessage = "Description cannot exceed 200 characters")]
     public string Description { get; set; } = string.Empty;
 
+    [RegularExpression(@"^#[0-9a-fA-F]{3,8}$", ErrorMessage = "Color must be a valid hex color")]
     public string Color { get; set; } = "#6c757d";
 
     public DateTime CreatedAt { get; set; } = DateTime.Now;

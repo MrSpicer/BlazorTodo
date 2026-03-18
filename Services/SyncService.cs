@@ -25,6 +25,9 @@ public class SyncService : ISyncService
 	{
 		try
 		{
+			if (!Guid.TryParseExact(sessionId, "N", out _))
+				return new SyncResult(false, "Invalid session ID format.");
+
 			var rateLimitKey = $"ratelimit:{sessionId}";
 			if (_cache.TryGetValue(rateLimitKey, out DateTimeOffset lastSync))
 			{
@@ -48,8 +51,16 @@ public class SyncService : ISyncService
 
 			var dataKey = $"syncdata:{sessionId}";
 
-			_cache.Set(dataKey, json, DataExpiry);
-			_cache.Set(rateLimitKey, DateTimeOffset.UtcNow, RateLimitWindow);
+			_cache.Set(dataKey, json, new MemoryCacheEntryOptions
+			{
+				AbsoluteExpirationRelativeToNow = DataExpiry,
+				Size = 1
+			});
+			_cache.Set(rateLimitKey, DateTimeOffset.UtcNow, new MemoryCacheEntryOptions
+			{
+				AbsoluteExpirationRelativeToNow = RateLimitWindow,
+				Size = 1
+			});
 
 			_logger.LogInformation("Synced data for session {SessionId}", sessionId);
 			return new SyncResult(true);
@@ -81,7 +92,11 @@ public class SyncService : ISyncService
 				return new RestoreResult(false, "Too many restore attempts. Please wait before trying again.");
 			}
 
-			_cache.Set(restoreRateLimitKey, attempts + 1, RestoreRateLimitWindow);
+			_cache.Set(restoreRateLimitKey, attempts + 1, new MemoryCacheEntryOptions
+			{
+				AbsoluteExpirationRelativeToNow = RestoreRateLimitWindow,
+				Size = 1
+			});
 
 			var dataKey = $"syncdata:{sessionId}";
 			if (!_cache.TryGetValue(dataKey, out string? json) || json is null)
