@@ -15,9 +15,40 @@
             </button>
             <div class="brand">
                 <div class="brand-icon">
-                    <svg width="28" height="28" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                        <rect x="3" y="3" width="18" height="18" rx="4" stroke="currentColor" stroke-width="2"/>
-                        <path d="M8 12L11 15L16 9" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                    <svg width="80" height="80" viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg">
+                        <defs>
+                            <linearGradient id="flameA1" x1="50%" y1="100%" x2="50%" y2="0%">
+                                <stop offset="0%" stop-color="#FF6B00"></stop>
+                                <stop offset="40%" stop-color="#C040E0"></stop>
+                                <stop offset="100%" stop-color="#512BD4"></stop>
+                            </linearGradient>
+                            <linearGradient id="flameA2" x1="50%" y1="100%" x2="50%" y2="0%">
+                                <stop offset="0%" stop-color="#FFB300"></stop>
+                                <stop offset="50%" stop-color="#E060FF" stop-opacity="0.9"></stop>
+                                <stop offset="100%" stop-color="#7C3AED" stop-opacity="0.7"></stop>
+                            </linearGradient>
+                            <filter id="glowA" x="-30%" y="-30%" width="160%" height="160%">
+                                <feGaussianBlur stdDeviation="1.2" result="blur"></feGaussianBlur>
+                                <feMerge>
+                                    <feMergeNode in="blur"></feMergeNode>
+                                    <feMergeNode in="SourceGraphic"></feMergeNode>
+                                </feMerge>
+                            </filter>
+                        </defs>
+                        <!-- Outer flame (large, purple-dominant) -->
+                        <path
+                        d="M16 30 C10 30 5 25 5 19 C5 14 8 11 10 9 C10 12 11 13 12 13 C10 10 11 6 14 3 C14 6 15 8 16 9 C17 7 18 5 18 3 C21 6 22 10 20 13 C21 13 22 12 22 9 C24 11 27 14 27 19 C27 25 22 30 16 30Z"
+                        fill="url(#flameA1)" filter="url(#glowA)"></path>
+                        <!-- Inner flame (tighter, lighter) -->
+                        <path
+                        d="M16 27 C12 27 9 24 9 20 C9 17 11 15 12 14 C12 16 13 17 14 17 C12.5 15 13 13 15 11 C15 13.5 15.5 15 16.5 16 C17 15 17.5 13.5 17 11 C19 13 20 15.5 18 17 C19 17 20 16 20 14 C21 15 23 17 23 20 C23 24 20 27 16 27Z"
+                        fill="url(#flameA2)" opacity="0.85"></path>
+                        <!-- Checkbox frame -->
+                        <rect x="6" y="12" width="14" height="14" rx="2.5" fill="none" stroke="white" stroke-width="2"
+                              opacity="0.95"></rect>
+                        <!-- Checkmark -->
+                        <polyline points="9,19 12.5,22.5 17,15.5" fill="none" stroke="white" stroke-width="2.2"
+                                  stroke-linecap="round" stroke-linejoin="round"></polyline>
                     </svg>
                 </div>
                 <span class="brand-name">BlazorTodo</span>
