@@ -40,8 +40,8 @@
 				@if (ShowParentSelector)
 				{
 					<div class="form-group" style="margin-bottom: var(--space-5);">
-						<label class="form-label">Parent</label>
-						<select class="form-input"
+						<label for="parentTaskSelect" class="form-label">Parent</label>
+						<select id="parentTaskSelect" class="form-input"
 						        value="@(_selectedParentId?.ToString() ?? string.Empty)"
 						        @onchange="e => _selectedParentId = string.IsNullOrEmpty(e.Value?.ToString()) ? (Guid?)null : Guid.Parse(e.Value!.ToString()!)">
 							<option value="">None</option>
