@@ -36,7 +36,7 @@ builder.Services.AddRateLimiter(options =>
 			?? context.Connection.RemoteIpAddress?.ToString()
 			?? "unknown";
 
-		var permitLimit = rateLimitConfig.GetValue<int>("PermitLimit", 100);
+		var permitLimit = rateLimitConfig.GetValue<int>("PermitLimit", 500);
 		var windowSeconds = rateLimitConfig.GetValue<int>("WindowSeconds", 60);
 		var queueLimit = rateLimitConfig.GetValue<int>("QueueLimit", 0);
 
@@ -51,7 +51,7 @@ builder.Services.AddRateLimiter(options =>
 
 	options.AddFixedWindowLimiter("strict", limiterOptions =>
 	{
-		limiterOptions.PermitLimit = rateLimitConfig.GetValue<int>("StrictPermitLimit", 10);
+		limiterOptions.PermitLimit = rateLimitConfig.GetValue<int>("StrictPermitLimit", 100);
 		limiterOptions.Window = TimeSpan.FromSeconds(rateLimitConfig.GetValue<int>("StrictWindowSeconds", 60));
 		limiterOptions.QueueProcessingOrder = QueueProcessingOrder.OldestFirst;
 		limiterOptions.QueueLimit = 0;
