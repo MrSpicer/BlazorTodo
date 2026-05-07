@@ -1,0 +1,76 @@
+@using TodoList.Models
+
+<span class="sync-badge @StateClass" data-sync-state="@StateName" title="@Tooltip" aria-label="@Tooltip">
+	@if (Item.IsDirty)
+	{
+		@if (Item.HasEverSynced)
+		{
+			<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+				<path d="M18 10h-1.26A8 8 0 1 0 9 20h9a5 5 0 0 0 0-10z" />
+				<circle cx="12" cy="14" r="2" fill="currentColor" stroke="none" />
+			</svg>
+		}
+		else
+		{
+			<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+				<path d="M22.61 16.95A5 5 0 0 0 18 10h-1.26a8 8 0 0 0-7.05-6M5 5a8 8 0 0 0 4 15h9a5 5 0 0 0 1.7-.3" />
+				<line x1="1" y1="1" x2="23" y2="23" />
+			</svg>
+		}
+	}
+	else
+	{
+		<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+			<path d="M18 10h-1.26A8 8 0 1 0 9 20h9a5 5 0 0 0 0-10z" />
+			<polyline points="9 14 11 16 15 12" />
+		</svg>
+	}
+</span>
+
+<style>
+	.sync-badge {
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		width: 22px;
+		height: 22px;
+		border-radius: var(--radius-full);
+		flex-shrink: 0;
+	}
+
+	.sync-badge.synced {
+		background: var(--success-light);
+		color: var(--success);
+	}
+
+	.sync-badge.dirty {
+		background: var(--warning-light);
+		color: #d97706;
+	}
+
+	.sync-badge.never-synced {
+		background: var(--gray-100);
+		color: var(--text-muted);
+	}
+</style>
+
+@code {
+	[Parameter, EditorRequired]
+	public TodoItem Item { get; set; } = default!;
+
+	private string StateName => Item.IsDirty
+		? (Item.HasEverSynced ? "dirty" : "never-synced")
+		: "synced";
+
+	private string StateClass => StateName;
+
+	private string Tooltip
+	{
+		get
+		{
+			if (!Item.HasEverSynced) return "Never synced to server";
+			if (Item.IsDirty) return $"Modified since last sync ({Item.LastSyncedAt:MMM d, yyyy h:mm tt})";
+			return $"Synced {Item.LastSyncedAt:MMM d, yyyy h:mm tt}";
+		}
+	}
+}

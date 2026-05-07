@@ -9,124 +9,213 @@ namespace TodoList.Services;
 /// </summary>
 public class TodoService : ITodoService
 {
-    private readonly ITodoRepository _repository;
-    private List<TodoItem> _todos = new();
+	private readonly ITodoRepository _repository;
+	private readonly ITagService _tagService;
+	private List<TodoItem> _todos = new();
 
-    public event Action? OnTodosChanged;
-    public IReadOnlyList<TodoItem> Todos => _todos.AsReadOnly();
+	public event Action? OnTodosChanged;
+	public IReadOnlyList<TodoItem> Todos => _todos.AsReadOnly();
 
-    public TodoService(ITodoRepository repository)
-    {
-        _repository = repository;
-    }
+	public TodoService(ITodoRepository repository, ITagService tagService)
+	{
+		_repository = repository;
+		_tagService = tagService;
+	}
 
-    public async Task InitializeAsync()
-    {
-        await _repository.InitializeAsync();
-        _todos = await _repository.GetTodos();
-        await ResetStaleTodosAsync();
-        NotifyStateChanged();
-    }
+	public async Task InitializeAsync()
+	{
+		await _repository.InitializeAsync();
+		_todos = await _repository.GetTodos();
+		await ResetStaleTodosAsync();
+		NotifyStateChanged();
+	}
 
-    private async Task ResetStaleTodosAsync()
-    {
-        var cutoff = DateTime.Now.AddDays(-7);
+	private async Task ResetStaleTodosAsync()
+	{
+		var cutoff = DateTime.Now.AddDays(-7);
 
-        foreach (var todo in _todos)
-        {
-            var dirty = false;
+		foreach (var todo in _todos)
+		{
+			var dirty = false;
 
-            if (todo.Status == TodoItemStatus.New && todo.CreatedAt < cutoff)
-            {
-                todo.Status = TodoItemStatus.None;
-                dirty = true;
-            }
+			if (todo.Status == TodoItemStatus.New && todo.CreatedAt < cutoff)
+			{
+				todo.Status = TodoItemStatus.None;
+				dirty = true;
+			}
 
-            foreach (var sub in todo.SubTasks)
-            {
-                if (sub.Status == TodoItemStatus.New && sub.CreatedAt < cutoff)
-                {
-                    sub.Status = TodoItemStatus.None;
-                    dirty = true;
-                }
-            }
+			foreach (var sub in todo.SubTasks)
+			{
+				if (sub.Status == TodoItemStatus.New && sub.CreatedAt < cutoff)
+				{
+					sub.Status = TodoItemStatus.None;
+					dirty = true;
+				}
+			}
 
-            if (dirty)
-                await _repository.AddOrUpdate(todo);
-        }
-    }
+			if (dirty)
+				await _repository.AddOrUpdate(todo);
+		}
+	}
 
-    public async Task<bool> SaveTodoAsync(TodoItem todo)
-    {
-        if (todo.Status == TodoItemStatus.None && !_todos.Any(t => t.Id == todo.Id))
-            todo.Status = TodoItemStatus.New;
+	public async Task<bool> SaveTodoAsync(TodoItem todo)
+	{
+		var now = DateTime.Now;
+		var existed = _todos.Any(t => t.Id == todo.Id);
 
-        var success = await _repository.AddOrUpdate(todo);
-        if (success)
-        {
-            _todos = await _repository.GetTodos();
-            NotifyStateChanged();
-        }
-        return success;
-    }
+		if (todo.Status == TodoItemStatus.None && !existed)
+			todo.Status = TodoItemStatus.New;
 
-    public async Task DeleteTodoAsync(TodoItem todo)
-    {
-        await _repository.Delete(todo);
-        _todos = await _repository.GetTodos();
-        NotifyStateChanged();
-    }
+		if (!existed)
+		{
+			// Brand-new todo (UpdatedAt unset and no prior history) → record creation.
+			// Imported todos already have their own UpdatedAt/ChangeLog/LastSyncedAt — preserve them.
+			if (todo.UpdatedAt is null && todo.ChangeLog.Count == 0)
+			{
+				todo.UpdatedAt = now;
+				todo.ChangeLog.Add(new TodoChangeLogEntry
+				{
+					ChangedAt = now,
+					Field = "Created",
+					OldValue = null,
+					NewValue = todo.Title
+				});
+			}
+		}
+		else
+		{
+			var old = await _repository.Get(todo.Id);
+			if (old != null)
+			{
+				var entries = BuildChangeEntries(old, todo, now).ToList();
+				if (entries.Count > 0)
+				{
+					todo.ChangeLog.AddRange(entries);
+					todo.UpdatedAt = now;
+				}
 
-    public async Task UpdateStatusAsync(TodoItem todo, TodoItemStatus newStatus)
-    {
-        todo.Status = newStatus;
-        
-        if (newStatus == TodoItemStatus.Done && !todo.CompletedAt.HasValue)
-            todo.CompletedAt = DateTime.Now;
-        
-        if (newStatus == TodoItemStatus.InProgress && !todo.StartedAt.HasValue)
-            todo.StartedAt = DateTime.Now;
+				var oldSubsById = old.SubTasks.ToDictionary(s => s.Id);
+				foreach (var sub in todo.SubTasks)
+				{
+					if (oldSubsById.TryGetValue(sub.Id, out var oldSub))
+					{
+						var subEntries = BuildChangeEntries(oldSub, sub, now).ToList();
+						if (subEntries.Count > 0)
+						{
+							sub.ChangeLog.AddRange(subEntries);
+							sub.UpdatedAt = now;
+						}
+					}
+					else
+					{
+						sub.UpdatedAt = now;
+						if (!sub.ChangeLog.Any(e => e.Field == "Created"))
+						{
+							sub.ChangeLog.Add(new TodoChangeLogEntry
+							{
+								ChangedAt = now,
+								Field = "Created",
+								OldValue = null,
+								NewValue = sub.Title
+							});
+						}
+					}
+				}
+			}
+		}
 
-        await _repository.AddOrUpdate(todo);
-        NotifyStateChanged();
-    }
+		var success = await _repository.AddOrUpdate(todo);
+		if (success)
+		{
+			_todos = await _repository.GetTodos();
+			NotifyStateChanged();
+		}
+		return success;
+	}
 
-    public async Task ClearAllAsync()
-    {
-        await _repository.ClearAll();
-        _todos.Clear();
-        NotifyStateChanged();
-    }
+	public async Task DeleteTodoAsync(TodoItem todo)
+	{
+		await _repository.Delete(todo);
+		_todos = await _repository.GetTodos();
+		NotifyStateChanged();
+	}
 
-    public async Task ClearAllAsync(Guid? projectId = null)
-    {
-        if (projectId == null)
-        {
-            await _repository.ClearAll();
-            _todos.Clear();
-        }
-        else
-        {
-            var todosToDelete = _todos.Where(t => t.ProjectId == projectId).ToList();
-            foreach (var todo in todosToDelete)
-            {
-                await _repository.Delete(todo);
-            }
-            _todos = await _repository.GetTodos();
-        }
-        NotifyStateChanged();
-    }
+	public async Task UpdateStatusAsync(TodoItem todo, TodoItemStatus newStatus)
+	{
+		var oldStatus = todo.Status;
+		todo.Status = newStatus;
 
-    public async Task DeleteTodosByProjectAsync(Guid projectId)
-    {
-        var todosToDelete = _todos.Where(t => t.ProjectId == projectId).ToList();
-        foreach (var todo in todosToDelete)
-        {
-            await _repository.Delete(todo);
-        }
-        _todos = await _repository.GetTodos();
-        NotifyStateChanged();
-    }
+		if (newStatus == TodoItemStatus.Done && !todo.CompletedAt.HasValue)
+			todo.CompletedAt = DateTime.Now;
+
+		if (newStatus == TodoItemStatus.InProgress && !todo.StartedAt.HasValue)
+			todo.StartedAt = DateTime.Now;
+
+		if (oldStatus != newStatus)
+		{
+			var now = DateTime.Now;
+			todo.ChangeLog.Add(new TodoChangeLogEntry
+			{
+				ChangedAt = now,
+				Field = "Status",
+				OldValue = oldStatus.ToString(),
+				NewValue = newStatus.ToString()
+			});
+			todo.UpdatedAt = now;
+		}
+
+		await _repository.AddOrUpdate(todo);
+		NotifyStateChanged();
+	}
+
+	public async Task ClearAllAsync()
+	{
+		await _repository.ClearAll();
+		_todos.Clear();
+		NotifyStateChanged();
+	}
+
+	public async Task ClearAllAsync(Guid? projectId = null)
+	{
+		if (projectId == null)
+		{
+			await _repository.ClearAll();
+			_todos.Clear();
+		}
+		else
+		{
+			var todosToDelete = _todos.Where(t => t.ProjectId == projectId).ToList();
+			foreach (var todo in todosToDelete)
+			{
+				await _repository.Delete(todo);
+			}
+			_todos = await _repository.GetTodos();
+		}
+		NotifyStateChanged();
+	}
+
+	public async Task DeleteTodosByProjectAsync(Guid projectId)
+	{
+		var todosToDelete = _todos.Where(t => t.ProjectId == projectId).ToList();
+		foreach (var todo in todosToDelete)
+		{
+			await _repository.Delete(todo);
+		}
+		_todos = await _repository.GetTodos();
+		NotifyStateChanged();
+	}
+
+	public async Task MarkAllSyncedAsync(DateTime syncedAt)
+	{
+		foreach (var todo in _todos)
+		{
+			todo.LastSyncedAt = syncedAt;
+			foreach (var sub in todo.SubTasks)
+				sub.LastSyncedAt = syncedAt;
+			await _repository.AddOrUpdate(todo);
+		}
+		NotifyStateChanged();
+	}
 
 	public IEnumerable<TodoItem> GetFilteredAndSorted(FilterOption filter, SortOption sort, Guid? projectId = null)
 	{
@@ -209,21 +298,67 @@ public class TodoService : ITodoService
 			_                   => c.Descending ? source.ThenByDescending(t => t.CreatedAt) : source.ThenBy(t => t.CreatedAt),
 		};
 
-    public int GetActiveCount(Guid? projectId = null)
-    {
-        var todos = projectId.HasValue 
-            ? _todos.Where(t => t.ProjectId == projectId.Value) 
-            : _todos;
-        return todos.Count(t => !t.IsDone && t.Status != TodoItemStatus.Abandoned && t.Status != TodoItemStatus.Archived);
-    }
-    
-    public int GetCompletedCount(Guid? projectId = null)
-    {
-        var todos = projectId.HasValue 
-            ? _todos.Where(t => t.ProjectId == projectId.Value) 
-            : _todos;
-        return todos.Count(t => t.IsDone && t.Status != TodoItemStatus.Abandoned && t.Status != TodoItemStatus.Archived);
-    }
+	public int GetActiveCount(Guid? projectId = null)
+	{
+		var todos = projectId.HasValue
+			? _todos.Where(t => t.ProjectId == projectId.Value)
+			: _todos;
+		return todos.Count(t => !t.IsDone && t.Status != TodoItemStatus.Abandoned && t.Status != TodoItemStatus.Archived);
+	}
 
-    private void NotifyStateChanged() => OnTodosChanged?.Invoke();
+	public int GetCompletedCount(Guid? projectId = null)
+	{
+		var todos = projectId.HasValue
+			? _todos.Where(t => t.ProjectId == projectId.Value)
+			: _todos;
+		return todos.Count(t => t.IsDone && t.Status != TodoItemStatus.Abandoned && t.Status != TodoItemStatus.Archived);
+	}
+
+	private IEnumerable<TodoChangeLogEntry> BuildChangeEntries(TodoItem oldItem, TodoItem newItem, DateTime now)
+	{
+		if (!string.Equals(oldItem.Title, newItem.Title, StringComparison.Ordinal))
+			yield return Entry("Title", oldItem.Title, newItem.Title);
+
+		if (!string.Equals(oldItem.Description, newItem.Description, StringComparison.Ordinal))
+			yield return Entry("Description", oldItem.Description, newItem.Description);
+
+		if (oldItem.Priority != newItem.Priority)
+			yield return Entry("Priority", oldItem.Priority.ToString(), newItem.Priority.ToString());
+
+		if (oldItem.Status != newItem.Status)
+			yield return Entry("Status", oldItem.Status.ToString(), newItem.Status.ToString());
+
+		if (oldItem.DueDate != newItem.DueDate)
+			yield return Entry("DueDate", FormatDate(oldItem.DueDate), FormatDate(newItem.DueDate));
+
+		if (oldItem.EstimatedMinutes != newItem.EstimatedMinutes)
+			yield return Entry("EstimatedMinutes", oldItem.EstimatedMinutes?.ToString(), newItem.EstimatedMinutes?.ToString());
+
+		var oldSet = oldItem.TagIds?.ToHashSet() ?? new HashSet<Guid>();
+		var newSet = newItem.TagIds?.ToHashSet() ?? new HashSet<Guid>();
+		if (!oldSet.SetEquals(newSet))
+			yield return Entry("TagIds", FormatTags(oldItem.TagIds), FormatTags(newItem.TagIds));
+
+		TodoChangeLogEntry Entry(string field, string? oldVal, string? newVal) => new()
+		{
+			ChangedAt = now,
+			Field = field,
+			OldValue = oldVal,
+			NewValue = newVal
+		};
+	}
+
+	private string FormatTags(List<Guid>? ids)
+	{
+		if (ids is null || ids.Count == 0)
+			return string.Empty;
+		var names = ids
+			.Select(id => _tagService.GetById(id)?.Name ?? id.ToString("N").Substring(0, 6))
+			.OrderBy(n => n, StringComparer.OrdinalIgnoreCase);
+		return string.Join(", ", names);
+	}
+
+	private static string FormatDate(DateTime? d) => d.HasValue ? d.Value.ToString("yyyy-MM-dd HH:mm") : string.Empty;
+
+	private void NotifyStateChanged() => OnTodosChanged?.Invoke();
 }

@@ -50,6 +50,21 @@ public class TodoRepository : ITodoRepository
 		}
 	}
 
+	async Task<TodoItem?> ITodoRepository.Get(Guid id)
+	{
+		try
+		{
+			if (!TodoIds.Contains(id))
+				return null;
+			return await _localStorage.GetItemAsync<TodoItem>($"{_storageName}_{id}");
+		}
+		catch (Exception ex)
+		{
+			_logger.LogError(ex, "Error retrieving todo {Id}", id);
+			return null;
+		}
+	}
+
 	async Task<List<TodoItem>> ITodoRepository.GetTodos()
 	{
 		try

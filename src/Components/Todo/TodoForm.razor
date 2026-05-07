@@ -55,6 +55,38 @@ else
                                @bind-Value="Todo.Description" placeholder="Add some details..." />
             </div>
 
+            <div class="form-row">
+                <div class="form-group form-group-due">
+                    <label for="TodoDueDate" class="form-label">Due date</label>
+                    <div class="due-date-wrap">
+                        <InputDate Type="InputDateType.DateTimeLocal"
+                                   id="TodoDueDate"
+                                   class="form-input"
+                                   @bind-Value="Todo.DueDate" />
+                        @if (Todo.DueDate.HasValue)
+                        {
+                            <button type="button" class="btn-clear-due"
+                                    @onclick="() => Todo.DueDate = null"
+                                    aria-label="Clear due date"
+                                    data-testid="clear-due-date">
+                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                                    <path d="M18 6L6 18M6 6l12 12" />
+                                </svg>
+                            </button>
+                        }
+                    </div>
+                </div>
+                <div class="form-group form-group-estimate">
+                    <label for="TodoEstimate" class="form-label">Estimate (minutes)</label>
+                    <InputNumber id="TodoEstimate" class="form-input" @bind-Value="Todo.EstimatedMinutes" placeholder="e.g. 30" />
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">Tags</label>
+                <TagSelector @bind-SelectedTagIds="Todo.TagIds" />
+            </div>
+
             <div class="form-group">
                 <label class="form-label">Priority</label>
                 <div class="priority-options">
@@ -156,6 +188,43 @@ else
                 color: var(--danger);
             }
             
+            .form-row {
+                display: flex;
+                gap: var(--space-3);
+                flex-wrap: wrap;
+            }
+
+            .form-row .form-group {
+                flex: 1;
+                min-width: 180px;
+            }
+
+            .due-date-wrap {
+                position: relative;
+            }
+
+            .btn-clear-due {
+                position: absolute;
+                right: 8px;
+                top: 50%;
+                transform: translateY(-50%);
+                width: 22px;
+                height: 22px;
+                display: inline-flex;
+                align-items: center;
+                justify-content: center;
+                border: none;
+                background: var(--gray-100);
+                color: var(--text-muted);
+                border-radius: var(--radius-full);
+                cursor: pointer;
+            }
+
+            .btn-clear-due:hover {
+                background: var(--gray-200);
+                color: var(--text-primary);
+            }
+
             .priority-options {
                 display: flex;
                 gap: var(--space-2);

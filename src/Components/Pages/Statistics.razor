@@ -2,6 +2,7 @@
 @implements IDisposable
 @inject ITodoService TodoService
 @inject IProjectService ProjectService
+@inject ITagService TagService
 
 <PageTitle>BlazorTodo - Statistics</PageTitle>
 
@@ -285,6 +286,7 @@ else
         {
             _initialized = true;
             await ProjectService.InitializeAsync();
+            await TagService.InitializeAsync();
             await TodoService.InitializeAsync();
             StateHasChanged();
         }

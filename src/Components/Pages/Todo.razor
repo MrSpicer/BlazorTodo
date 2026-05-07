@@ -3,6 +3,7 @@
 @inject ITodoService TodoService
 @inject IProjectService ProjectService
 @inject INoteService NoteService
+@inject ITagService TagService
 @inject IDialogService DialogService
 @inject NavigationManager NavigationManager
 
@@ -469,6 +470,7 @@ else
         {
             _initialized = true;
             await ProjectService.InitializeAsync();
+            await TagService.InitializeAsync();
             await TodoService.InitializeAsync();
             await NoteService.InitializeAsync();
             StateHasChanged();

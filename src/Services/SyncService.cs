@@ -6,6 +6,7 @@ namespace TodoList.Services;
 public class SyncService : ISyncService
 {
 	private readonly IImportExportService _importExportService;
+	private readonly ITodoService _todoService;
 	private readonly IMemoryCache _cache;
 	private readonly ILogger<SyncService> _logger;
 
@@ -14,9 +15,10 @@ public class SyncService : ISyncService
 	private static readonly TimeSpan RestoreRateLimitWindow = TimeSpan.FromMinutes(2);
 	private const int MaxRestoreAttempts = 5;
 
-	public SyncService(IImportExportService importExportService, IMemoryCache cache, ILogger<SyncService> logger)
+	public SyncService(IImportExportService importExportService, ITodoService todoService, IMemoryCache cache, ILogger<SyncService> logger)
 	{
 		_importExportService = importExportService;
+		_todoService = todoService;
 		_cache = cache;
 		_logger = logger;
 	}
@@ -41,6 +43,9 @@ public class SyncService : ISyncService
 			}
 
 			var json = await _importExportService.ExportToJsonAsync();
+			// Capture syncedAt AFTER the export snapshot but BEFORE the upload.
+			// Any todo edited during the upload window will have UpdatedAt > syncedAt and remain dirty.
+			var syncedAt = DateTime.Now;
 
 			const int MaxBytes = 5 * 1024 * 1024;
 			if (System.Text.Encoding.UTF8.GetByteCount(json) > MaxBytes)
@@ -61,6 +66,8 @@ public class SyncService : ISyncService
 				AbsoluteExpirationRelativeToNow = RateLimitWindow,
 				Size = 1
 			});
+
+			await _todoService.MarkAllSyncedAsync(syncedAt);
 
 			_logger.LogInformation("Synced data for session {SessionId}", sessionId);
 			return new SyncResult(true);

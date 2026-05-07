@@ -205,7 +205,13 @@
 					CreatedAt = EditingTodo.CreatedAt,
 					StartedAt = EditingTodo.StartedAt,
 					CompletedAt = EditingTodo.CompletedAt,
+					DueDate = EditingTodo.DueDate,
+					EstimatedMinutes = EditingTodo.EstimatedMinutes,
+					UpdatedAt = EditingTodo.UpdatedAt,
+					LastSyncedAt = EditingTodo.LastSyncedAt,
 					ProjectId = EditingTodo.ProjectId,
+					TagIds = EditingTodo.TagIds.ToList(),
+					ChangeLog = EditingTodo.ChangeLog.ToList(),
 					SubTasks = EditingTodo.SubTasks.Select(st => new TodoItem
 					{
 						Id = st.Id,
@@ -214,7 +220,15 @@
 						Priority = st.Priority,
 						Status = st.Status,
 						CreatedAt = st.CreatedAt,
+						StartedAt = st.StartedAt,
+						CompletedAt = st.CompletedAt,
+						DueDate = st.DueDate,
+						EstimatedMinutes = st.EstimatedMinutes,
+						UpdatedAt = st.UpdatedAt,
+						LastSyncedAt = st.LastSyncedAt,
 						ProjectId = st.ProjectId,
+						TagIds = st.TagIds.ToList(),
+						ChangeLog = st.ChangeLog.ToList(),
 					}).ToList()
 				};
 				if (ShowParentSelector)

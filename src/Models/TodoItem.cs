@@ -20,8 +20,14 @@ public class TodoItem
 	public DateTime CreatedAt { get; set; } = DateTime.Now;
 	public DateTime? StartedAt { get; set; }
 	public DateTime? CompletedAt { get; set; }
+	public DateTime? DueDate { get; set; }
+	public int? EstimatedMinutes { get; set; }
+	public DateTime? UpdatedAt { get; set; }
+	public DateTime? LastSyncedAt { get; set; }
 	public Guid ProjectId { get; set; }
 
+	public List<Guid> TagIds { get; set; } = new();
+	public List<TodoChangeLogEntry> ChangeLog { get; set; } = new();
 	public List<TodoItem> SubTasks { get; set; } = new();
 
 	public bool IsDone => Status == TodoItemStatus.Done;
@@ -29,6 +35,9 @@ public class TodoItem
 	public bool HasSubTasks => SubTasks.Count > 0;
 	public int SubTaskCount => SubTasks.Count;
 	public int SubTaskDoneCount => SubTasks.Count(t => t.IsDone);
+
+	public bool IsDirty => LastSyncedAt is null || (UpdatedAt.HasValue && UpdatedAt > LastSyncedAt);
+	public bool HasEverSynced => LastSyncedAt.HasValue;
 
 	public bool IsValid()
 	{

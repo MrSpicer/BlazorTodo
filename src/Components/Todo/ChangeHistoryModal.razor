@@ -1,0 +1,179 @@
+@using TodoList.Models
+@inject ITagService TagService
+
+@if (IsVisible && Item is not null)
+{
+	<div class="modal-overlay" @onclick="HandleClose" data-testid="change-history-overlay">
+		<div class="modal-container" @onclick:stopPropagation>
+			<div class="modal-header">
+				<h3>Change History</h3>
+				<button type="button" class="btn-close-modal" @onclick="HandleClose" aria-label="Close">
+					<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+						<path d="M18 6L6 18M6 6l12 12" />
+					</svg>
+				</button>
+			</div>
+			<div class="modal-body">
+				<p class="modal-subtitle">@Item.Title</p>
+				@if (Item.ChangeLog.Count == 0)
+				{
+					<p class="empty-history">No changes recorded yet.</p>
+				}
+				else
+				{
+					<table class="history-table" data-testid="history-table">
+						<thead>
+							<tr>
+								<th>When</th>
+								<th>Field</th>
+								<th>From</th>
+								<th>To</th>
+							</tr>
+						</thead>
+						<tbody>
+							@foreach (var entry in Item.ChangeLog.OrderByDescending(e => e.ChangedAt))
+							{
+								<tr>
+									<td class="history-when">@entry.ChangedAt.ToString("MMM d, yyyy h:mm tt")</td>
+									<td class="history-field">@entry.Field</td>
+									<td class="history-old">@(string.IsNullOrEmpty(entry.OldValue) ? "—" : entry.OldValue)</td>
+									<td class="history-new">@(string.IsNullOrEmpty(entry.NewValue) ? "—" : entry.NewValue)</td>
+								</tr>
+							}
+						</tbody>
+					</table>
+				}
+			</div>
+		</div>
+	</div>
+}
+
+<style>
+	.modal-overlay {
+		position: fixed;
+		inset: 0;
+		background: rgba(15, 23, 42, 0.45);
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		z-index: 1000;
+		padding: var(--space-4);
+		animation: fadeIn var(--transition-base) ease-out;
+	}
+
+	.modal-container {
+		background: var(--surface);
+		border-radius: var(--radius-xl);
+		box-shadow: var(--shadow-xl);
+		width: 100%;
+		max-width: 720px;
+		max-height: 85vh;
+		display: flex;
+		flex-direction: column;
+	}
+
+	.modal-header {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		padding: var(--space-4) var(--space-5);
+		border-bottom: 1px solid var(--border-light);
+	}
+
+	.modal-header h3 {
+		margin: 0;
+		font-size: 1.125rem;
+		font-weight: 600;
+	}
+
+	.btn-close-modal {
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		width: 32px;
+		height: 32px;
+		border: none;
+		background: transparent;
+		color: var(--text-muted);
+		cursor: pointer;
+		border-radius: var(--radius-md);
+	}
+
+	.btn-close-modal:hover {
+		background: var(--gray-100);
+		color: var(--text-primary);
+	}
+
+	.modal-body {
+		padding: var(--space-4) var(--space-5);
+		overflow-y: auto;
+	}
+
+	.modal-subtitle {
+		margin: 0 0 var(--space-3);
+		color: var(--text-secondary);
+		font-size: 0.875rem;
+	}
+
+	.empty-history {
+		color: var(--text-muted);
+		font-style: italic;
+	}
+
+	.history-table {
+		width: 100%;
+		border-collapse: collapse;
+		font-size: 0.875rem;
+	}
+
+	.history-table th {
+		text-align: left;
+		padding: var(--space-2) var(--space-3);
+		border-bottom: 2px solid var(--border-light);
+		color: var(--text-secondary);
+		font-weight: 600;
+		font-size: 0.75rem;
+		text-transform: uppercase;
+		letter-spacing: 0.05em;
+	}
+
+	.history-table td {
+		padding: var(--space-2) var(--space-3);
+		border-bottom: 1px solid var(--border-light);
+		vertical-align: top;
+	}
+
+	.history-when {
+		color: var(--text-secondary);
+		white-space: nowrap;
+		font-variant-numeric: tabular-nums;
+	}
+
+	.history-field {
+		font-weight: 600;
+		color: var(--text-primary);
+	}
+
+	.history-old {
+		color: var(--text-muted);
+		text-decoration: line-through;
+	}
+
+	.history-new {
+		color: var(--success);
+		font-weight: 500;
+	}
+</style>
+
+@code {
+	[Parameter, EditorRequired]
+	public bool IsVisible { get; set; }
+
+	[Parameter]
+	public TodoItem? Item { get; set; }
+
+	[Parameter]
+	public EventCallback OnClose { get; set; }
+
+	private async Task HandleClose() => await OnClose.InvokeAsync();
+}

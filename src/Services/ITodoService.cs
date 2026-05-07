@@ -88,4 +88,10 @@ public interface ITodoService
     /// </summary>
     /// <param name="projectId">The project ID.</param>
     Task DeleteTodosByProjectAsync(Guid projectId);
+
+    /// <summary>
+    /// Marks every todo (and subtask) as synced at the given timestamp.
+    /// Sets LastSyncedAt only — does not touch UpdatedAt.
+    /// </summary>
+    Task MarkAllSyncedAsync(DateTime syncedAt);
 }

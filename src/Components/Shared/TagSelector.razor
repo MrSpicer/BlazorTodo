@@ -1,0 +1,262 @@
+@using TodoList.Models
+@implements IDisposable
+@inject ITagService TagService
+
+<div class="tag-selector" data-testid="tag-selector">
+	<div class="tag-chips">
+		@foreach (var id in SelectedTagIds)
+		{
+			var tag = TagService.GetById(id);
+			<span class="tag-chip" @key="id">
+				<span class="tag-chip-name">@(tag?.Name ?? "(unknown)")</span>
+				<button type="button" class="tag-chip-remove"
+				        @onclick="() => RemoveTag(id)"
+				        aria-label="Remove tag @(tag?.Name)">
+					<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3">
+						<path d="M18 6L6 18M6 6l12 12" />
+					</svg>
+				</button>
+			</span>
+		}
+	</div>
+
+	<div class="tag-input-wrap">
+		<input type="text" class="form-input tag-input"
+		       placeholder="Type to search or add a tag..."
+		       value="@_query"
+		       @oninput="OnInput"
+		       @onkeydown="OnKeyDown"
+		       @onfocus="() => _showSuggestions = true"
+		       @onblur="OnBlur"
+		       data-testid="tag-input" />
+
+		@if (_showSuggestions && (_suggestions.Count > 0 || CanCreateNew))
+		{
+			<div class="tag-suggestions" data-testid="tag-suggestions">
+				@foreach (var suggestion in _suggestions)
+				{
+					<button type="button" class="tag-suggestion"
+					        @onmousedown:preventDefault
+					        @onclick="() => SelectExisting(suggestion)"
+					        data-testid="tag-suggestion">
+						@suggestion.Name
+					</button>
+				}
+				@if (CanCreateNew)
+				{
+					<button type="button" class="tag-suggestion tag-suggestion-create"
+					        @onmousedown:preventDefault
+					        @onclick="CreateAndAdd"
+					        data-testid="tag-create-new">
+						<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+							<path d="M12 5v14M5 12h14" />
+						</svg>
+						Add new tag "@_query.Trim()"
+					</button>
+				}
+			</div>
+		}
+	</div>
+</div>
+
+<style>
+	.tag-selector {
+		display: flex;
+		flex-direction: column;
+		gap: var(--space-2);
+	}
+
+	.tag-chips {
+		display: flex;
+		flex-wrap: wrap;
+		gap: var(--space-2);
+	}
+
+	.tag-chip {
+		display: inline-flex;
+		align-items: center;
+		gap: var(--space-1);
+		padding: 0.125rem 0.25rem 0.125rem 0.625rem;
+		background: var(--primary-50);
+		color: #4338ca;
+		border-radius: var(--radius-full);
+		font-size: 0.8125rem;
+		font-weight: 500;
+	}
+
+	.tag-chip-remove {
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		width: 18px;
+		height: 18px;
+		border: none;
+		background: transparent;
+		color: inherit;
+		cursor: pointer;
+		border-radius: var(--radius-full);
+		padding: 0;
+	}
+
+	.tag-chip-remove:hover {
+		background: rgba(67, 56, 202, 0.15);
+	}
+
+	.tag-input-wrap {
+		position: relative;
+	}
+
+	.tag-input {
+		width: 100%;
+	}
+
+	.tag-suggestions {
+		position: absolute;
+		top: calc(100% + 4px);
+		left: 0;
+		right: 0;
+		background: var(--surface);
+		border: 1px solid var(--border);
+		border-radius: var(--radius-lg);
+		box-shadow: var(--shadow-md);
+		max-height: 220px;
+		overflow-y: auto;
+		z-index: 10;
+	}
+
+	.tag-suggestion {
+		display: flex;
+		align-items: center;
+		gap: var(--space-2);
+		width: 100%;
+		padding: var(--space-2) var(--space-3);
+		border: none;
+		background: transparent;
+		text-align: left;
+		cursor: pointer;
+		font-size: 0.875rem;
+		color: var(--text-primary);
+	}
+
+	.tag-suggestion:hover {
+		background: var(--gray-50);
+	}
+
+	.tag-suggestion-create {
+		color: var(--primary);
+		border-top: 1px solid var(--border-light);
+	}
+</style>
+
+@code {
+	[Parameter, EditorRequired]
+	public List<Guid> SelectedTagIds { get; set; } = new();
+
+	[Parameter]
+	public EventCallback<List<Guid>> SelectedTagIdsChanged { get; set; }
+
+	private string _query = string.Empty;
+	private bool _showSuggestions;
+	private List<Tag> _suggestions = new();
+
+	private bool CanCreateNew
+	{
+		get
+		{
+			var trimmed = _query.Trim();
+			return !string.IsNullOrEmpty(trimmed)
+				&& !TagService.Tags.Any(t => string.Equals(t.Name, trimmed, StringComparison.OrdinalIgnoreCase));
+		}
+	}
+
+	protected override void OnInitialized()
+	{
+		TagService.OnTagsChanged += HandleTagsChanged;
+		RefreshSuggestions();
+	}
+
+	private void HandleTagsChanged()
+	{
+		RefreshSuggestions();
+		InvokeAsync(StateHasChanged);
+	}
+
+	private void OnInput(ChangeEventArgs e)
+	{
+		_query = e.Value?.ToString() ?? string.Empty;
+		_showSuggestions = true;
+		RefreshSuggestions();
+	}
+
+	private async Task OnKeyDown(KeyboardEventArgs e)
+	{
+		if (e.Key == "Enter" && !string.IsNullOrWhiteSpace(_query))
+		{
+			if (_suggestions.Count > 0)
+				await SelectExisting(_suggestions[0]);
+			else if (CanCreateNew)
+				await CreateAndAdd();
+		}
+		else if (e.Key == "Escape")
+		{
+			_showSuggestions = false;
+		}
+	}
+
+	private void OnBlur()
+	{
+		// Delay so click on a suggestion can fire first.
+		_ = InvokeAsync(async () =>
+		{
+			await Task.Delay(150);
+			_showSuggestions = false;
+			StateHasChanged();
+		});
+	}
+
+	private async Task SelectExisting(Tag tag)
+	{
+		if (!SelectedTagIds.Contains(tag.Id))
+		{
+			SelectedTagIds.Add(tag.Id);
+			await SelectedTagIdsChanged.InvokeAsync(SelectedTagIds);
+		}
+		_query = string.Empty;
+		_showSuggestions = false;
+		RefreshSuggestions();
+	}
+
+	private async Task CreateAndAdd()
+	{
+		var name = _query.Trim();
+		if (string.IsNullOrEmpty(name)) return;
+		var tag = await TagService.GetOrCreateAsync(name);
+		if (!SelectedTagIds.Contains(tag.Id))
+		{
+			SelectedTagIds.Add(tag.Id);
+			await SelectedTagIdsChanged.InvokeAsync(SelectedTagIds);
+		}
+		_query = string.Empty;
+		_showSuggestions = false;
+		RefreshSuggestions();
+	}
+
+	private async Task RemoveTag(Guid id)
+	{
+		SelectedTagIds.Remove(id);
+		await SelectedTagIdsChanged.InvokeAsync(SelectedTagIds);
+	}
+
+	private void RefreshSuggestions()
+	{
+		_suggestions = TagService.Search(_query)
+			.Where(t => !SelectedTagIds.Contains(t.Id))
+			.Take(8)
+			.ToList();
+	}
+
+	public void Dispose()
+	{
+		TagService.OnTagsChanged -= HandleTagsChanged;
+	}
+}

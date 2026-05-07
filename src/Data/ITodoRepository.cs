@@ -10,4 +10,5 @@ public interface ITodoRepository
 	Task ClearAll();
 
 	Task<List<TodoItem>> GetTodos();
+	Task<TodoItem?> Get(Guid id);
 }

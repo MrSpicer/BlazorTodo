@@ -14,6 +14,8 @@ public class ImportExportService : IImportExportService
 	private readonly ITodoService _todoService;
 	private readonly IProjectService _projectService;
 	private readonly INoteService _noteService;
+	private readonly ITagService _tagService;
+	private readonly ITagRepository _tagRepository;
 	private readonly ILogger<ImportExportService> _logger;
 
 	private static readonly JsonSerializerOptions JsonOptions = new()
@@ -22,12 +24,14 @@ public class ImportExportService : IImportExportService
 		PropertyNamingPolicy = JsonNamingPolicy.CamelCase
 	};
 
-	public ImportExportService(ITodoRepository repository, ITodoService todoService, IProjectService projectService, INoteService noteService, ILogger<ImportExportService> logger)
+	public ImportExportService(ITodoRepository repository, ITodoService todoService, IProjectService projectService, INoteService noteService, ITagService tagService, ITagRepository tagRepository, ILogger<ImportExportService> logger)
 	{
 		_repository = repository;
 		_todoService = todoService;
 		_projectService = projectService;
 		_noteService = noteService;
+		_tagService = tagService;
+		_tagRepository = tagRepository;
 		_logger = logger;
 	}
 
@@ -37,10 +41,11 @@ public class ImportExportService : IImportExportService
 		var exportData = new TodoExportData
 		{
 			ExportedAt = DateTime.Now,
-			Version = "1.1",
+			Version = "1.2",
 			Projects = _projectService.Projects.ToList(),
 			Todos = todos,
-			Notes = _noteService.Notes.ToList()
+			Notes = _noteService.Notes.ToList(),
+			Tags = _tagService.Tags.ToList()
 		};
 
 		return JsonSerializer.Serialize(exportData, JsonOptions);
@@ -78,12 +83,39 @@ public class ImportExportService : IImportExportService
 					await _projectService.SaveProjectAsync(project);
 			}
 
+			// Import tags first (todos reference them) and build a remap from incoming tag id → local tag id.
+			// Tags are deduped case-insensitively by name across all devices/projects.
+			var tagIdRemap = new Dictionary<Guid, Guid>();
+			var existingTagsByName = _tagService.Tags.ToDictionary(t => t.Name.Trim(), t => t, StringComparer.OrdinalIgnoreCase);
+			foreach (var tag in importData.Tags ?? new List<Tag>())
+			{
+				if (tag.Id == Guid.Empty)
+					tag.Id = Guid.NewGuid();
+				if (!IsValid(tag))
+					continue;
+
+				if (existingTagsByName.TryGetValue(tag.Name.Trim(), out var existingTag))
+				{
+					if (existingTag.Id != tag.Id)
+						tagIdRemap[tag.Id] = existingTag.Id;
+				}
+				else
+				{
+					var created = await _tagService.GetOrCreateAsync(tag.Name);
+					if (created.Id != tag.Id)
+						tagIdRemap[tag.Id] = created.Id;
+					existingTagsByName[created.Name] = created;
+				}
+			}
+
 			// Import todos
 			var existingTodos = await _repository.GetTodos();
 			var existingIds = existingTodos.Select(t => t.Id).ToHashSet();
 
 			int imported = 0;
 			int skipped = 0;
+
+			var importedAt = DateTime.Now;
 
 			foreach (var todo in importData.Todos ?? new List<TodoItem>())
 			{
@@ -100,6 +132,14 @@ public class ImportExportService : IImportExportService
 				{
 					skipped++;
 					continue;
+				}
+
+				RemapTagIds(todo, tagIdRemap);
+				todo.LastSyncedAt = importedAt;
+				foreach (var sub in todo.SubTasks)
+				{
+					RemapTagIds(sub, tagIdRemap);
+					sub.LastSyncedAt = importedAt;
 				}
 
 				await _todoService.SaveTodoAsync(todo);
@@ -150,6 +190,17 @@ public class ImportExportService : IImportExportService
 		var context = new ValidationContext(entity);
 		return Validator.TryValidateObject(entity, context, null, validateAllProperties: true);
 	}
+
+	private static void RemapTagIds(TodoItem todo, Dictionary<Guid, Guid> remap)
+	{
+		if (remap.Count == 0 || todo.TagIds is null || todo.TagIds.Count == 0)
+			return;
+		for (int i = 0; i < todo.TagIds.Count; i++)
+		{
+			if (remap.TryGetValue(todo.TagIds[i], out var mapped))
+				todo.TagIds[i] = mapped;
+		}
+	}
 }
 
 /// <summary>
@@ -158,8 +209,9 @@ public class ImportExportService : IImportExportService
 public class TodoExportData
 {
 	public DateTime ExportedAt { get; set; }
-	public string Version { get; set; } = "1.1";
+	public string Version { get; set; } = "1.2";
 	public List<Project> Projects { get; set; } = new();
 	public List<TodoItem> Todos { get; set; } = new();
 	public List<ProjectNote> Notes { get; set; } = new();
+	public List<Tag> Tags { get; set; } = new();
 }
