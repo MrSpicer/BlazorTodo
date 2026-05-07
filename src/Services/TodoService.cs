@@ -11,23 +11,46 @@ public class TodoService : ITodoService
 {
 	private readonly ITodoRepository _repository;
 	private readonly ITagService _tagService;
+	private readonly IStatusService _statusService;
 	private List<TodoItem> _todos = new();
 
 	public event Action? OnTodosChanged;
 	public IReadOnlyList<TodoItem> Todos => _todos.AsReadOnly();
 
-	public TodoService(ITodoRepository repository, ITagService tagService)
+	public TodoService(ITodoRepository repository, ITagService tagService, IStatusService statusService)
 	{
 		_repository = repository;
 		_tagService = tagService;
+		_statusService = statusService;
 	}
 
 	public async Task InitializeAsync()
 	{
 		await _repository.InitializeAsync();
 		_todos = await _repository.GetTodos();
+		await MigrateStatusIdsAsync();
 		await ResetStaleTodosAsync();
 		NotifyStateChanged();
+	}
+
+	private async Task MigrateStatusIdsAsync()
+	{
+		foreach (var todo in _todos)
+		{
+			var changed = TryFillStatusId(todo);
+			foreach (var sub in todo.SubTasks)
+				changed |= TryFillStatusId(sub);
+			if (changed)
+				await _repository.AddOrUpdate(todo);
+		}
+
+		static bool TryFillStatusId(TodoItem t)
+		{
+			if (t.StatusId != Guid.Empty)
+				return false;
+			t.StatusId = BuiltInStatusIds.FromLegacyEnum((int)t.Status);
+			return true;
+		}
 	}
 
 	private async Task ResetStaleTodosAsync()
@@ -38,17 +61,17 @@ public class TodoService : ITodoService
 		{
 			var dirty = false;
 
-			if (todo.Status == TodoItemStatus.New && todo.CreatedAt < cutoff)
+			if (todo.StatusId == BuiltInStatusIds.New && todo.CreatedAt < cutoff)
 			{
-				todo.Status = TodoItemStatus.None;
+				todo.StatusId = BuiltInStatusIds.None;
 				dirty = true;
 			}
 
 			foreach (var sub in todo.SubTasks)
 			{
-				if (sub.Status == TodoItemStatus.New && sub.CreatedAt < cutoff)
+				if (sub.StatusId == BuiltInStatusIds.New && sub.CreatedAt < cutoff)
 				{
-					sub.Status = TodoItemStatus.None;
+					sub.StatusId = BuiltInStatusIds.None;
 					dirty = true;
 				}
 			}
@@ -63,8 +86,8 @@ public class TodoService : ITodoService
 		var now = DateTime.Now;
 		var existed = _todos.Any(t => t.Id == todo.Id);
 
-		if (todo.Status == TodoItemStatus.None && !existed)
-			todo.Status = TodoItemStatus.New;
+		if ((todo.StatusId == Guid.Empty || todo.StatusId == BuiltInStatusIds.None) && !existed)
+			todo.StatusId = BuiltInStatusIds.New;
 
 		if (!existed)
 		{
@@ -140,26 +163,26 @@ public class TodoService : ITodoService
 		NotifyStateChanged();
 	}
 
-	public async Task UpdateStatusAsync(TodoItem todo, TodoItemStatus newStatus)
+	public async Task UpdateStatusAsync(TodoItem todo, Guid newStatusId)
 	{
-		var oldStatus = todo.Status;
-		todo.Status = newStatus;
+		var oldStatusId = todo.StatusId;
+		todo.StatusId = newStatusId;
 
-		if (newStatus == TodoItemStatus.Done && !todo.CompletedAt.HasValue)
+		if (newStatusId == BuiltInStatusIds.Done && !todo.CompletedAt.HasValue)
 			todo.CompletedAt = DateTime.Now;
 
-		if (newStatus == TodoItemStatus.InProgress && !todo.StartedAt.HasValue)
+		if (newStatusId == BuiltInStatusIds.InProgress && !todo.StartedAt.HasValue)
 			todo.StartedAt = DateTime.Now;
 
-		if (oldStatus != newStatus)
+		if (oldStatusId != newStatusId)
 		{
 			var now = DateTime.Now;
 			todo.ChangeLog.Add(new TodoChangeLogEntry
 			{
 				ChangedAt = now,
 				Field = "Status",
-				OldValue = oldStatus.ToString(),
-				NewValue = newStatus.ToString()
+				OldValue = StatusName(oldStatusId),
+				NewValue = StatusName(newStatusId)
 			});
 			todo.UpdatedAt = now;
 		}
@@ -167,6 +190,9 @@ public class TodoService : ITodoService
 		await _repository.AddOrUpdate(todo);
 		NotifyStateChanged();
 	}
+
+	private string StatusName(Guid id) =>
+		_statusService.GetById(id)?.Name ?? (id == Guid.Empty ? string.Empty : id.ToString());
 
 	public async Task ClearAllAsync()
 	{
@@ -237,7 +263,7 @@ public class TodoService : ITodoService
 		return sort switch
 		{
 			SortOption.Priority => filtered.OrderByDescending(t => t.Priority),
-			SortOption.Status => filtered.OrderBy(t => t.Status),
+			SortOption.Status => filtered.OrderBy(t => StatusRank(t.StatusId)),
 			_ => filtered.OrderByDescending(t => t.CreatedAt)
 		};
 	}
@@ -270,7 +296,7 @@ public class TodoService : ITodoService
 		// Filter by selected statuses
 		if (criteria.SelectedStatuses.Any())
 		{
-			filtered = filtered.Where(t => criteria.SelectedStatuses.Contains(t.Status));
+			filtered = filtered.Where(t => criteria.SelectedStatuses.Contains(t.StatusId));
 		}
 
 		// Sort
@@ -282,28 +308,41 @@ public class TodoService : ITodoService
 		return sorted;
 	}
 
-	private static IOrderedEnumerable<TodoItem> ApplyFirstSort(IEnumerable<TodoItem> source, SortCriterion c) =>
+	private IOrderedEnumerable<TodoItem> ApplyFirstSort(IEnumerable<TodoItem> source, SortCriterion c) =>
 		c.Option switch
 		{
 			SortOption.Priority => c.Descending ? source.OrderByDescending(t => t.Priority) : source.OrderBy(t => t.Priority),
-			SortOption.Status   => c.Descending ? source.OrderByDescending(t => t.Status)   : source.OrderBy(t => t.Status),
+			SortOption.Status   => c.Descending ? source.OrderByDescending(t => StatusRank(t.StatusId)) : source.OrderBy(t => StatusRank(t.StatusId)),
 			_                   => c.Descending ? source.OrderByDescending(t => t.CreatedAt) : source.OrderBy(t => t.CreatedAt),
 		};
 
-	private static IOrderedEnumerable<TodoItem> ApplyThenSort(IOrderedEnumerable<TodoItem> source, SortCriterion c) =>
+	private IOrderedEnumerable<TodoItem> ApplyThenSort(IOrderedEnumerable<TodoItem> source, SortCriterion c) =>
 		c.Option switch
 		{
 			SortOption.Priority => c.Descending ? source.ThenByDescending(t => t.Priority) : source.ThenBy(t => t.Priority),
-			SortOption.Status   => c.Descending ? source.ThenByDescending(t => t.Status)   : source.ThenBy(t => t.Status),
+			SortOption.Status   => c.Descending ? source.ThenByDescending(t => StatusRank(t.StatusId)) : source.ThenBy(t => StatusRank(t.StatusId)),
 			_                   => c.Descending ? source.ThenByDescending(t => t.CreatedAt) : source.ThenBy(t => t.CreatedAt),
 		};
+
+	private int StatusRank(Guid id)
+	{
+		var natural = BuiltInStatusIds.NaturalOrder(id);
+		if (natural != int.MaxValue)
+			return natural;
+		var customs = _statusService.Statuses
+			.Where(s => !s.IsBuiltIn)
+			.OrderBy(s => s.Name, StringComparer.OrdinalIgnoreCase)
+			.ToList();
+		var idx = customs.FindIndex(s => s.Id == id);
+		return idx >= 0 ? 1000 + idx : int.MaxValue;
+	}
 
 	public int GetActiveCount(Guid? projectId = null)
 	{
 		var todos = projectId.HasValue
 			? _todos.Where(t => t.ProjectId == projectId.Value)
 			: _todos;
-		return todos.Count(t => !t.IsDone && t.Status != TodoItemStatus.Abandoned && t.Status != TodoItemStatus.Archived);
+		return todos.Count(t => !BuiltInStatusIds.IsCompletedLike(t.StatusId));
 	}
 
 	public int GetCompletedCount(Guid? projectId = null)
@@ -311,7 +350,7 @@ public class TodoService : ITodoService
 		var todos = projectId.HasValue
 			? _todos.Where(t => t.ProjectId == projectId.Value)
 			: _todos;
-		return todos.Count(t => t.IsDone && t.Status != TodoItemStatus.Abandoned && t.Status != TodoItemStatus.Archived);
+		return todos.Count(t => t.StatusId == BuiltInStatusIds.Done);
 	}
 
 	private IEnumerable<TodoChangeLogEntry> BuildChangeEntries(TodoItem oldItem, TodoItem newItem, DateTime now)
@@ -325,8 +364,8 @@ public class TodoService : ITodoService
 		if (oldItem.Priority != newItem.Priority)
 			yield return Entry("Priority", oldItem.Priority.ToString(), newItem.Priority.ToString());
 
-		if (oldItem.Status != newItem.Status)
-			yield return Entry("Status", oldItem.Status.ToString(), newItem.Status.ToString());
+		if (oldItem.StatusId != newItem.StatusId)
+			yield return Entry("Status", StatusName(oldItem.StatusId), StatusName(newItem.StatusId));
 
 		if (oldItem.DueDate != newItem.DueDate)
 			yield return Entry("DueDate", FormatDate(oldItem.DueDate), FormatDate(newItem.DueDate));

@@ -16,6 +16,8 @@ public class ImportExportService : IImportExportService
 	private readonly INoteService _noteService;
 	private readonly ITagService _tagService;
 	private readonly ITagRepository _tagRepository;
+	private readonly IStatusService _statusService;
+	private readonly IStatusRepository _statusRepository;
 	private readonly ILogger<ImportExportService> _logger;
 
 	private static readonly JsonSerializerOptions JsonOptions = new()
@@ -24,7 +26,7 @@ public class ImportExportService : IImportExportService
 		PropertyNamingPolicy = JsonNamingPolicy.CamelCase
 	};
 
-	public ImportExportService(ITodoRepository repository, ITodoService todoService, IProjectService projectService, INoteService noteService, ITagService tagService, ITagRepository tagRepository, ILogger<ImportExportService> logger)
+	public ImportExportService(ITodoRepository repository, ITodoService todoService, IProjectService projectService, INoteService noteService, ITagService tagService, ITagRepository tagRepository, IStatusService statusService, IStatusRepository statusRepository, ILogger<ImportExportService> logger)
 	{
 		_repository = repository;
 		_todoService = todoService;
@@ -32,6 +34,8 @@ public class ImportExportService : IImportExportService
 		_noteService = noteService;
 		_tagService = tagService;
 		_tagRepository = tagRepository;
+		_statusService = statusService;
+		_statusRepository = statusRepository;
 		_logger = logger;
 	}
 
@@ -41,11 +45,12 @@ public class ImportExportService : IImportExportService
 		var exportData = new TodoExportData
 		{
 			ExportedAt = DateTime.Now,
-			Version = "1.2",
+			Version = "1.3",
 			Projects = _projectService.Projects.ToList(),
 			Todos = todos,
 			Notes = _noteService.Notes.ToList(),
-			Tags = _tagService.Tags.ToList()
+			Tags = _tagService.Tags.ToList(),
+			Statuses = _statusService.Statuses.ToList()
 		};
 
 		return JsonSerializer.Serialize(exportData, JsonOptions);
@@ -108,6 +113,38 @@ public class ImportExportService : IImportExportService
 				}
 			}
 
+			// Import statuses. Built-ins are upserted by Guid (peer device may have edited
+			// the name/color/emoji); custom statuses dedupe by name (case-insensitive).
+			var statusIdRemap = new Dictionary<Guid, Guid>();
+			var existingCustomStatusesByName = _statusService.Statuses
+				.Where(s => !s.IsBuiltIn)
+				.ToDictionary(s => s.Name.Trim(), s => s, StringComparer.OrdinalIgnoreCase);
+			foreach (var incoming in importData.Statuses ?? new List<Status>())
+			{
+				if (incoming.Id == Guid.Empty || string.IsNullOrWhiteSpace(incoming.Name))
+					continue;
+
+				if (BuiltInStatusIds.IsBuiltIn(incoming.Id))
+				{
+					incoming.IsBuiltIn = true;
+					await _statusService.UpdateAsync(incoming);
+					continue;
+				}
+
+				incoming.IsBuiltIn = false;
+				if (existingCustomStatusesByName.TryGetValue(incoming.Name.Trim(), out var existing))
+				{
+					if (existing.Id != incoming.Id)
+						statusIdRemap[incoming.Id] = existing.Id;
+				}
+				else
+				{
+					var added = await _statusService.AddAsync(incoming);
+					if (added)
+						existingCustomStatusesByName[incoming.Name.Trim()] = incoming;
+				}
+			}
+
 			// Import todos
 			var existingTodos = await _repository.GetTodos();
 			var existingIds = existingTodos.Select(t => t.Id).ToHashSet();
@@ -135,10 +172,12 @@ public class ImportExportService : IImportExportService
 				}
 
 				RemapTagIds(todo, tagIdRemap);
+				FillStatusId(todo, statusIdRemap);
 				todo.LastSyncedAt = importedAt;
 				foreach (var sub in todo.SubTasks)
 				{
 					RemapTagIds(sub, tagIdRemap);
+					FillStatusId(sub, statusIdRemap);
 					sub.LastSyncedAt = importedAt;
 				}
 
@@ -201,6 +240,17 @@ public class ImportExportService : IImportExportService
 				todo.TagIds[i] = mapped;
 		}
 	}
+
+	// Ensures incoming TodoItem has a non-empty StatusId. Pre-v1.3 exports populate only
+	// the legacy enum field, so we map it to a built-in Guid. v1.3 exports may carry a
+	// custom-status Guid that was deduped on this device — apply the remap.
+	private static void FillStatusId(TodoItem todo, Dictionary<Guid, Guid> statusIdRemap)
+	{
+		if (todo.StatusId == Guid.Empty)
+			todo.StatusId = BuiltInStatusIds.FromLegacyEnum((int)todo.Status);
+		else if (statusIdRemap.TryGetValue(todo.StatusId, out var mapped))
+			todo.StatusId = mapped;
+	}
 }
 
 /// <summary>
@@ -209,9 +259,10 @@ public class ImportExportService : IImportExportService
 public class TodoExportData
 {
 	public DateTime ExportedAt { get; set; }
-	public string Version { get; set; } = "1.2";
+	public string Version { get; set; } = "1.3";
 	public List<Project> Projects { get; set; } = new();
 	public List<TodoItem> Todos { get; set; } = new();
 	public List<ProjectNote> Notes { get; set; } = new();
 	public List<Tag> Tags { get; set; } = new();
+	public List<Status> Statuses { get; set; } = new();
 }

@@ -770,3 +770,20 @@ a:hover, .btn-link:hover {
 .animate-scale-in {
     animation: scaleIn var(--transition-fast) ease-out;
 }
+
+/* ========================================
+   Status badge base
+   Background and foreground colors are applied inline by callers
+   (resolved via TodoList.Helpers.StatusColor from each Status's hex value);
+   this class only provides typography and shape.
+   ======================================== */
+.status-badge {
+    font-size: 0.6875rem;
+    font-weight: 600;
+    padding: 0.125rem 0.5rem;
+    border-radius: var(--radius-full);
+    text-transform: uppercase;
+    letter-spacing: 0.025em;
+    display: inline-flex;
+    align-items: center;
+}

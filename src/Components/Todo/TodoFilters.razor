@@ -1,5 +1,7 @@
 @using TodoList.Models
 @using TodoList.Models.Enums
+@implements IDisposable
+@inject IStatusService StatusService
 
 <div class="filters-panel @(_isExpanded ? "expanded" : "collapsed")">
     <button class="filters-toggle" @onclick="ToggleExpanded">
@@ -69,12 +71,13 @@
                 <div class="filter-group">
                     <span class="filter-group-label">Status</span>
                     <div class="filter-chips">
-                        @foreach (TodoItemStatus status in Enum.GetValues(typeof(TodoItemStatus)))
+                        @foreach (var status in StatusService.Statuses)
                         {
-                            var isSelected = FilterCriteria.SelectedStatuses.Contains(status);
-                            <button class="filter-chip status-@status.ToString().ToLower() @(isSelected ? "selected" : "")"
-                                    @onclick="() => OnStatusToggle(status)">
-                                @GetStatusLabel(status)
+                            var isSelected = FilterCriteria.SelectedStatuses.Contains(status.Id);
+                            var sid = status.Id;
+                            <button class="filter-chip @(isSelected ? "selected" : "")"
+                                    @onclick="() => OnStatusToggle(sid)">
+                                @status.Name
                             </button>
                         }
                     </div>
@@ -531,10 +534,20 @@
         await FilterChanged.InvokeAsync();
     }
 
-    private async Task OnStatusToggle(TodoItemStatus status)
+    private async Task OnStatusToggle(Guid statusId)
     {
-        FilterCriteria.ToggleStatus(status);
+        FilterCriteria.ToggleStatus(statusId);
         await FilterChanged.InvokeAsync();
+    }
+
+    protected override void OnInitialized()
+    {
+        StatusService.OnStatusesChanged += StateHasChanged;
+    }
+
+    public void Dispose()
+    {
+        StatusService.OnStatusesChanged -= StateHasChanged;
     }
 
     private async Task AddSortCriterion(ChangeEventArgs e)
@@ -595,21 +608,14 @@
         await FilterChanged.InvokeAsync();
     }
 
-    private string GetStatusLabel(TodoItemStatus status) => status switch
-    {
-        TodoItemStatus.InProgress => "In Progress",
-        _ => status.ToString()
-    };
-    
-    private static readonly HashSet<TodoItemStatus> _defaultStatuses =
-        [TodoItemStatus.None, TodoItemStatus.New, TodoItemStatus.InProgress];
+    private static readonly HashSet<Guid> _defaultStatuses = BuiltInStatusIds.DefaultFilterIds.ToHashSet();
 
     private int GetActiveFilterCount()
     {
         int count = 0;
         if (!string.IsNullOrEmpty(FilterCriteria.SearchText)) count++;
         count += FilterCriteria.SelectedPriorities.Count;
-        if (!new HashSet<TodoItemStatus>(FilterCriteria.SelectedStatuses).SetEquals(_defaultStatuses))
+        if (!new HashSet<Guid>(FilterCriteria.SelectedStatuses).SetEquals(_defaultStatuses))
             count += FilterCriteria.SelectedStatuses.Count;
         return count;
     }

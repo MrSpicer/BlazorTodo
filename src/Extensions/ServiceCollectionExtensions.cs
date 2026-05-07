@@ -18,6 +18,8 @@ public static class ServiceCollectionExtensions
         services.AddScoped<INoteRepository, NoteRepository>();
         services.AddScoped<ITagRepository, TagRepository>();
         services.AddScoped<ITagService, TagService>();
+        services.AddScoped<IStatusRepository, StatusRepository>();
+        services.AddScoped<IStatusService, StatusService>();
         services.AddScoped<ITodoService, TodoService>();
         services.AddScoped<INoteService, NoteService>();
         services.AddScoped<IProjectService, ProjectService>();

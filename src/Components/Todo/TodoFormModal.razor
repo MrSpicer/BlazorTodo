@@ -202,6 +202,7 @@
 					Description = EditingTodo.Description,
 					Priority = EditingTodo.Priority,
 					Status = EditingTodo.Status,
+					StatusId = EditingTodo.StatusId,
 					CreatedAt = EditingTodo.CreatedAt,
 					StartedAt = EditingTodo.StartedAt,
 					CompletedAt = EditingTodo.CompletedAt,
@@ -219,6 +220,7 @@
 						Description = st.Description,
 						Priority = st.Priority,
 						Status = st.Status,
+						StatusId = st.StatusId,
 						CreatedAt = st.CreatedAt,
 						StartedAt = st.StartedAt,
 						CompletedAt = st.CompletedAt,
@@ -303,9 +305,7 @@
 	private IEnumerable<TodoItem> GetAvailableParents() =>
 		TodoService.Todos.Where(t =>
 			t.Id != (EditingTodo?.Id ?? _todo.Id) &&
-			t.Status != TodoItemStatus.Done &&
-			t.Status != TodoItemStatus.Abandoned &&
-			t.Status != TodoItemStatus.Archived);
+			!BuiltInStatusIds.IsCompletedLike(t.StatusId));
 
 	private async Task HandleConvertToNote(TodoItem todo)
 	{

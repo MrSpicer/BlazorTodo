@@ -4,6 +4,7 @@
 @inject IProjectService ProjectService
 @inject INoteService NoteService
 @inject ITagService TagService
+@inject IStatusService StatusService
 @inject IDialogService DialogService
 @inject NavigationManager NavigationManager
 
@@ -471,6 +472,7 @@ else
             _initialized = true;
             await ProjectService.InitializeAsync();
             await TagService.InitializeAsync();
+            await StatusService.InitializeAsync();
             await TodoService.InitializeAsync();
             await NoteService.InitializeAsync();
             StateHasChanged();
@@ -498,9 +500,9 @@ else
     private int GetCompletedCount()
     {
         var projectId = ProjectService.SelectedProject?.Id;
-        return projectId.HasValue 
-            ? TodoService.Todos.Count(t => t.ProjectId == projectId.Value && t.Status == TodoItemStatus.Done)
-            : TodoService.Todos.Count(t => t.Status == TodoItemStatus.Done);
+        return projectId.HasValue
+            ? TodoService.Todos.Count(t => t.ProjectId == projectId.Value && t.StatusId == BuiltInStatusIds.Done)
+            : TodoService.Todos.Count(t => t.StatusId == BuiltInStatusIds.Done);
     }
     
     private int GetProgressPercentage()

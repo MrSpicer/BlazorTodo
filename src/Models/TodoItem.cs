@@ -16,7 +16,12 @@ public class TodoItem
 	public string Description { get; set; } = string.Empty;
 
 	public Priority Priority { get; set; } = Priority.Medium;
+
+	/// <summary>Legacy enum status. Kept for one-time migration of pre-v1.3 data; not authoritative — use <see cref="StatusId"/>.</summary>
 	public TodoItemStatus Status { get; set; } = TodoItemStatus.None;
+
+	public Guid StatusId { get; set; } = Guid.Empty;
+
 	public DateTime CreatedAt { get; set; } = DateTime.Now;
 	public DateTime? StartedAt { get; set; }
 	public DateTime? CompletedAt { get; set; }
@@ -30,7 +35,7 @@ public class TodoItem
 	public List<TodoChangeLogEntry> ChangeLog { get; set; } = new();
 	public List<TodoItem> SubTasks { get; set; } = new();
 
-	public bool IsDone => Status == TodoItemStatus.Done;
+	public bool IsDone => StatusId == BuiltInStatusIds.Done;
 
 	public bool HasSubTasks => SubTasks.Count > 0;
 	public int SubTaskCount => SubTasks.Count;

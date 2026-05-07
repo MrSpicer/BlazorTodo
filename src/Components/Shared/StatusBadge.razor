@@ -1,30 +1,25 @@
-@using TodoList.Models.Enums
+@using TodoList.Helpers
+@using TodoList.Models
+@implements IDisposable
+@inject IStatusService StatusService
 
-<span class="badge @GetBadgeClass()">@GetStatusEmoji() @Status</span>
+@{
+	var status = StatusService.GetById(StatusId);
+	var (bg, fg) = StatusColor.Resolve(status?.Color);
+}
+<span class="status-badge" style="background-color:@bg;color:@fg">@(status?.Name ?? "Unknown")</span>
 
 @code {
-    [Parameter, EditorRequired]
-    public TodoItemStatus Status { get; set; }
+	[Parameter, EditorRequired]
+	public Guid StatusId { get; set; }
 
-    private string GetStatusEmoji() => Status switch
-    {
-        TodoItemStatus.None => "⚪",
-        TodoItemStatus.New => "🆕",
-        TodoItemStatus.InProgress => "🔄",
-        TodoItemStatus.Done => "✅",
-        TodoItemStatus.Abandoned => "❌",
-        TodoItemStatus.Archived => "📦",
-        _ => "⚪"
-    };
+	protected override void OnInitialized()
+	{
+		StatusService.OnStatusesChanged += StateHasChanged;
+	}
 
-    private string GetBadgeClass() => Status switch
-    {
-        TodoItemStatus.None => "bg-light text-dark",
-        TodoItemStatus.New => "bg-info",
-        TodoItemStatus.InProgress => "bg-primary",
-        TodoItemStatus.Done => "bg-success",
-        TodoItemStatus.Abandoned => "bg-secondary",
-        TodoItemStatus.Archived => "bg-dark",
-        _ => "bg-light"
-    };
+	public void Dispose()
+	{
+		StatusService.OnStatusesChanged -= StateHasChanged;
+	}
 }

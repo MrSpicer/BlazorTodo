@@ -3,6 +3,7 @@
 @inject ITodoService TodoService
 @inject IProjectService ProjectService
 @inject ITagService TagService
+@inject IStatusService StatusService
 
 <PageTitle>BlazorTodo - Statistics</PageTitle>
 
@@ -287,6 +288,7 @@ else
             _initialized = true;
             await ProjectService.InitializeAsync();
             await TagService.InitializeAsync();
+            await StatusService.InitializeAsync();
             await TodoService.InitializeAsync();
             StateHasChanged();
         }

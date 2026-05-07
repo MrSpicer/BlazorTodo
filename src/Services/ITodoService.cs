@@ -40,8 +40,8 @@ public interface ITodoService
     /// Updates the status of a todo item.
     /// </summary>
     /// <param name="todo">The todo item to update.</param>
-    /// <param name="newStatus">The new status.</param>
-    Task UpdateStatusAsync(TodoItem todo, TodoItemStatus newStatus);
+    /// <param name="newStatusId">The new status id.</param>
+    Task UpdateStatusAsync(TodoItem todo, Guid newStatusId);
 
     /// <summary>
     /// Clears all todos.

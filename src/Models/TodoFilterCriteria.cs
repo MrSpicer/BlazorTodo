@@ -18,10 +18,9 @@ public class TodoFilterCriteria
 	public List<Priority> SelectedPriorities { get; set; } = new();
 
 	/// <summary>
-	/// Selected statuses to filter by. Empty list means no status filtering.
+	/// Selected status ids to filter by. Empty list means no status filtering.
 	/// </summary>
-	public List<TodoItemStatus> SelectedStatuses { get; set; } =
-		[TodoItemStatus.None, TodoItemStatus.New, TodoItemStatus.InProgress];
+	public List<Guid> SelectedStatuses { get; set; } = BuiltInStatusIds.DefaultFilterIds.ToList();
 
 	/// <summary>
 	/// Ordered list of sort criteria applied in sequence.
@@ -33,8 +32,7 @@ public class TodoFilterCriteria
 	public IEnumerable<SortOption> AvailableSortOptions =>
 		Enum.GetValues<SortOption>().Except(SortCriteria.Select(c => c.Option));
 
-	private static readonly HashSet<TodoItemStatus> _defaultStatuses =
-		[TodoItemStatus.None, TodoItemStatus.New, TodoItemStatus.InProgress];
+	private static readonly HashSet<Guid> _defaultStatuses = BuiltInStatusIds.DefaultFilterIds.ToHashSet();
 
 	/// <summary>
 	/// Gets whether any filters are currently active (excluding sort).
@@ -42,7 +40,7 @@ public class TodoFilterCriteria
 	public bool HasActiveFilters =>
 		!string.IsNullOrWhiteSpace(SearchText) ||
 		SelectedPriorities.Any() ||
-		!new HashSet<TodoItemStatus>(SelectedStatuses).SetEquals(_defaultStatuses);
+		!new HashSet<Guid>(SelectedStatuses).SetEquals(_defaultStatuses);
 
 	/// <summary>
 	/// Restores default sort criteria (Status asc, Priority asc).
@@ -59,7 +57,7 @@ public class TodoFilterCriteria
 	{
 		SearchText = string.Empty;
 		SelectedPriorities.Clear();
-		SelectedStatuses = [TodoItemStatus.None, TodoItemStatus.New, TodoItemStatus.InProgress];
+		SelectedStatuses = BuiltInStatusIds.DefaultFilterIds.ToList();
 	}
 
 	/// <summary>
@@ -74,13 +72,13 @@ public class TodoFilterCriteria
 	}
 
 	/// <summary>
-	/// Toggles a status in the selected statuses list.
+	/// Toggles a status id in the selected statuses list.
 	/// </summary>
-	public void ToggleStatus(TodoItemStatus status)
+	public void ToggleStatus(Guid statusId)
 	{
-		if (SelectedStatuses.Contains(status))
-			SelectedStatuses.Remove(status);
+		if (SelectedStatuses.Contains(statusId))
+			SelectedStatuses.Remove(statusId);
 		else
-			SelectedStatuses.Add(status);
+			SelectedStatuses.Add(statusId);
 	}
 }

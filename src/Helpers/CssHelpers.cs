@@ -21,24 +21,24 @@ public static class CssHelpers
     };
 
     /// <summary>
-    /// Gets the Bootstrap list-group-item class for a status.
+    /// Gets the Bootstrap list-group-item class for a status id (built-ins only; custom statuses get neutral styling).
     /// </summary>
-    public static string GetStatusItemClass(TodoItemStatus status) => status switch
+    public static string GetStatusItemClass(Guid statusId)
     {
-        TodoItemStatus.Done => "list-group-item-success",
-        TodoItemStatus.Archived => "list-group-item-light",
-        TodoItemStatus.Abandoned => "list-group-item-secondary",
-        TodoItemStatus.InProgress => "list-group-item-info",
-        _ => ""
-    };
+        if (statusId == BuiltInStatusIds.Done) return "list-group-item-success";
+        if (statusId == BuiltInStatusIds.Archived) return "list-group-item-light";
+        if (statusId == BuiltInStatusIds.Abandoned) return "list-group-item-secondary";
+        if (statusId == BuiltInStatusIds.InProgress) return "list-group-item-info";
+        return "";
+    }
 
     /// <summary>
-    /// Gets the text decoration class for a status.
+    /// Gets the text decoration class for a status id.
     /// </summary>
-    public static string GetStatusTextClass(TodoItemStatus status) => status switch
+    public static string GetStatusTextClass(Guid statusId)
     {
-        TodoItemStatus.Done => "text-decoration-line-through",
-        TodoItemStatus.Archived or TodoItemStatus.Abandoned => "text-muted",
-        _ => ""
-    };
+        if (statusId == BuiltInStatusIds.Done) return "text-decoration-line-through";
+        if (statusId == BuiltInStatusIds.Archived || statusId == BuiltInStatusIds.Abandoned) return "text-muted";
+        return "";
+    }
 }

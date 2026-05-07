@@ -91,6 +91,31 @@
 		</div>
 	</div>
 
+	<!-- Statuses -->
+	<div class="settings-card">
+		<div class="settings-card-header">
+			<div class="settings-card-icon">
+				<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+					<circle cx="12" cy="12" r="10"/>
+					<path d="M9 12l2 2 4-4"/>
+				</svg>
+			</div>
+			<div>
+				<h2 class="settings-card-title">Statuses</h2>
+				<p class="settings-card-description">Add custom statuses or rename and recolor the built-in ones used to track todo progress.</p>
+			</div>
+		</div>
+		<div class="settings-card-actions">
+			<button class="btn btn-outline-secondary" @onclick="ShowStatusModal">
+				<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+					<circle cx="12" cy="12" r="10"/>
+					<path d="M9 12l2 2 4-4"/>
+				</svg>
+				Manage Statuses
+			</button>
+		</div>
+	</div>
+
 	<!-- Danger Zone -->
 	<div class="settings-card danger-zone">
 		<div class="settings-card-header">
@@ -128,6 +153,8 @@
 <SyncModal IsVisible="@_showSyncModal" InitialTab="sync" OnClose="HideSyncModal" />
 
 <TagsModal IsVisible="@_showTagsModal" OnClose="HideTagsModal" />
+
+<StatusManagementModal IsVisible="@_showStatusModal" OnClose="HideStatusModal" />
 
 <style>
 	.settings-sections {
@@ -230,6 +257,7 @@
 	private bool _showImportExportModal;
 	private bool _showSyncModal;
 	private bool _showTagsModal;
+	private bool _showStatusModal;
 	private ImportExportModal? _importExportModal;
 
 	private void ShowImportExportModal() => _showImportExportModal = true;
@@ -238,6 +266,8 @@
 	private void HideSyncModal() => _showSyncModal = false;
 	private void ShowTagsModal() => _showTagsModal = true;
 	private void HideTagsModal() => _showTagsModal = false;
+	private void ShowStatusModal() => _showStatusModal = true;
+	private void HideStatusModal() => _showStatusModal = false;
 
 	private async Task HandleExport()
 	{

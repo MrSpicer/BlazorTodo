@@ -1,0 +1,692 @@
+@using System.ComponentModel.DataAnnotations
+@using TodoList.Helpers
+@using TodoList.Models
+@implements IDisposable
+@inject IStatusService StatusService
+@inject IDialogService DialogService
+
+@if (IsVisible)
+{
+	<div class="modal-overlay" @onclick="Close">
+		<div class="modal-container statuses-modal-container"
+		     role="dialog"
+		     aria-modal="true"
+		     aria-labelledby="statuses-modal-title"
+		     @onclick:stopPropagation="true">
+			<div class="modal-header">
+				<h2 class="modal-title" id="statuses-modal-title">
+					<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+						<circle cx="12" cy="12" r="10"/>
+						<path d="M9 12l2 2 4-4"/>
+					</svg>
+					<span>Statuses</span>
+				</h2>
+				<button class="modal-close" @onclick="Close" aria-label="Close">
+					<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+						<path d="M18 6L6 18M6 6l12 12"/>
+					</svg>
+				</button>
+			</div>
+
+			<div class="modal-body">
+				<EditForm Model="@_createForm" OnValidSubmit="HandleCreate">
+					<DataAnnotationsValidator />
+					<div class="status-create-block">
+						<div class="status-create-row">
+							<InputText class="form-input status-create-input"
+							           @bind-Value="_createForm.Name"
+							           placeholder="New status name..."
+							           data-testid="status-create-input" />
+							<button type="submit" class="btn btn-primary" data-testid="status-create-submit">
+								<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+									<path d="M12 5v14M5 12h14"/>
+								</svg>
+								<span>Add</span>
+							</button>
+						</div>
+						<label class="color-input-label">
+							<span class="color-input-text">Color</span>
+							<input type="color"
+							       class="color-input"
+							       value="@_createForm.Color"
+							       @onchange="e => _createForm.Color = NormalizeHex(e.Value?.ToString())"
+							       aria-label="Status color"
+							       data-testid="status-create-color" />
+							<span class="color-input-preview" style="background-color:@_createForm.Color" aria-hidden="true"></span>
+						</label>
+						<ValidationMessage For="@(() => _createForm.Name)" class="validation-error" />
+					</div>
+				</EditForm>
+
+				@if (!string.IsNullOrEmpty(_bannerMessage))
+				{
+					<div class="status-banner @(_bannerIsError ? "status-banner-error" : "status-banner-info")" data-testid="status-banner">
+						<span>@_bannerMessage</span>
+						<button type="button" class="status-banner-dismiss" @onclick="() => _bannerMessage = null" aria-label="Dismiss">
+							<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+								<path d="M18 6L6 18M6 6l12 12"/>
+							</svg>
+						</button>
+					</div>
+				}
+
+				<ul class="status-list" data-testid="status-list">
+					@foreach (var status in OrderedStatuses)
+					{
+						var sid = status.Id;
+						var count = _usageCounts.TryGetValue(sid, out var c) ? c : 0;
+						<li class="status-row" @key="sid" data-testid="status-row">
+							@if (_editingId == sid)
+							{
+								<div class="status-edit-block">
+									<div class="status-edit-row">
+										<input type="text"
+										       class="form-input status-name-input"
+										       value="@_editBuffer.Name"
+										       @oninput="e => _editBuffer.Name = e.Value?.ToString() ?? string.Empty"
+										       @onkeydown="e => OnEditKeyDown(e, status)"
+										       @ref="_editInputRef"
+										       data-testid="status-edit-name" />
+									</div>
+									<label class="color-input-label">
+										<span class="color-input-text">Color</span>
+										<input type="color"
+										       class="color-input"
+										       value="@_editBuffer.Color"
+										       @onchange="e => _editBuffer.Color = NormalizeHex(e.Value?.ToString())"
+										       aria-label="Status color"
+										       data-testid="status-edit-color" />
+										<span class="color-input-preview" style="background-color:@_editBuffer.Color" aria-hidden="true"></span>
+									</label>
+									<div class="status-edit-actions">
+										<button class="status-action-btn primary"
+										        @onclick="() => SaveEdit(status)"
+										        title="Save"
+										        aria-label="Save changes"
+										        data-testid="status-edit-save">
+											<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+												<path d="M5 12l5 5L20 7"/>
+											</svg>
+										</button>
+										<button class="status-action-btn"
+										        @onclick="CancelEdit"
+										        title="Cancel"
+										        aria-label="Cancel edit"
+										        data-testid="status-edit-cancel">
+											<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+												<path d="M18 6L6 18M6 6l12 12"/>
+											</svg>
+										</button>
+									</div>
+								</div>
+							}
+							else
+							{
+								var (rowBg, rowFg) = StatusColor.Resolve(status.Color);
+								<span class="status-badge" style="background-color:@rowBg;color:@rowFg">@status.Name</span>
+								@if (status.IsBuiltIn)
+								{
+									<span class="status-built-in" title="Built-in status — cannot be deleted">built-in</span>
+								}
+								<span class="status-count">@count used</span>
+								<div class="status-actions">
+									<button class="status-action-btn"
+									        @onclick="() => StartEdit(status)"
+									        title="Edit status"
+									        aria-label="Edit status @status.Name"
+									        data-testid="status-edit-btn">
+										<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+											<path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+											<path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+										</svg>
+									</button>
+									<button class="status-action-btn danger"
+									        @onclick="() => HandleDelete(status)"
+									        title="@(status.IsBuiltIn ? "Built-in statuses cannot be deleted" : "Delete status")"
+									        aria-label="Delete status @status.Name"
+									        disabled="@status.IsBuiltIn"
+									        data-testid="status-delete-btn">
+										<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+											<path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+										</svg>
+									</button>
+								</div>
+							}
+						</li>
+					}
+				</ul>
+			</div>
+
+			<div class="modal-footer">
+				<button type="button" class="btn btn-ghost" @onclick="Close">Close</button>
+			</div>
+		</div>
+	</div>
+}
+
+<style>
+	.modal-overlay {
+		position: fixed;
+		inset: 0;
+		background: rgba(15, 23, 42, 0.6);
+		backdrop-filter: blur(4px);
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		z-index: 1000;
+		padding: var(--space-4);
+		animation: fadeIn var(--transition-fast) ease-out;
+	}
+
+	.modal-container.statuses-modal-container {
+		background: var(--surface);
+		border-radius: var(--radius-xl);
+		box-shadow: var(--shadow-xl);
+		width: 100%;
+		max-width: 600px;
+		max-height: 85vh;
+		display: flex;
+		flex-direction: column;
+		animation: scaleIn var(--transition-base) ease-out;
+	}
+
+	@@keyframes fadeIn {
+		from { opacity: 0; }
+		to { opacity: 1; }
+	}
+
+	@@keyframes scaleIn {
+		from { opacity: 0; transform: scale(0.95) translateY(10px); }
+		to { opacity: 1; transform: scale(1) translateY(0); }
+	}
+
+	.modal-header {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		padding: var(--space-5) var(--space-6);
+		border-bottom: 1px solid var(--border-light);
+	}
+
+	.modal-title {
+		display: flex;
+		align-items: center;
+		gap: var(--space-3);
+		font-size: 1.125rem;
+		font-weight: 600;
+		color: var(--text-primary);
+		margin: 0;
+	}
+
+	.modal-title svg {
+		color: var(--primary);
+	}
+
+	.modal-close {
+		width: 36px;
+		height: 36px;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		background: transparent;
+		border: none;
+		border-radius: var(--radius-md);
+		color: var(--text-muted);
+		cursor: pointer;
+		transition: all var(--transition-fast);
+	}
+
+	.modal-close:hover {
+		background: var(--gray-100);
+		color: var(--text-primary);
+	}
+
+	.modal-body {
+		padding: var(--space-5) var(--space-6);
+		display: flex;
+		flex-direction: column;
+		gap: var(--space-4);
+		overflow-y: auto;
+	}
+
+	.modal-footer {
+		display: flex;
+		justify-content: flex-end;
+		gap: var(--space-3);
+		padding: var(--space-4) var(--space-6);
+		border-top: 1px solid var(--border-light);
+		background: var(--gray-50);
+	}
+
+	.form-input {
+		padding: var(--space-3) var(--space-4);
+		border: 1.5px solid var(--border);
+		border-radius: var(--radius-lg);
+		font-size: 0.9375rem;
+		transition: all var(--transition-fast);
+		background: var(--surface);
+		width: 100%;
+	}
+
+	.form-input:focus {
+		outline: none;
+		border-color: var(--primary);
+		box-shadow: 0 0 0 3px var(--primary-light);
+	}
+
+	.form-input::placeholder {
+		color: var(--text-muted);
+	}
+
+	.validation-error {
+		font-size: 0.8125rem;
+		color: var(--danger);
+		margin-top: var(--space-1);
+	}
+
+	.status-create-block,
+	.status-edit-block {
+		display: flex;
+		flex-direction: column;
+		gap: var(--space-2);
+		width: 100%;
+	}
+
+	.status-create-row,
+	.status-edit-row {
+		display: flex;
+		gap: var(--space-2);
+		align-items: stretch;
+	}
+
+	.status-create-input,
+	.status-name-input {
+		flex: 1;
+	}
+
+	.color-input-label {
+		display: inline-flex;
+		align-items: center;
+		gap: var(--space-2);
+		font-size: 0.8125rem;
+		color: var(--text-secondary);
+		cursor: pointer;
+	}
+
+	.color-input-text {
+		font-weight: 500;
+	}
+
+	.color-input {
+		width: 36px;
+		height: 28px;
+		padding: 0;
+		border: 1.5px solid var(--border);
+		border-radius: var(--radius-md);
+		background: var(--surface);
+		cursor: pointer;
+	}
+
+	.color-input::-webkit-color-swatch-wrapper { padding: 2px; }
+	.color-input::-webkit-color-swatch { border: none; border-radius: var(--radius-sm); }
+	.color-input::-moz-color-swatch    { border: none; border-radius: var(--radius-sm); }
+
+	.color-input-preview {
+		display: inline-block;
+		width: 22px;
+		height: 22px;
+		border-radius: var(--radius-full);
+		border: 1px solid var(--border-light);
+	}
+
+	.status-banner {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		gap: var(--space-3);
+		padding: var(--space-2) var(--space-3);
+		border-radius: var(--radius-md);
+		font-size: 0.8125rem;
+	}
+
+	.status-banner-info {
+		background: var(--primary-50);
+		color: #4338ca;
+		border: 1px solid var(--primary-light);
+	}
+
+	.status-banner-error {
+		background: var(--danger-light);
+		color: #991b1b;
+		border: 1px solid #fca5a5;
+	}
+
+	.status-banner-dismiss {
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		width: 22px;
+		height: 22px;
+		border: none;
+		background: transparent;
+		color: inherit;
+		border-radius: var(--radius-full);
+		cursor: pointer;
+		opacity: 0.7;
+	}
+
+	.status-banner-dismiss:hover {
+		opacity: 1;
+	}
+
+	.status-list {
+		list-style: none;
+		margin: 0;
+		padding: 0;
+		display: flex;
+		flex-direction: column;
+		gap: var(--space-1);
+	}
+
+	.status-row {
+		display: flex;
+		align-items: center;
+		gap: var(--space-3);
+		padding: var(--space-2) var(--space-3);
+		border-radius: var(--radius-md);
+		border: 1px solid transparent;
+		transition: all var(--transition-fast);
+	}
+
+	.status-row:hover {
+		background: var(--gray-50);
+		border-color: var(--border-light);
+	}
+
+	.status-row:hover .status-actions {
+		opacity: 1;
+	}
+
+	.status-preview {
+		flex: 1;
+		font-size: 0.8125rem;
+		font-weight: 600;
+		padding: 0.25rem 0.625rem;
+		border-radius: var(--radius-full);
+		max-width: max-content;
+	}
+
+	.status-built-in {
+		font-size: 0.6875rem;
+		font-weight: 600;
+		text-transform: uppercase;
+		letter-spacing: 0.025em;
+		color: var(--text-muted);
+		background: var(--gray-100);
+		padding: 0.125rem 0.5rem;
+		border-radius: var(--radius-full);
+	}
+
+	.status-count {
+		font-size: 0.75rem;
+		color: var(--text-muted);
+		background: var(--gray-100);
+		padding: 0.125rem 0.5rem;
+		border-radius: var(--radius-full);
+		flex-shrink: 0;
+	}
+
+	.status-actions,
+	.status-edit-actions {
+		display: flex;
+		gap: var(--space-1);
+		flex-shrink: 0;
+	}
+
+	.status-actions {
+		opacity: 0;
+		transition: opacity var(--transition-fast);
+	}
+
+	.status-action-btn {
+		width: 30px;
+		height: 30px;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		background: transparent;
+		border: none;
+		border-radius: var(--radius-md);
+		color: var(--text-muted);
+		cursor: pointer;
+		transition: all var(--transition-fast);
+	}
+
+	.status-action-btn:hover:not(:disabled) {
+		background: var(--gray-100);
+		color: var(--text-primary);
+	}
+
+	.status-action-btn:disabled {
+		opacity: 0.3;
+		cursor: not-allowed;
+	}
+
+	.status-action-btn.primary {
+		color: var(--primary);
+	}
+
+	.status-action-btn.primary:hover {
+		background: var(--primary-50);
+	}
+
+	.status-action-btn.danger:hover:not(:disabled) {
+		background: var(--danger-light);
+		color: var(--danger);
+	}
+
+	@@media (max-width: 640px) {
+		.status-actions {
+			opacity: 1;
+		}
+	}
+</style>
+
+@code {
+	[Parameter]
+	public bool IsVisible { get; set; }
+
+	[Parameter]
+	public EventCallback OnClose { get; set; }
+
+	private class StatusForm
+	{
+		[Required(ErrorMessage = "Name is required")]
+		[StringLength(40, MinimumLength = 1, ErrorMessage = "Name must be 1-40 characters")]
+		public string Name { get; set; } = string.Empty;
+
+		public string Color { get; set; } = StatusColor.Default;
+	}
+
+	private static string NormalizeHex(string? raw)
+	{
+		if (string.IsNullOrWhiteSpace(raw))
+			return StatusColor.Default;
+		var trimmed = raw.Trim();
+		return StatusColor.IsHex(trimmed) ? trimmed.ToLowerInvariant() : StatusColor.Default;
+	}
+
+	private StatusForm _createForm = new();
+	private Guid? _editingId;
+	private StatusForm _editBuffer = new();
+	private string? _bannerMessage;
+	private bool _bannerIsError;
+	private Dictionary<Guid, int> _usageCounts = new();
+	private bool _wasVisible;
+	private ElementReference _editInputRef;
+	private bool _focusEditInput;
+
+	private IEnumerable<Status> OrderedStatuses =>
+		StatusService.Statuses
+			.OrderByDescending(s => s.IsBuiltIn)
+			.ThenBy(s => s.IsBuiltIn ? BuiltInStatusIds.NaturalOrder(s.Id) : int.MaxValue)
+			.ThenBy(s => s.Name, StringComparer.OrdinalIgnoreCase);
+
+	protected override void OnInitialized()
+	{
+		StatusService.OnStatusesChanged += HandleStatusesChanged;
+	}
+
+	protected override async Task OnParametersSetAsync()
+	{
+		if (IsVisible && !_wasVisible)
+		{
+			_createForm = new StatusForm();
+			_editingId = null;
+			_bannerMessage = null;
+			await StatusService.InitializeAsync();
+			await RefreshUsageCounts();
+		}
+		_wasVisible = IsVisible;
+	}
+
+	protected override async Task OnAfterRenderAsync(bool firstRender)
+	{
+		if (_focusEditInput)
+		{
+			_focusEditInput = false;
+			try { await _editInputRef.FocusAsync(); } catch { }
+		}
+	}
+
+	private void HandleStatusesChanged()
+	{
+		_ = InvokeAsync(async () =>
+		{
+			await RefreshUsageCounts();
+			StateHasChanged();
+		});
+	}
+
+	private async Task RefreshUsageCounts()
+	{
+		var fresh = new Dictionary<Guid, int>();
+		foreach (var status in StatusService.Statuses)
+			fresh[status.Id] = await StatusService.GetUsageCountAsync(status.Id);
+		_usageCounts = fresh;
+	}
+
+	private async Task HandleCreate()
+	{
+		var name = (_createForm.Name ?? string.Empty).Trim();
+		if (string.IsNullOrEmpty(name))
+			return;
+
+		var status = new Status
+		{
+			Id = Guid.NewGuid(),
+			Name = name,
+			Color = _createForm.Color,
+			IsBuiltIn = false,
+		};
+
+		var ok = await StatusService.AddAsync(status);
+		if (!ok)
+		{
+			ShowBanner($"A status named '{name}' already exists.", isError: true);
+			return;
+		}
+
+		_createForm = new StatusForm();
+		_bannerMessage = null;
+	}
+
+	private void StartEdit(Status status)
+	{
+		_editingId = status.Id;
+		_editBuffer = new StatusForm
+		{
+			Name = status.Name,
+			Color = StatusColor.NormalizeBackground(status.Color),
+		};
+		_bannerMessage = null;
+		_focusEditInput = true;
+	}
+
+	private void CancelEdit()
+	{
+		_editingId = null;
+		_editBuffer = new StatusForm();
+	}
+
+	private async Task SaveEdit(Status original)
+	{
+		var name = (_editBuffer.Name ?? string.Empty).Trim();
+		if (string.IsNullOrEmpty(name))
+		{
+			ShowBanner("Status name cannot be empty.", isError: true);
+			return;
+		}
+
+		var updated = new Status
+		{
+			Id = original.Id,
+			Name = name,
+			Color = string.IsNullOrEmpty(_editBuffer.Color) ? original.Color : _editBuffer.Color,
+			IsBuiltIn = original.IsBuiltIn,
+		};
+
+		var ok = await StatusService.UpdateAsync(updated);
+		if (!ok)
+		{
+			ShowBanner($"A status named '{name}' already exists.", isError: true);
+			return;
+		}
+
+		_editingId = null;
+		_editBuffer = new StatusForm();
+	}
+
+	private async Task OnEditKeyDown(KeyboardEventArgs e, Status status)
+	{
+		if (e.Key == "Enter")
+			await SaveEdit(status);
+		else if (e.Key == "Escape")
+			CancelEdit();
+	}
+
+	private async Task HandleDelete(Status status)
+	{
+		if (status.IsBuiltIn)
+			return;
+
+		var count = _usageCounts.TryGetValue(status.Id, out var c) ? c : 0;
+		var prompt = count > 0
+			? $"'{status.Name}' is used on {count} todo{(count == 1 ? "" : "s")}. Deleting it will reset those todos to 'None'. Continue?"
+			: $"Delete status '{status.Name}'?";
+
+		var confirmed = await DialogService.ConfirmAsync(prompt);
+		if (!confirmed)
+			return;
+
+		await StatusService.DeleteAsync(status);
+		if (_editingId == status.Id)
+			CancelEdit();
+	}
+
+	private void ShowBanner(string message, bool isError)
+	{
+		_bannerMessage = message;
+		_bannerIsError = isError;
+	}
+
+	private async Task Close()
+	{
+		await OnClose.InvokeAsync();
+	}
+
+	public void Dispose()
+	{
+		StatusService.OnStatusesChanged -= HandleStatusesChanged;
+	}
+}

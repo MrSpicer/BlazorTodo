@@ -2,16 +2,18 @@
 @using TodoList.Models.Enums
 @using TodoList.Helpers
 @using TodoList.Components.Shared
+@implements IDisposable
 @inject ITagService TagService
+@inject IStatusService StatusService
 
-<div class="todo-card @GetStatusClass() @(Item.Status == TodoItemStatus.Done ? "completed" : "") @(Depth > 0 ? "subtask-card" : "")"
+<div class="todo-card @GetStatusClass() @(IsDone ? "completed" : "") @(Depth > 0 ? "subtask-card" : "")"
      data-testid="@(Depth > 0 ? "subtask-card" : "todo-card")">
 	<div class="todo-card-left">
-		<button class="todo-checkbox @(Item.Status == TodoItemStatus.Done ? "checked" : "")"
+		<button class="todo-checkbox @(IsDone ? "checked" : "")"
 		        @onclick="ToggleComplete"
-		        title="@(Item.Status == TodoItemStatus.Done ? "Mark as incomplete" : "Mark as complete")"
-		        aria-label="@(Item.Status == TodoItemStatus.Done ? "Mark as incomplete" : "Mark as complete")">
-			@if (Item.Status == TodoItemStatus.Done)
+		        title="@(IsDone ? "Mark as incomplete" : "Mark as complete")"
+		        aria-label="@(IsDone ? "Mark as incomplete" : "Mark as complete")">
+			@if (IsDone)
 			{
 				<svg class="check-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3">
 					<path d="M5 12l5 5L20 7"/>
@@ -34,16 +36,16 @@
 
 	<div class="todo-card-content">
 		<div class="todo-header">
-			<h3 class="todo-title @(Item.Status == TodoItemStatus.Done ? "done" : "")">@Item.Title</h3>
+			<h3 class="todo-title @(IsDone ? "done" : "")">@Item.Title</h3>
 			<div class="todo-badges">
 				<span class="priority-badge priority-@Item.Priority.ToString().ToLower()">
 					@Item.Priority
 				</span>
-				@if (Item.Status != TodoItemStatus.None && Item.Status != TodoItemStatus.Done)
+				@if (Item.StatusId != BuiltInStatusIds.None && Item.StatusId != BuiltInStatusIds.Done)
 				{
-					<span class="status-badge status-@Item.Status.ToString().ToLower()">
-						@GetStatusLabel()
-					</span>
+					var st = StatusService.GetById(Item.StatusId);
+					var (stBg, stFg) = StatusColor.Resolve(st?.Color);
+					<span class="status-badge" style="background-color:@stBg;color:@stFg">@(st?.Name ?? "Unknown")</span>
 				}
 				<SyncStatusBadge Item="Item" />
 			</div>
@@ -104,13 +106,13 @@
 		@if (Depth == 0)
 		{
 			<select class="status-select"
-			        value="@Item.Status"
+			        value="@Item.StatusId"
 			        @onchange="HandleStatusChange"
 			        title="Change task status"
 			        aria-label="Change task status for: @Item.Title">
-				@foreach (var status in Enum.GetValues<TodoItemStatus>())
+				@foreach (var status in StatusService.Statuses)
 				{
-					<option value="@status" selected="@(Item.Status == status)">@GetStatusLabel(status)</option>
+					<option value="@status.Id" selected="@(Item.StatusId == status.Id)">@status.Name</option>
 				}
 			</select>
 		}
@@ -377,7 +379,7 @@
 		flex-shrink: 0;
 	}
 
-	.priority-badge, .status-badge {
+	.priority-badge {
 		font-size: 0.6875rem;
 		font-weight: 600;
 		padding: 0.125rem 0.5rem;
@@ -404,26 +406,6 @@
 	.priority-badge.priority-emergency {
 		background: var(--danger-light);
 		color: #991b1b;
-	}
-
-	.status-badge.status-new {
-		background: var(--info-light);
-		color: #1e40af;
-	}
-
-	.status-badge.status-inprogress {
-		background: #fef3c7;
-		color: #92400e;
-	}
-
-	.status-badge.status-abandoned {
-		background: var(--gray-200);
-		color: var(--text-secondary);
-	}
-
-	.status-badge.status-archived {
-		background: var(--gray-200);
-		color: var(--text-secondary);
 	}
 
 	.todo-description {
@@ -664,11 +646,21 @@
 	private TodoItem? _editingSubTask;
 	private bool _showHistoryModal;
 
+	private bool IsDone => Item.StatusId == BuiltInStatusIds.Done;
+
 	private bool IsOverdue => Item.DueDate.HasValue
 		&& Item.DueDate.Value < DateTime.Now
-		&& Item.Status != TodoItemStatus.Done
-		&& Item.Status != TodoItemStatus.Abandoned
-		&& Item.Status != TodoItemStatus.Archived;
+		&& !BuiltInStatusIds.IsCompletedLike(Item.StatusId);
+
+	protected override void OnInitialized()
+	{
+		StatusService.OnStatusesChanged += StateHasChanged;
+	}
+
+	public void Dispose()
+	{
+		StatusService.OnStatusesChanged -= StateHasChanged;
+	}
 
 	private static string FormatMinutes(int minutes)
 	{
@@ -687,12 +679,12 @@
 
 	private async Task HandleStatusChange(ChangeEventArgs e)
 	{
-		if (Enum.TryParse<TodoItemStatus>(e.Value?.ToString(), out var status))
+		if (Guid.TryParse(e.Value?.ToString(), out var statusId))
 		{
-			Item.Status = status;
-			if (status == TodoItemStatus.Done && !Item.CompletedAt.HasValue)
+			Item.StatusId = statusId;
+			if (statusId == BuiltInStatusIds.Done && !Item.CompletedAt.HasValue)
 				Item.CompletedAt = DateTime.Now;
-			if (status == TodoItemStatus.InProgress && !Item.StartedAt.HasValue)
+			if (statusId == BuiltInStatusIds.InProgress && !Item.StartedAt.HasValue)
 				Item.StartedAt = DateTime.Now;
 			await OnSave.InvokeAsync(Item);
 		}
@@ -700,12 +692,10 @@
 
 	private async Task ToggleComplete()
 	{
-		var newStatus = Item.Status == TodoItemStatus.Done ? TodoItemStatus.New : TodoItemStatus.Done;
-		Item.Status = newStatus;
-		if (newStatus == TodoItemStatus.Done && !Item.CompletedAt.HasValue)
+		var newStatusId = IsDone ? BuiltInStatusIds.New : BuiltInStatusIds.Done;
+		Item.StatusId = newStatusId;
+		if (newStatusId == BuiltInStatusIds.Done && !Item.CompletedAt.HasValue)
 			Item.CompletedAt = DateTime.Now;
-		if (newStatus == TodoItemStatus.InProgress && !Item.StartedAt.HasValue)
-			Item.StartedAt = DateTime.Now;
 		await OnSave.InvokeAsync(Item);
 	}
 
@@ -757,22 +747,10 @@
 		_editingSubTask = null;
 	}
 
-	private string GetStatusClass() => Item.Status switch
+	private string GetStatusClass()
 	{
-		TodoItemStatus.Done => "status-done",
-		TodoItemStatus.InProgress => "status-in-progress",
-		_ => ""
-	};
-
-	private string GetStatusLabel() => Item.Status switch
-	{
-		TodoItemStatus.InProgress => "In Progress",
-		_ => Item.Status.ToString()
-	};
-
-	private string GetStatusLabel(TodoItemStatus status) => status switch
-	{
-		TodoItemStatus.InProgress => "In Progress",
-		_ => status.ToString()
-	};
+		if (Item.StatusId == BuiltInStatusIds.Done) return "status-done";
+		if (Item.StatusId == BuiltInStatusIds.InProgress) return "status-in-progress";
+		return "";
+	}
 }
