@@ -10,5 +10,7 @@ public interface ITagService
 	Task<Tag> GetOrCreateAsync(string name);
 	Tag? GetById(Guid id);
 	IEnumerable<Tag> Search(string query);
+	Task<bool> UpdateAsync(Tag tag);
+	Task<int> GetUsageCountAsync(Guid tagId);
 	Task DeleteAsync(Tag tag);
 }

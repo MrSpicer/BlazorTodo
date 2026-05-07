@@ -23,6 +23,7 @@ public class TagService : ITagService
 	public async Task InitializeAsync()
 	{
 		await _tagRepository.InitializeAsync();
+		await _todoRepository.InitializeAsync();
 		_tags = await _tagRepository.GetTags();
 		Notify();
 	}
@@ -58,25 +59,101 @@ public class TagService : ITagService
 			.OrderBy(t => t.Name, StringComparer.OrdinalIgnoreCase);
 	}
 
+	public async Task<bool> UpdateAsync(Tag tag)
+	{
+		if (tag == null)
+			return false;
+
+		var trimmed = (tag.Name ?? string.Empty).Trim();
+		if (string.IsNullOrWhiteSpace(trimmed))
+			return false;
+
+		var conflict = _tags.Any(t => t.Id != tag.Id
+			&& string.Equals(t.Name, trimmed, StringComparison.OrdinalIgnoreCase));
+		if (conflict)
+			return false;
+
+		tag.Name = trimmed;
+		var ok = await _tagRepository.AddOrUpdate(tag);
+		if (!ok)
+			return false;
+
+		var index = _tags.FindIndex(t => t.Id == tag.Id);
+		if (index >= 0)
+			_tags[index] = tag;
+		else
+			_tags.Add(tag);
+
+		Notify();
+		return true;
+	}
+
+	public async Task<int> GetUsageCountAsync(Guid tagId)
+	{
+		var todos = await _todoRepository.GetTodos();
+		var count = 0;
+		foreach (var todo in todos)
+		{
+			if (todo.TagIds.Contains(tagId))
+				count++;
+			foreach (var sub in todo.SubTasks)
+			{
+				if (sub.TagIds.Contains(tagId))
+					count++;
+			}
+		}
+		return count;
+	}
+
 	public async Task DeleteAsync(Tag tag)
 	{
+		var deletedId = tag.Id;
+		var now = DateTime.Now;
+
 		await _tagRepository.Delete(tag);
-		_tags.RemoveAll(t => t.Id == tag.Id);
 
 		var todos = await _todoRepository.GetTodos();
 		foreach (var todo in todos)
 		{
-			var changed = todo.TagIds.Remove(tag.Id);
+			var oldTopNames = FormatTagNames(todo.TagIds);
+			var topRemoved = todo.TagIds.Remove(deletedId);
+
+			var subChanged = false;
 			foreach (var sub in todo.SubTasks)
 			{
-				if (sub.TagIds.Remove(tag.Id))
-					changed = true;
+				if (sub.TagIds.Remove(deletedId))
+					subChanged = true;
 			}
-			if (changed)
+
+			if (topRemoved || subChanged)
+			{
+				todo.UpdatedAt = now;
+				if (topRemoved)
+				{
+					todo.ChangeLog.Add(new TodoChangeLogEntry
+					{
+						ChangedAt = now,
+						Field = "TagIds",
+						OldValue = oldTopNames,
+						NewValue = FormatTagNames(todo.TagIds)
+					});
+				}
 				await _todoRepository.AddOrUpdate(todo);
+			}
 		}
 
+		_tags.RemoveAll(t => t.Id == deletedId);
 		Notify();
+	}
+
+	private string FormatTagNames(List<Guid> ids)
+	{
+		if (ids.Count == 0)
+			return string.Empty;
+		var names = ids
+			.Select(id => _tags.FirstOrDefault(t => t.Id == id)?.Name ?? id.ToString("N").Substring(0, 6))
+			.OrderBy(n => n, StringComparer.OrdinalIgnoreCase);
+		return string.Join(", ", names);
 	}
 
 	private void Notify() => OnTagsChanged?.Invoke();

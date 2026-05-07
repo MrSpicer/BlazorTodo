@@ -66,6 +66,31 @@
 		</div>
 	</div>
 
+	<!-- Tags -->
+	<div class="settings-card">
+		<div class="settings-card-header">
+			<div class="settings-card-icon">
+				<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+					<path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/>
+					<line x1="7" y1="7" x2="7.01" y2="7"/>
+				</svg>
+			</div>
+			<div>
+				<h2 class="settings-card-title">Tags</h2>
+				<p class="settings-card-description">Create, rename, sort, and delete tags used to label your todos.</p>
+			</div>
+		</div>
+		<div class="settings-card-actions">
+			<button class="btn btn-outline-secondary" @onclick="ShowTagsModal">
+				<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+					<path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/>
+					<line x1="7" y1="7" x2="7.01" y2="7"/>
+				</svg>
+				Manage Tags
+			</button>
+		</div>
+	</div>
+
 	<!-- Danger Zone -->
 	<div class="settings-card danger-zone">
 		<div class="settings-card-header">
@@ -101,6 +126,8 @@
                    @ref="_importExportModal" />
 
 <SyncModal IsVisible="@_showSyncModal" InitialTab="sync" OnClose="HideSyncModal" />
+
+<TagsModal IsVisible="@_showTagsModal" OnClose="HideTagsModal" />
 
 <style>
 	.settings-sections {
@@ -202,12 +229,15 @@
 @code {
 	private bool _showImportExportModal;
 	private bool _showSyncModal;
+	private bool _showTagsModal;
 	private ImportExportModal? _importExportModal;
 
 	private void ShowImportExportModal() => _showImportExportModal = true;
 	private void HideImportExportModal() => _showImportExportModal = false;
 	private void ShowSyncModal() => _showSyncModal = true;
 	private void HideSyncModal() => _showSyncModal = false;
+	private void ShowTagsModal() => _showTagsModal = true;
+	private void HideTagsModal() => _showTagsModal = false;
 
 	private async Task HandleExport()
 	{
