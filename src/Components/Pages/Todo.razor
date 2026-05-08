@@ -6,6 +6,7 @@
 @inject ITagService TagService
 @inject IStatusService StatusService
 @inject IDialogService DialogService
+@inject IFilterPresetService PresetService
 @inject NavigationManager NavigationManager
 
 <PageTitle>BlazorTodo - Todo Management</PageTitle>
@@ -152,6 +153,8 @@ else
         <TodoFilters FilterCriteria="@_filterCriteria"
                      TotalCount="@GetProjectTodoCount()"
                      FilteredCount="@GetFilteredTodos().Count()"
+                     SelectedPresetName="@_selectedPresetName"
+                     SelectedPresetChanged="HandleSelectedPresetChanged"
                      FilterChanged="StateHasChanged" />
 
         <!-- Todo List -->
@@ -449,6 +452,7 @@ else
     private TodoItem _currentTodo = new();
     private bool _isEditing;
     private TodoFilterCriteria _filterCriteria = new();
+    private string _selectedPresetName = FilterPreset.DefaultName;
     private bool _initialized;
     private bool _showProjectModal;
     private bool _showTodoModal;
@@ -475,12 +479,31 @@ else
             await StatusService.InitializeAsync();
             await TodoService.InitializeAsync();
             await NoteService.InitializeAsync();
+            await PresetService.InitializeAsync();
+            ApplyRememberedPreset();
             StateHasChanged();
         }
     }
 
     private IEnumerable<TodoItem> GetFilteredTodos() =>
         TodoService.GetFilteredAndSorted(_filterCriteria, ProjectService.SelectedProject?.Id);
+
+    private void ApplyRememberedPreset()
+    {
+        if (!PresetService.RememberPresets) return;
+        var name = PresetService.RememberedPresetName;
+        if (string.IsNullOrWhiteSpace(name)) return;
+        var preset = PresetService.GetByName(name);
+        if (preset == null) return;
+        _filterCriteria.ApplyPreset(preset);
+        _selectedPresetName = preset.Name;
+    }
+
+    private async Task HandleSelectedPresetChanged(string? name)
+    {
+        _selectedPresetName = name ?? FilterPreset.DefaultName;
+        await PresetService.SetRememberedPresetNameAsync(name);
+    }
 
     private IReadOnlyList<ProjectNote> GetProjectNotes() =>
         NoteService.GetNotesForProject(ProjectService.SelectedProject?.Id ?? Guid.Empty);

@@ -61,6 +61,17 @@ public class TodoFilterCriteria
 	}
 
 	/// <summary>
+	/// Replaces all filter values with those from the given preset.
+	/// </summary>
+	public void ApplyPreset(FilterPreset preset)
+	{
+		SearchText = preset.SearchText;
+		SelectedPriorities = preset.SelectedPriorities.ToList();
+		SelectedStatuses = preset.SelectedStatuses.ToList();
+		SortCriteria = preset.SortCriteria.ToList();
+	}
+
+	/// <summary>
 	/// Toggles a priority in the selected priorities list.
 	/// </summary>
 	public void TogglePriority(Priority priority)

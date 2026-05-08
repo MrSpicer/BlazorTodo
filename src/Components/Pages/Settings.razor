@@ -3,8 +3,10 @@
 @inject IImportExportService ImportExportService
 @inject IFileService FileService
 @inject IDialogService DialogService
+@inject IFilterPresetService PresetService
 @inject ILocalStorageService LocalStorage
 @inject NavigationManager NavigationManager
+@implements IDisposable
 
 <PageTitle>BlazorTodo - Settings</PageTitle>
 
@@ -113,6 +115,29 @@
 				</svg>
 				Manage Statuses
 			</button>
+		</div>
+	</div>
+
+	<!-- Filter Presets -->
+	<div class="settings-card">
+		<div class="settings-card-header">
+			<div class="settings-card-icon">
+				<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+					<path d="M3 4h18M6 12h12M10 20h4"/>
+				</svg>
+			</div>
+			<div>
+				<h2 class="settings-card-title">Filter Presets</h2>
+				<p class="settings-card-description">Remember your selected filter preset across sessions. When enabled, Reset to Defaults restores your selected preset; when disabled, it restores the built-in defaults.</p>
+			</div>
+		</div>
+		<div class="settings-card-actions">
+			<label class="setting-toggle">
+				<input type="checkbox"
+				       checked="@PresetService.RememberPresets"
+				       @onchange="HandleRememberPresetsChanged" />
+				<span>Remember filter presets</span>
+			</label>
 		</div>
 	</div>
 
@@ -229,6 +254,21 @@
 		flex-shrink: 0;
 	}
 
+	.setting-toggle {
+		display: inline-flex;
+		align-items: center;
+		gap: var(--space-2);
+		font-size: 0.9375rem;
+		color: var(--text-primary);
+		cursor: pointer;
+	}
+
+	.setting-toggle input[type="checkbox"] {
+		width: 18px;
+		height: 18px;
+		cursor: pointer;
+	}
+
 	.btn-ghost.danger {
 		color: var(--danger);
 	}
@@ -259,6 +299,34 @@
 	private bool _showTagsModal;
 	private bool _showStatusModal;
 	private ImportExportModal? _importExportModal;
+	private bool _initialized;
+
+	protected override void OnInitialized()
+	{
+		PresetService.OnPresetsChanged += StateHasChanged;
+	}
+
+	protected override async Task OnAfterRenderAsync(bool firstRender)
+	{
+		if (firstRender && !_initialized)
+		{
+			_initialized = true;
+			await PresetService.InitializeAsync();
+			StateHasChanged();
+		}
+	}
+
+	public void Dispose()
+	{
+		PresetService.OnPresetsChanged -= StateHasChanged;
+	}
+
+	private async Task HandleRememberPresetsChanged(ChangeEventArgs e)
+	{
+		var enabled = e.Value is bool b && b;
+		var seed = enabled ? (PresetService.RememberedPresetName ?? FilterPreset.DefaultName) : null;
+		await PresetService.SetRememberPresetsAsync(enabled, seed);
+	}
 
 	private void ShowImportExportModal() => _showImportExportModal = true;
 	private void HideImportExportModal() => _showImportExportModal = false;

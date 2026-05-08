@@ -27,6 +27,8 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IFileService, FileService>();
         services.AddScoped<IImportExportService, ImportExportService>();
         services.AddScoped<ISyncService, SyncService>();
+        services.AddScoped<IFilterPresetRepository, FilterPresetRepository>();
+        services.AddScoped<IFilterPresetService, FilterPresetService>();
         return services;
     }
 }

@@ -2,6 +2,8 @@
 @using TodoList.Models.Enums
 @implements IDisposable
 @inject IStatusService StatusService
+@inject IFilterPresetService PresetService
+@inject IDialogService DialogService
 
 <div class="filters-panel @(_isExpanded ? "expanded" : "collapsed")">
     <button class="filters-toggle" @onclick="ToggleExpanded">
@@ -26,6 +28,54 @@
     @if (_isExpanded)
     {
         <div class="filters-content">
+            <!-- Presets -->
+            <div class="filter-section presets-bar">
+                <span class="filter-group-label">Preset</span>
+                <div class="presets-controls">
+                    <select class="preset-select" @onchange="OnPresetSelectChanged">
+                        @foreach (var preset in PresetService.Presets)
+                        {
+                            <option value="@preset.Name" selected="@IsSelected(preset.Name)">@preset.Name</option>
+                        }
+                    </select>
+                    <input type="text"
+                           class="preset-name-input"
+                           placeholder="Preset name"
+                           value="@_editableName"
+                           @oninput="OnEditableNameChanged" />
+                    <button type="button"
+                            class="btn btn-outline-secondary preset-action-btn"
+                            disabled="@(!CanAddPreset)"
+                            @onclick="OnAddPreset">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                            <path d="M12 5v14M5 12h14"/>
+                        </svg>
+                        Add Preset
+                    </button>
+                    <button type="button"
+                            class="btn btn-outline-secondary preset-action-btn"
+                            @onclick="OnResetToDefaults">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                            <path d="M3 12a9 9 0 0 1 15-6.7L21 8"/>
+                            <path d="M21 22v-6h-6"/>
+                            <path d="M21 12a9 9 0 0 1-15 6.7L3 16"/>
+                        </svg>
+                        Reset to Defaults
+                    </button>
+                    @if (!PresetService.IsProtected(_selectedPresetName))
+                    {
+                        <button type="button"
+                                class="btn btn-ghost preset-action-btn preset-delete-btn"
+                                @onclick="OnDeletePreset">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                                <path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+                            </svg>
+                            Delete
+                        </button>
+                    }
+                </div>
+            </div>
+
             <!-- Search -->
             <div class="filter-section">
                 <div class="search-input-wrapper">
@@ -231,6 +281,59 @@
     
     .filter-section {
         margin-bottom: var(--space-4);
+    }
+
+    .presets-bar {
+        display: flex;
+        flex-direction: column;
+        gap: var(--space-2);
+    }
+
+    .presets-controls {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: var(--space-2);
+    }
+
+    .preset-select,
+    .preset-name-input {
+        padding: var(--space-2) var(--space-3);
+        border: 1.5px solid var(--border);
+        border-radius: var(--radius-md);
+        font-size: 0.875rem;
+        background: var(--surface);
+        color: var(--text-primary);
+        min-width: 160px;
+        transition: all var(--transition-fast);
+    }
+
+    .preset-select:focus,
+    .preset-name-input:focus {
+        outline: none;
+        border-color: var(--primary);
+        box-shadow: 0 0 0 3px var(--primary-light);
+    }
+
+    .preset-action-btn {
+        display: inline-flex;
+        align-items: center;
+        gap: var(--space-1);
+        padding: var(--space-2) var(--space-3);
+        font-size: 0.8125rem;
+    }
+
+    .preset-action-btn:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+    }
+
+    .preset-delete-btn {
+        color: var(--danger);
+    }
+
+    .preset-delete-btn:hover {
+        background: var(--danger-light);
     }
     
     .search-input-wrapper {
@@ -511,8 +614,39 @@
 
     [Parameter]
     public EventCallback FilterChanged { get; set; }
-    
+
+    [Parameter]
+    public string SelectedPresetName { get; set; } = FilterPreset.DefaultName;
+
+    [Parameter]
+    public EventCallback<string?> SelectedPresetChanged { get; set; }
+
     private bool _isExpanded = false;
+    private string _selectedPresetName = FilterPreset.DefaultName;
+    private string _editableName = FilterPreset.DefaultName;
+
+    private bool IsSelected(string name) =>
+        name.Equals(_selectedPresetName, StringComparison.OrdinalIgnoreCase);
+
+    private bool CanAddPreset
+    {
+        get
+        {
+            var trimmed = _editableName?.Trim() ?? string.Empty;
+            if (string.IsNullOrWhiteSpace(trimmed)) return false;
+            if (PresetService.IsProtected(trimmed)) return false;
+            return !trimmed.Equals(_selectedPresetName, StringComparison.OrdinalIgnoreCase);
+        }
+    }
+
+    protected override void OnParametersSet()
+    {
+        if (!string.Equals(_selectedPresetName, SelectedPresetName, StringComparison.OrdinalIgnoreCase))
+        {
+            _selectedPresetName = SelectedPresetName;
+            _editableName = SelectedPresetName;
+        }
+    }
     
     private void ToggleExpanded() => _isExpanded = !_isExpanded;
 
@@ -543,11 +677,13 @@
     protected override void OnInitialized()
     {
         StatusService.OnStatusesChanged += StateHasChanged;
+        PresetService.OnPresetsChanged += StateHasChanged;
     }
 
     public void Dispose()
     {
         StatusService.OnStatusesChanged -= StateHasChanged;
+        PresetService.OnPresetsChanged -= StateHasChanged;
     }
 
     private async Task AddSortCriterion(ChangeEventArgs e)
@@ -606,6 +742,78 @@
     {
         FilterCriteria.Clear();
         await FilterChanged.InvokeAsync();
+    }
+
+    private async Task OnPresetSelectChanged(ChangeEventArgs e)
+    {
+        var name = e.Value?.ToString() ?? FilterPreset.DefaultName;
+        var preset = PresetService.GetByName(name);
+        if (preset == null) return;
+        _selectedPresetName = preset.Name;
+        _editableName = preset.Name;
+        FilterCriteria.ApplyPreset(preset);
+        await SelectedPresetChanged.InvokeAsync(preset.Name);
+        await FilterChanged.InvokeAsync();
+    }
+
+    private void OnEditableNameChanged(ChangeEventArgs e)
+    {
+        _editableName = e.Value?.ToString() ?? string.Empty;
+    }
+
+    private async Task OnAddPreset()
+    {
+        var name = _editableName?.Trim() ?? string.Empty;
+        if (!CanAddPreset) return;
+
+        if (PresetService.Exists(name))
+        {
+            if (!await DialogService.ConfirmAsync($"Overwrite preset '{name}'?", "Overwrite Preset"))
+                return;
+        }
+
+        var preset = FilterPreset.FromCriteria(name, FilterCriteria);
+        if (await PresetService.SaveAsync(preset))
+        {
+            _selectedPresetName = preset.Name;
+            _editableName = preset.Name;
+            await SelectedPresetChanged.InvokeAsync(preset.Name);
+        }
+    }
+
+    private async Task OnResetToDefaults()
+    {
+        FilterPreset preset = PresetService.RememberPresets
+            ? (PresetService.GetByName(_selectedPresetName) ?? FilterPreset.SystemDefault)
+            : FilterPreset.SystemDefault;
+
+        FilterCriteria.ApplyPreset(preset);
+
+        if (!preset.Name.Equals(_selectedPresetName, StringComparison.OrdinalIgnoreCase))
+        {
+            _selectedPresetName = preset.Name;
+            _editableName = preset.Name;
+            await SelectedPresetChanged.InvokeAsync(preset.Name);
+        }
+
+        await FilterChanged.InvokeAsync();
+    }
+
+    private async Task OnDeletePreset()
+    {
+        var name = _selectedPresetName;
+        if (PresetService.IsProtected(name)) return;
+        if (!await DialogService.ConfirmAsync($"Delete preset '{name}'?", "Delete Preset"))
+            return;
+
+        if (await PresetService.DeleteAsync(name))
+        {
+            _selectedPresetName = FilterPreset.DefaultName;
+            _editableName = FilterPreset.DefaultName;
+            FilterCriteria.ApplyPreset(FilterPreset.SystemDefault);
+            await SelectedPresetChanged.InvokeAsync(FilterPreset.DefaultName);
+            await FilterChanged.InvokeAsync();
+        }
     }
 
     private static readonly HashSet<Guid> _defaultStatuses = BuiltInStatusIds.DefaultFilterIds.ToHashSet();
