@@ -28,7 +28,11 @@ public class NoteService : INoteService
 		var success = await _repository.AddOrUpdate(note);
 		if (success)
 		{
-			_notes = await _repository.GetNotes();
+			var idx = _notes.FindIndex(n => n.Id == note.Id);
+			if (idx >= 0)
+				_notes[idx] = note;
+			else
+				_notes.Insert(0, note);
 			NotifyStateChanged();
 		}
 		return success;
@@ -37,7 +41,7 @@ public class NoteService : INoteService
 	public async Task DeleteNoteAsync(ProjectNote note)
 	{
 		await _repository.Delete(note);
-		_notes = await _repository.GetNotes();
+		_notes.RemoveAll(n => n.Id == note.Id);
 		NotifyStateChanged();
 	}
 
@@ -49,7 +53,7 @@ public class NoteService : INoteService
 	public async Task DeleteNotesByProjectAsync(Guid projectId)
 	{
 		await _repository.DeleteByProject(projectId);
-		_notes = await _repository.GetNotes();
+		_notes.RemoveAll(n => n.ProjectId == projectId);
 		NotifyStateChanged();
 	}
 

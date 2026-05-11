@@ -150,7 +150,11 @@ public class TodoService : ITodoService
 		var success = await _repository.AddOrUpdate(todo);
 		if (success)
 		{
-			_todos = await _repository.GetTodos();
+			var idx = _todos.FindIndex(t => t.Id == todo.Id);
+			if (idx >= 0)
+				_todos[idx] = todo;
+			else
+				_todos.Add(todo);
 			NotifyStateChanged();
 		}
 		return success;
@@ -159,7 +163,7 @@ public class TodoService : ITodoService
 	public async Task DeleteTodoAsync(TodoItem todo)
 	{
 		await _repository.Delete(todo);
-		_todos = await _repository.GetTodos();
+		_todos.RemoveAll(t => t.Id == todo.Id);
 		NotifyStateChanged();
 	}
 
@@ -210,24 +214,16 @@ public class TodoService : ITodoService
 		}
 		else
 		{
-			var todosToDelete = _todos.Where(t => t.ProjectId == projectId).ToList();
-			foreach (var todo in todosToDelete)
-			{
-				await _repository.Delete(todo);
-			}
-			_todos = await _repository.GetTodos();
+			await _repository.DeleteByProject(projectId.Value);
+			_todos.RemoveAll(t => t.ProjectId == projectId.Value);
 		}
 		NotifyStateChanged();
 	}
 
 	public async Task DeleteTodosByProjectAsync(Guid projectId)
 	{
-		var todosToDelete = _todos.Where(t => t.ProjectId == projectId).ToList();
-		foreach (var todo in todosToDelete)
-		{
-			await _repository.Delete(todo);
-		}
-		_todos = await _repository.GetTodos();
+		await _repository.DeleteByProject(projectId);
+		_todos.RemoveAll(t => t.ProjectId == projectId);
 		NotifyStateChanged();
 	}
 

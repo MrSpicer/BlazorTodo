@@ -10,5 +10,7 @@ public interface ITodoRepository
 	Task ClearAll();
 
 	Task<List<TodoItem>> GetTodos();
+	Task<List<TodoItem>> GetTodosByProject(Guid projectId);
 	Task<TodoItem?> Get(Guid id);
+	Task DeleteByProject(Guid projectId);
 }
