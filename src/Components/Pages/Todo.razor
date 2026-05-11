@@ -11,7 +11,29 @@
 
 <PageTitle>BlazorTodo - Todo Management</PageTitle>
 
-@if (!ProjectService.Projects.Any())
+@if (_isLoading)
+{
+    <div class="skeleton-shell" aria-busy="true" aria-live="polite">
+        <div class="skeleton-stats">
+            <div class="skeleton-card"></div>
+            <div class="skeleton-card"></div>
+            <div class="skeleton-card"></div>
+            <div class="skeleton-card"></div>
+        </div>
+        <div class="skeleton-tabs">
+            <div class="skeleton-tab"></div>
+            <div class="skeleton-tab"></div>
+        </div>
+        <div class="skeleton-list">
+            <div class="skeleton-row"></div>
+            <div class="skeleton-row"></div>
+            <div class="skeleton-row"></div>
+            <div class="skeleton-row"></div>
+            <div class="skeleton-row"></div>
+        </div>
+    </div>
+}
+else if (!ProjectService.Projects.Any())
 {
     <div class="welcome-screen">
         <div class="welcome-content">
@@ -454,6 +476,7 @@ else
     private TodoFilterCriteria _filterCriteria = new();
     private string _selectedPresetName = FilterPreset.DefaultName;
     private bool _initialized;
+    private bool _isLoading = true;
     private bool _showProjectModal;
     private bool _showTodoModal;
 
@@ -474,13 +497,16 @@ else
         if (firstRender && !_initialized)
         {
             _initialized = true;
-            await ProjectService.InitializeAsync();
-            await TagService.InitializeAsync();
-            await StatusService.InitializeAsync();
-            await TodoService.InitializeAsync();
-            await NoteService.InitializeAsync();
-            await PresetService.InitializeAsync();
+            await Task.WhenAll(
+                ProjectService.InitializeAsync(),
+                TagService.InitializeAsync(),
+                StatusService.InitializeAsync(),
+                TodoService.InitializeAsync(),
+                NoteService.InitializeAsync(),
+                PresetService.InitializeAsync()
+            );
             ApplyRememberedPreset();
+            _isLoading = false;
             StateHasChanged();
         }
     }

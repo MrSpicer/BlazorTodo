@@ -35,11 +35,12 @@ public class TodoRepository : ITodoRepository
 			return;
 		}
 
-		foreach (var projectId in projectIndex)
+		var bucketTasks = projectIndex.Select(async pid =>
+			(pid, bucket: await _localStorage.GetItemAsync<HashSet<Guid>>(BucketKey(pid))));
+		foreach (var (pid, bucket) in await Task.WhenAll(bucketTasks))
 		{
-			var bucket = await _localStorage.GetItemAsync<HashSet<Guid>>(BucketKey(projectId));
 			if (bucket is not null && bucket.Count > 0)
-				_idsByProject[projectId] = bucket;
+				_idsByProject[pid] = bucket;
 		}
 	}
 

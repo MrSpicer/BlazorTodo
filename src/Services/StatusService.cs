@@ -29,7 +29,6 @@ public class StatusService : IStatusService
 			return;
 
 		await _statusRepository.InitializeAsync();
-		await _todoRepository.InitializeAsync();
 		var stored = await _statusRepository.GetStatuses();
 
 		var seeded = BuiltInStatusIds.Seed();

@@ -787,3 +787,122 @@ a:hover, .btn-link:hover {
     display: inline-flex;
     align-items: center;
 }
+
+/* ========================================
+   Initial load overlay (pre-Blazor)
+   ======================================== */
+#app-loading {
+    position: fixed;
+    inset: 0;
+    z-index: 9999;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: linear-gradient(135deg, var(--gray-50, #f8fafc) 0%, var(--primary-50, #eef2ff) 100%);
+    opacity: 1;
+    transition: opacity 300ms ease;
+}
+
+#app-loading.loaded {
+    opacity: 0;
+    pointer-events: none;
+}
+
+.app-loading-content {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 1rem;
+}
+
+.app-loading-brand svg {
+    filter: drop-shadow(0 4px 12px rgba(99, 102, 241, 0.25));
+}
+
+.app-loading-name {
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: var(--gray-800, #1e293b);
+    letter-spacing: -0.02em;
+}
+
+.app-loading-spinner {
+    width: 32px;
+    height: 32px;
+    border: 3px solid var(--gray-200, #e2e8f0);
+    border-top-color: var(--primary, #6366f1);
+    border-radius: 50%;
+    animation: app-loading-spin 0.8s linear infinite;
+    margin-top: 0.5rem;
+}
+
+@keyframes app-loading-spin {
+    to { transform: rotate(360deg); }
+}
+
+/* ========================================
+   In-app loading skeleton
+   ======================================== */
+.skeleton-shell {
+    padding: 1rem 0;
+}
+
+.skeleton-stats {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+}
+
+.skeleton-card {
+    height: 84px;
+    border-radius: var(--radius-lg, 12px);
+    background: var(--gray-100, #f1f5f9);
+    overflow: hidden;
+    position: relative;
+}
+
+.skeleton-tabs {
+    display: flex;
+    gap: 0.5rem;
+    margin-bottom: 1rem;
+}
+
+.skeleton-tab {
+    height: 36px;
+    width: 110px;
+    border-radius: var(--radius-md, 8px);
+    background: var(--gray-100, #f1f5f9);
+    position: relative;
+    overflow: hidden;
+}
+
+.skeleton-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.skeleton-row {
+    height: 56px;
+    border-radius: var(--radius-md, 8px);
+    background: var(--gray-100, #f1f5f9);
+    position: relative;
+    overflow: hidden;
+}
+
+.skeleton-card::after,
+.skeleton-tab::after,
+.skeleton-row::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.6), transparent);
+    transform: translateX(-100%);
+    animation: skeleton-shimmer 1.4s ease-in-out infinite;
+}
+
+@keyframes skeleton-shimmer {
+    100% { transform: translateX(100%); }
+}
