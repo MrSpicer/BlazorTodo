@@ -540,17 +540,17 @@ else
     private int GetProjectTodoCount()
     {
         var projectId = ProjectService.SelectedProject?.Id;
-        return projectId.HasValue 
-            ? TodoService.Todos.Count(t => t.ProjectId == projectId.Value)
-            : TodoService.Todos.Count;
+        return projectId.HasValue
+            ? TodoService.Todos.Count(t => t.ParentId is null && t.ProjectId == projectId.Value)
+            : TodoService.Todos.Count(t => t.ParentId is null);
     }
-    
+
     private int GetCompletedCount()
     {
         var projectId = ProjectService.SelectedProject?.Id;
         return projectId.HasValue
-            ? TodoService.Todos.Count(t => t.ProjectId == projectId.Value && t.StatusId == BuiltInStatusIds.Done)
-            : TodoService.Todos.Count(t => t.StatusId == BuiltInStatusIds.Done);
+            ? TodoService.Todos.Count(t => t.ParentId is null && t.ProjectId == projectId.Value && t.StatusId == BuiltInStatusIds.Done)
+            : TodoService.Todos.Count(t => t.ParentId is null && t.StatusId == BuiltInStatusIds.Done);
     }
     
     private int GetProgressPercentage()

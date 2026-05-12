@@ -163,18 +163,7 @@ public class StatusService : EntityServiceBase<Status>, IStatusService
 	public async Task<int> GetUsageCountAsync(Guid statusId)
 	{
 		var todos = await _todoRepository.GetTodos();
-		var count = 0;
-		foreach (var todo in todos)
-		{
-			if (todo.StatusId == statusId)
-				count++;
-			foreach (var sub in todo.SubTasks)
-			{
-				if (sub.StatusId == statusId)
-					count++;
-			}
-		}
-		return count;
+		return todos.Count(t => t.StatusId == statusId);
 	}
 
 	public async Task<bool> DeleteAsync(Status status)
@@ -196,25 +185,9 @@ public class StatusService : EntityServiceBase<Status>, IStatusService
 		var todos = await _todoRepository.GetTodos();
 		foreach (var todo in todos)
 		{
-			var changed = false;
-
 			if (todo.StatusId == deletedId)
 			{
 				todo.StatusId = BuiltInStatusIds.None;
-				changed = true;
-			}
-
-			foreach (var sub in todo.SubTasks)
-			{
-				if (sub.StatusId == deletedId)
-				{
-					sub.StatusId = BuiltInStatusIds.None;
-					changed = true;
-				}
-			}
-
-			if (changed)
-			{
 				todo.UpdatedAt = now;
 				await _todoRepository.AddOrUpdate(todo);
 			}

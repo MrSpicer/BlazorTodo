@@ -34,15 +34,18 @@ public class TodoItem : IEntity, IProjectScoped
 	public DateTime? LastSyncedAt { get; set; }
 	public Guid ProjectId { get; set; }
 
+	/// <summary>Null = top-level todo. Otherwise points at the parent <see cref="TodoItem"/>.</summary>
+	public Guid? ParentId { get; set; }
+
 	public List<Guid> TagIds { get; set; } = new();
 	public List<TodoChangeLogEntry> ChangeLog { get; set; } = new();
+
+	/// <summary>Legacy nested children. Pre-v1.5 data hydrates here; the one-time
+	/// flatten in <c>TodoService</c> converts each entry into a top-level item with
+	/// <see cref="ParentId"/> set and then clears this list.</summary>
 	public List<TodoItem> SubTasks { get; set; } = new();
 
 	public bool IsDone => StatusId == BuiltInStatusIds.Done;
-
-	public bool HasSubTasks => SubTasks.Count > 0;
-	public int SubTaskCount => SubTasks.Count;
-	public int SubTaskDoneCount => SubTasks.Count(t => t.IsDone);
 
 	public bool IsDirty => LastSyncedAt is null || (UpdatedAt.HasValue && UpdatedAt > LastSyncedAt);
 	public bool HasEverSynced => LastSyncedAt.HasValue;

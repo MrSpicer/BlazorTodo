@@ -90,8 +90,14 @@ public interface ITodoService
     Task DeleteTodosByProjectAsync(Guid projectId);
 
     /// <summary>
-    /// Marks every todo (and subtask) as synced at the given timestamp.
+    /// Marks every todo as synced at the given timestamp.
     /// Sets LastSyncedAt only — does not touch UpdatedAt.
     /// </summary>
     Task MarkAllSyncedAsync(DateTime syncedAt);
+
+    /// <summary>
+    /// Returns the children of a parent todo (todos whose <c>ParentId</c> matches),
+    /// ordered by <c>CreatedAt</c>.
+    /// </summary>
+    IReadOnlyList<TodoItem> GetSubTasks(Guid parentId);
 }

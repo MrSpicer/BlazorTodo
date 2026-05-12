@@ -5,6 +5,7 @@
 @inject ITagService TagService
 @inject IStatusService StatusService
 @inject IPriorityService PriorityService
+@inject ITodoService TodoService
 
 <div class="todo-card @GetStatusClass() @(IsDone ? "completed" : "") @(Depth > 0 ? "subtask-card" : "")"
      data-testid="@(Depth > 0 ? "subtask-card" : "todo-card")">
@@ -20,7 +21,10 @@
 				</svg>
 			}
 		</button>
-		@if (Item.HasSubTasks)
+		@{
+			var subs = Depth == 0 ? TodoService.GetSubTasks(Item.Id) : Array.Empty<TodoItem>();
+		}
+		@if (subs.Count > 0)
 		{
 			<button class="expand-toggle @(_isExpanded ? "expanded" : "")"
 			        @onclick="() => _isExpanded = !_isExpanded"
@@ -137,7 +141,7 @@
 					</svg>
 				</button>
 			}
-			@if (Depth == 0 && !Item.HasSubTasks)
+			@if (Depth == 0 && subs.Count == 0)
 			{
 				<button class="action-btn add-subtask-btn" @onclick="ShowAddSubTaskModal"
 				        title="Add subtask"
@@ -175,7 +179,7 @@
 @if (_isExpanded)
 {
 	<div class="subtask-tree" data-testid="subtask-tree">
-		@foreach (var sub in Item.SubTasks)
+		@foreach (var sub in subs)
 		{
 			<div class="subtask-item-wrapper" @key="sub.Id">
 				<TodoItemRow Item="sub" Depth="Depth + 1"
@@ -679,13 +683,9 @@
 		await OnSave.InvokeAsync(Item);
 	}
 
-	private async Task HandleSubTaskSave(TodoItem _) => await OnSave.InvokeAsync(Item);
+	private async Task HandleSubTaskSave(TodoItem sub) => await TodoService.SaveTodoAsync(sub);
 
-	private async Task HandleSubTaskDelete(TodoItem sub)
-	{
-		Item.SubTasks.Remove(sub);
-		await OnSave.InvokeAsync(Item);
-	}
+	private async Task HandleSubTaskDelete(TodoItem sub) => await TodoService.DeleteTodoAsync(sub);
 
 	private void ShowAddSubTaskModal()
 	{
@@ -703,21 +703,12 @@
 
 	private async Task HandleSubTaskModalSubmit(TodoItem submitted)
 	{
-		if (_isEditingSubTask && _editingSubTask != null)
-		{
-			submitted.SubTasks = _editingSubTask.SubTasks;
-			var idx = Item.SubTasks.FindIndex(s => s.Id == submitted.Id);
-			if (idx >= 0) Item.SubTasks[idx] = submitted;
-		}
-		else
-		{
-			submitted.ProjectId = Item.ProjectId;
-			Item.SubTasks.Add(submitted);
-		}
+		// ParentId / ProjectId already populated by TodoFormModal.HandleSubmit
+		// from DefaultParentId / parent-selector state.
 		_showSubTaskModal = false;
 		_isEditingSubTask = false;
 		_editingSubTask = null;
-		await OnSave.InvokeAsync(Item);
+		await TodoService.SaveTodoAsync(submitted);
 	}
 
 	private void HandleSubTaskModalClose()

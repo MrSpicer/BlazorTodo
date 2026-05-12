@@ -204,6 +204,6 @@
 
     private int GetTodoCount(Guid projectId)
     {
-        return Todos.Count(t => !BuiltInStatusIds.IsCompletedLike(t.StatusId) && t.ProjectId == projectId);
+        return Todos.Count(t => t.ParentId is null && !BuiltInStatusIds.IsCompletedLike(t.StatusId) && t.ProjectId == projectId);
     }
 }

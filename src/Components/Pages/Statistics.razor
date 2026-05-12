@@ -78,7 +78,7 @@ else
             </div>
             @foreach (var project in ProjectService.Projects)
             {
-                var todos = TodoService.Todos.Where(t => t.ProjectId == project.Id).ToList();
+                var todos = TodoService.Todos.Where(t => t.ParentId is null && t.ProjectId == project.Id).ToList();
                 var completed = todos.Count(t => t.IsDone);
                 var uncompleted = todos.Count(t => !t.IsDone);
                 <div class="breakdown-row">
@@ -298,7 +298,7 @@ else
     {
         var projectCount = ProjectService.Projects.Count;
         if (projectCount == 0) return "0";
-        var total = (double)TodoService.Todos.Count(t => t.IsDone);
+        var total = (double)TodoService.Todos.Count(t => t.ParentId is null && t.IsDone);
         return (total / projectCount).ToString("F1");
     }
 
@@ -306,7 +306,7 @@ else
     {
         var projectCount = ProjectService.Projects.Count;
         if (projectCount == 0) return "0";
-        var total = (double)TodoService.Todos.Count(t => !t.IsDone);
+        var total = (double)TodoService.Todos.Count(t => t.ParentId is null && !t.IsDone);
         return (total / projectCount).ToString("F1");
     }
 }

@@ -109,18 +109,7 @@ public class PriorityService : EntityServiceBase<Priority>, IPriorityService
 	public async Task<int> GetUsageCountAsync(Guid priorityId)
 	{
 		var todos = await _todoRepository.GetTodos();
-		var count = 0;
-		foreach (var todo in todos)
-		{
-			if (todo.PriorityId == priorityId)
-				count++;
-			foreach (var sub in todo.SubTasks)
-			{
-				if (sub.PriorityId == priorityId)
-					count++;
-			}
-		}
-		return count;
+		return todos.Count(t => t.PriorityId == priorityId);
 	}
 
 	public async Task<bool> DeleteAsync(Priority priority)
@@ -142,25 +131,9 @@ public class PriorityService : EntityServiceBase<Priority>, IPriorityService
 		var todos = await _todoRepository.GetTodos();
 		foreach (var todo in todos)
 		{
-			var changed = false;
-
 			if (todo.PriorityId == deletedId)
 			{
 				todo.PriorityId = BuiltInPriorityIds.Medium;
-				changed = true;
-			}
-
-			foreach (var sub in todo.SubTasks)
-			{
-				if (sub.PriorityId == deletedId)
-				{
-					sub.PriorityId = BuiltInPriorityIds.Medium;
-					changed = true;
-				}
-			}
-
-			if (changed)
-			{
 				todo.UpdatedAt = now;
 				await _todoRepository.AddOrUpdate(todo);
 			}

@@ -39,8 +39,34 @@ public class TodoService : EntityServiceBase<TodoItem>, ITodoService
 		_items = await Repository.GetAll();
 		await MigrateStatusIdsAsync();
 		await MigratePriorityIdsAsync();
+		await FlattenLegacySubTasksAsync();
 		await ResetStaleTodosAsync();
 		NotifyChanged();
+	}
+
+	// One-time migration of pre-v1.5 nested-children data. Legacy blobs stored
+	// children inside parent.SubTasks; we hoist each child to a top-level _items
+	// entry with ParentId set, then clear the parent's list. Idempotent — once
+	// SubTasks is empty everywhere, this is a no-op.
+	private async Task FlattenLegacySubTasksAsync()
+	{
+		var toFlatten = _items.Where(t => t.SubTasks.Count > 0).ToList();
+		if (toFlatten.Count == 0)
+			return;
+
+		foreach (var parent in toFlatten)
+		{
+			foreach (var sub in parent.SubTasks)
+			{
+				sub.ParentId = parent.Id;
+				sub.ProjectId = parent.ProjectId;
+				await Repository.AddOrUpdate(sub);
+			}
+			parent.SubTasks.Clear();
+			await Repository.AddOrUpdate(parent);
+		}
+
+		_items = await Repository.GetAll();
 	}
 
 	private async Task MigrateStatusIdsAsync()
@@ -89,25 +115,11 @@ public class TodoService : EntityServiceBase<TodoItem>, ITodoService
 
 		foreach (var todo in _items)
 		{
-			var dirty = false;
-
 			if (todo.StatusId == BuiltInStatusIds.New && todo.CreatedAt < cutoff)
 			{
 				todo.StatusId = BuiltInStatusIds.None;
-				dirty = true;
-			}
-
-			foreach (var sub in todo.SubTasks)
-			{
-				if (sub.StatusId == BuiltInStatusIds.New && sub.CreatedAt < cutoff)
-				{
-					sub.StatusId = BuiltInStatusIds.None;
-					dirty = true;
-				}
-			}
-
-			if (dirty)
 				await Repository.AddOrUpdate(todo);
+			}
 		}
 	}
 
@@ -149,34 +161,6 @@ public class TodoService : EntityServiceBase<TodoItem>, ITodoService
 					todo.ChangeLog.AddRange(entries);
 					todo.UpdatedAt = now;
 				}
-
-				var oldSubsById = old.SubTasks.ToDictionary(s => s.Id);
-				foreach (var sub in todo.SubTasks)
-				{
-					if (oldSubsById.TryGetValue(sub.Id, out var oldSub))
-					{
-						var subEntries = BuildChangeEntries(oldSub, sub, now).ToList();
-						if (subEntries.Count > 0)
-						{
-							sub.ChangeLog.AddRange(subEntries);
-							sub.UpdatedAt = now;
-						}
-					}
-					else
-					{
-						sub.UpdatedAt = now;
-						if (!sub.ChangeLog.Any(e => e.Field == "Created"))
-						{
-							sub.ChangeLog.Add(new TodoChangeLogEntry
-							{
-								ChangedAt = now,
-								Field = "Created",
-								OldValue = null,
-								NewValue = sub.Title
-							});
-						}
-					}
-				}
 			}
 		}
 
@@ -195,8 +179,13 @@ public class TodoService : EntityServiceBase<TodoItem>, ITodoService
 
 	public async Task DeleteTodoAsync(TodoItem todo)
 	{
+		// Cascade: delete children before the parent so a partial failure leaves
+		// no orphan rows pointing at a deleted parent.
+		var children = _items.Where(t => t.ParentId == todo.Id).ToList();
+		foreach (var c in children)
+			await Repository.Delete(c);
 		await Repository.Delete(todo);
-		_items.RemoveAll(t => t.Id == todo.Id);
+		_items.RemoveAll(t => t.Id == todo.Id || t.ParentId == todo.Id);
 		NotifyChanged();
 	}
 
@@ -264,16 +253,20 @@ public class TodoService : EntityServiceBase<TodoItem>, ITodoService
 		foreach (var todo in _items)
 		{
 			todo.LastSyncedAt = syncedAt;
-			foreach (var sub in todo.SubTasks)
-				sub.LastSyncedAt = syncedAt;
 			await Repository.AddOrUpdate(todo);
 		}
 		NotifyChanged();
 	}
 
+	public IReadOnlyList<TodoItem> GetSubTasks(Guid parentId) =>
+		_items.Where(t => t.ParentId == parentId)
+			.OrderBy(t => t.CreatedAt)
+			.ToList();
+
 	public IEnumerable<TodoItem> GetFilteredAndSorted(FilterOption filter, SortOption sort, Guid? projectId = null)
 	{
-		var filtered = _items.AsEnumerable();
+		// Top-level only — subtasks render inside their parent row, not in the list itself.
+		var filtered = _items.Where(t => t.ParentId is null);
 
 		if (projectId.HasValue)
 			filtered = filtered.Where(t => t.ProjectId == projectId.Value);
@@ -295,7 +288,7 @@ public class TodoService : EntityServiceBase<TodoItem>, ITodoService
 
 	public IEnumerable<TodoItem> GetFilteredAndSorted(TodoFilterCriteria criteria, Guid? projectId = null)
 	{
-		var filtered = _items.AsEnumerable();
+		var filtered = _items.Where(t => t.ParentId is null);
 
 		if (projectId.HasValue)
 			filtered = filtered.Where(t => t.ProjectId == projectId.Value);
@@ -362,17 +355,17 @@ public class TodoService : EntityServiceBase<TodoItem>, ITodoService
 
 	public int GetActiveCount(Guid? projectId = null)
 	{
-		var todos = projectId.HasValue
-			? _items.Where(t => t.ProjectId == projectId.Value)
-			: _items;
+		var todos = _items.Where(t => t.ParentId is null);
+		if (projectId.HasValue)
+			todos = todos.Where(t => t.ProjectId == projectId.Value);
 		return todos.Count(t => !BuiltInStatusIds.IsCompletedLike(t.StatusId));
 	}
 
 	public int GetCompletedCount(Guid? projectId = null)
 	{
-		var todos = projectId.HasValue
-			? _items.Where(t => t.ProjectId == projectId.Value)
-			: _items;
+		var todos = _items.Where(t => t.ParentId is null);
+		if (projectId.HasValue)
+			todos = todos.Where(t => t.ProjectId == projectId.Value);
 		return todos.Count(t => t.StatusId == BuiltInStatusIds.Done);
 	}
 

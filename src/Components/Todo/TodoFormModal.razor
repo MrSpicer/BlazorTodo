@@ -102,35 +102,12 @@
 					UpdatedAt = EditingTodo.UpdatedAt,
 					LastSyncedAt = EditingTodo.LastSyncedAt,
 					ProjectId = EditingTodo.ProjectId,
+					ParentId = EditingTodo.ParentId,
 					TagIds = EditingTodo.TagIds.ToList(),
 					ChangeLog = EditingTodo.ChangeLog.ToList(),
-					SubTasks = EditingTodo.SubTasks.Select(st => new TodoItem
-					{
-						Id = st.Id,
-						Title = st.Title,
-						Description = st.Description,
-						Priority = st.Priority,
-						PriorityId = st.PriorityId,
-						Status = st.Status,
-						StatusId = st.StatusId,
-						CreatedAt = st.CreatedAt,
-						StartedAt = st.StartedAt,
-						CompletedAt = st.CompletedAt,
-						DueDate = st.DueDate,
-						EstimatedMinutes = st.EstimatedMinutes,
-						UpdatedAt = st.UpdatedAt,
-						LastSyncedAt = st.LastSyncedAt,
-						ProjectId = st.ProjectId,
-						TagIds = st.TagIds.ToList(),
-						ChangeLog = st.ChangeLog.ToList(),
-					}).ToList()
 				};
-				if (ShowParentSelector)
-				{
-					var parent = TodoService.Todos.FirstOrDefault(t => t.SubTasks.Any(st => st.Id == EditingTodo.Id));
-					_originalParentId = parent?.Id;
-					_selectedParentId = parent?.Id;
-				}
+				_originalParentId = EditingTodo.ParentId;
+				_selectedParentId = EditingTodo.ParentId;
 			}
 			else
 			{
@@ -147,57 +124,33 @@
 
 	private async Task HandleSubmit(TodoItem todo)
 	{
-		var selectedParentId = _selectedParentId;
-		var originalParentId = _originalParentId;
-
-		if (!ShowParentSelector || selectedParentId == originalParentId)
+		if (ShowParentSelector)
 		{
-			await OnSubmit.InvokeAsync(todo);
-		}
-		else
-		{
-			// Remove from old parent if was a subtask
-			if (originalParentId.HasValue)
+			todo.ParentId = _selectedParentId;
+			// Reparenting across projects: child follows its new parent's project.
+			if (_selectedParentId.HasValue)
 			{
-				var oldParent = TodoService.Todos.FirstOrDefault(t => t.Id == originalParentId.Value);
-				if (oldParent != null)
-				{
-					oldParent.SubTasks.RemoveAll(st => st.Id == todo.Id);
-					await TodoService.SaveTodoAsync(oldParent);
-				}
-			}
-
-			if (selectedParentId.HasValue)
-			{
-				// Add to new parent
-				var newParent = TodoService.Todos.FirstOrDefault(t => t.Id == selectedParentId.Value);
+				var newParent = TodoService.Todos.FirstOrDefault(t => t.Id == _selectedParentId.Value);
 				if (newParent != null)
-				{
-					newParent.SubTasks.Add(todo);
-					await TodoService.SaveTodoAsync(newParent);
-				}
-				// If was top-level, delete the orphaned top-level entry
-				if (!originalParentId.HasValue)
-				{
-					var topLevel = TodoService.Todos.FirstOrDefault(t => t.Id == todo.Id);
-					if (topLevel != null)
-						await TodoService.DeleteTodoAsync(topLevel);
-				}
-			}
-			else
-			{
-				// Parent set to None → promote to top-level; save directly to avoid
-				// the subtask-modal's OnSubmit re-adding the todo as a subtask
-				await TodoService.SaveTodoAsync(todo);
+					todo.ProjectId = newParent.ProjectId;
 			}
 		}
+		await OnSubmit.InvokeAsync(todo);
 		await Close();
 	}
 
-	private IEnumerable<TodoItem> GetAvailableParents() =>
-		TodoService.Todos.Where(t =>
-			t.Id != (EditingTodo?.Id ?? _todo.Id) &&
+	// 1-level depth policy: only top-level todos may be parents. Exclude self
+	// (a todo can't parent itself) and completed-like todos (no point burying
+	// new work under a done task). Scoped to the todo's own project.
+	private IEnumerable<TodoItem> GetAvailableParents()
+	{
+		var selfId = EditingTodo?.Id ?? _todo.Id;
+		return TodoService.Todos.Where(t =>
+			t.ProjectId == _todo.ProjectId &&
+			t.ParentId is null &&
+			t.Id != selfId &&
 			!BuiltInStatusIds.IsCompletedLike(t.StatusId));
+	}
 
 	private async Task HandleConvertToNote(TodoItem todo)
 	{

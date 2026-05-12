@@ -92,18 +92,7 @@ public class TagService : EntityServiceBase<Tag>, ITagService
 	public async Task<int> GetUsageCountAsync(Guid tagId)
 	{
 		var todos = await _todoRepository.GetTodos();
-		var count = 0;
-		foreach (var todo in todos)
-		{
-			if (todo.TagIds.Contains(tagId))
-				count++;
-			foreach (var sub in todo.SubTasks)
-			{
-				if (sub.TagIds.Contains(tagId))
-					count++;
-			}
-		}
-		return count;
+		return todos.Count(t => t.TagIds.Contains(tagId));
 	}
 
 	public async Task DeleteAsync(Tag tag)
@@ -116,31 +105,19 @@ public class TagService : EntityServiceBase<Tag>, ITagService
 		var todos = await _todoRepository.GetTodos();
 		foreach (var todo in todos)
 		{
-			var oldTopNames = FormatTagNames(todo.TagIds);
-			var topRemoved = todo.TagIds.Remove(deletedId);
+			var oldNames = FormatTagNames(todo.TagIds);
+			if (!todo.TagIds.Remove(deletedId))
+				continue;
 
-			var subChanged = false;
-			foreach (var sub in todo.SubTasks)
+			todo.UpdatedAt = now;
+			todo.ChangeLog.Add(new TodoChangeLogEntry
 			{
-				if (sub.TagIds.Remove(deletedId))
-					subChanged = true;
-			}
-
-			if (topRemoved || subChanged)
-			{
-				todo.UpdatedAt = now;
-				if (topRemoved)
-				{
-					todo.ChangeLog.Add(new TodoChangeLogEntry
-					{
-						ChangedAt = now,
-						Field = "TagIds",
-						OldValue = oldTopNames,
-						NewValue = FormatTagNames(todo.TagIds)
-					});
-				}
-				await _todoRepository.AddOrUpdate(todo);
-			}
+				ChangedAt = now,
+				Field = "TagIds",
+				OldValue = oldNames,
+				NewValue = FormatTagNames(todo.TagIds)
+			});
+			await _todoRepository.AddOrUpdate(todo);
 		}
 
 		_items.RemoveAll(t => t.Id == deletedId);

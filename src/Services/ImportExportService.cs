@@ -50,7 +50,7 @@ public class ImportExportService : IImportExportService
 		var document = new AppDataDocument
 		{
 			ExportedAt = DateTime.Now,
-			Version = "1.4",
+			Version = "1.5",
 			Projects = _projectService.Projects.ToList(),
 			Todos = todos,
 			Notes = _noteService.Notes.ToList(),
@@ -213,16 +213,35 @@ public class ImportExportService : IImportExportService
 				FillStatusId(todo, statusIdRemap);
 				FillPriorityId(todo, priorityIdRemap);
 				todo.LastSyncedAt = importedAt;
-				foreach (var sub in todo.SubTasks)
+
+				// Defensive flatten for legacy (≤ v1.4) exports — children arrive nested
+				// inside the parent. Hoist them to top-level rows with ParentId set.
+				// v1.5+ exports already write a flat list and children come through the
+				// outer loop on their own.
+				var legacyChildren = todo.SubTasks.ToList();
+				todo.SubTasks.Clear();
+
+				await _todoService.SaveTodoAsync(todo);
+				imported++;
+
+				foreach (var sub in legacyChildren)
 				{
+					sub.ParentId = todo.Id;
+					sub.ProjectId = todo.ProjectId;
+					if (sub.Id == Guid.Empty)
+						sub.Id = Guid.NewGuid();
+					if (!IsValid(sub))
+					{
+						skipped++;
+						continue;
+					}
 					RemapTagIds(sub, tagIdRemap);
 					FillStatusId(sub, statusIdRemap);
 					FillPriorityId(sub, priorityIdRemap);
 					sub.LastSyncedAt = importedAt;
+					await _todoService.SaveTodoAsync(sub);
+					imported++;
 				}
-
-				await _todoService.SaveTodoAsync(todo);
-				imported++;
 			}
 
 			// Import notes
