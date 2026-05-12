@@ -3,7 +3,7 @@ using System.ComponentModel.DataAnnotations;
 
 namespace TodoList.Models;
 
-public class Project
+public class Project : IEntity
 {
     public Guid Id { get; set; } = Guid.NewGuid();
 
@@ -19,7 +19,13 @@ public class Project
 
     public DateTime CreatedAt { get; set; } = DateTime.Now;
 
+    public DateTime? UpdatedAt { get; set; }
+
+    public DateTime? LastSyncedAt { get; set; }
+
     public bool IsDefault { get; set; }
+
+    public bool IsDirty => LastSyncedAt is null || (UpdatedAt.HasValue && UpdatedAt > LastSyncedAt);
 
     public bool IsValid()
     {

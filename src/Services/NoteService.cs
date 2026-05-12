@@ -3,59 +3,63 @@ using TodoList.Models;
 
 namespace TodoList.Services;
 
-public class NoteService : INoteService
+public class NoteService : EntityServiceBase<ProjectNote>, INoteService
 {
-	private readonly INoteRepository _repository;
-	private List<ProjectNote> _notes = new();
+	private readonly INoteRepository _noteRepository;
 
-	public event Action? OnNotesChanged;
-	public IReadOnlyList<ProjectNote> Notes => _notes.AsReadOnly();
-
-	public NoteService(INoteRepository repository)
+	public event Action? OnNotesChanged
 	{
-		_repository = repository;
+		add => OnChanged += value;
+		remove => OnChanged -= value;
 	}
 
-	public async Task InitializeAsync()
+	public IReadOnlyList<ProjectNote> Notes => Items;
+
+	public NoteService(INoteRepository repository, ILogger<NoteService> logger)
+		: base((IRepository<ProjectNote>)repository, logger)
 	{
-		await _repository.InitializeAsync();
-		_notes = await _repository.GetNotes();
-		NotifyStateChanged();
+		_noteRepository = repository;
+	}
+
+	public override async Task InitializeAsync()
+	{
+		await Repository.InitializeAsync();
+		_items = (await Repository.GetAll()).OrderByDescending(n => n.CreatedAt).ToList();
+		NotifyChanged();
 	}
 
 	public async Task<bool> SaveNoteAsync(ProjectNote note)
 	{
-		var success = await _repository.AddOrUpdate(note);
+		note.UpdatedAt = DateTime.Now;
+		var success = await Repository.AddOrUpdate(note);
 		if (success)
 		{
-			var idx = _notes.FindIndex(n => n.Id == note.Id);
+			var idx = _items.FindIndex(n => n.Id == note.Id);
 			if (idx >= 0)
-				_notes[idx] = note;
+				_items[idx] = note;
 			else
-				_notes.Insert(0, note);
-			NotifyStateChanged();
+				_items.Insert(0, note);
+			NotifyChanged();
 		}
 		return success;
 	}
 
 	public async Task DeleteNoteAsync(ProjectNote note)
 	{
-		await _repository.Delete(note);
-		_notes.RemoveAll(n => n.Id == note.Id);
-		NotifyStateChanged();
+		await Repository.Delete(note);
+		_items.RemoveAll(n => n.Id == note.Id);
+		NotifyChanged();
 	}
 
 	public IReadOnlyList<ProjectNote> GetNotesForProject(Guid projectId)
 	{
-		return _notes.Where(n => n.ProjectId == projectId).ToList().AsReadOnly();
+		return _items.Where(n => n.ProjectId == projectId).ToList().AsReadOnly();
 	}
 
 	public async Task DeleteNotesByProjectAsync(Guid projectId)
 	{
-		await _repository.DeleteByProject(projectId);
-		_notes.RemoveAll(n => n.ProjectId == projectId);
-		NotifyStateChanged();
+		await _noteRepository.DeleteByProject(projectId);
+		_items.RemoveAll(n => n.ProjectId == projectId);
+		NotifyChanged();
 	}
-
-	private void NotifyStateChanged() => OnNotesChanged?.Invoke();
 }

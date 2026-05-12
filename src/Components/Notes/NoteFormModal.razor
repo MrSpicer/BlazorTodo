@@ -1,162 +1,65 @@
 @using TodoList.Models
 
-@if (IsVisible)
-{
-	<div class="modal-overlay" @onclick="Close">
-		<div class="modal-container" @onclick:stopPropagation="true">
-			<div class="modal-header">
-				<h2 class="modal-title">
-					@if (IsEditing)
+<Modal IsVisible="IsVisible" OnClose="Close" Title="@(IsEditing ? "Edit Note" : "New Note")">
+	<HeaderIcon>
+		@if (IsEditing)
+		{
+			<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+				<path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+				<path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+			</svg>
+		}
+		else
+		{
+			<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+				<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+				<polyline points="14 2 14 8 20 8"/>
+				<path d="M12 18v-6M9 15h6"/>
+			</svg>
+		}
+	</HeaderIcon>
+	<ChildContent>
+		<div class="modal-body">
+			<EditForm Model="@_note" OnValidSubmit="HandleSubmit" style="display: flex; flex-direction: column; flex: 1">
+				<DataAnnotationsValidator />
+				<div class="form-field">
+					<label class="form-label" for="note-title">Title <span class="required">*</span></label>
+					<InputText id="note-title"
+					           class="form-input"
+					           @bind-Value="_note.Title"
+					           placeholder="Note title..." />
+					<ValidationMessage For="@(() => _note.Title)" class="validation-message" />
+				</div>
+				<div class="form-field" style="flex: 1; display: flex; flex-direction: column">
+					<label class="form-label" for="note-content">Content</label>
+					<InputTextArea id="note-content"
+					               class="form-input form-textarea"
+					               @bind-Value="_note.Content"
+					               placeholder="Write your note here..." />
+					<ValidationMessage For="@(() => _note.Content)" class="validation-message" />
+				</div>
+				<div class="form-actions">
+					@if (IsEditing && OnConvertToTodo.HasDelegate)
 					{
-						<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-							<path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
-							<path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
-						</svg>
-						<span>Edit Note</span>
-					}
-					else
-					{
-						<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-							<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
-							<polyline points="14 2 14 8 20 8"/>
-							<path d="M12 18v-6M9 15h6"/>
-						</svg>
-						<span>New Note</span>
-					}
-				</h2>
-				<button class="modal-close" @onclick="Close" aria-label="Close">
-					<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-						<path d="M18 6L6 18M6 6l12 12"/>
-					</svg>
-				</button>
-			</div>
-			<div class="modal-body">
-				<EditForm Model="@_note" OnValidSubmit="HandleSubmit" style="display: flex; flex-direction: column; flex: 1">
-					<DataAnnotationsValidator />
-					<div class="form-field">
-						<label class="form-label" for="note-title">Title <span class="required">*</span></label>
-						<InputText id="note-title"
-						           class="form-input"
-						           @bind-Value="_note.Title"
-						           placeholder="Note title..." />
-						<ValidationMessage For="@(() => _note.Title)" class="validation-message" />
-					</div>
-					<div class="form-field" style="flex: 1; display: flex; flex-direction: column">
-						<label class="form-label" for="note-content">Content</label>
-						<InputTextArea id="note-content"
-						               class="form-input form-textarea"
-						               @bind-Value="_note.Content"
-						               placeholder="Write your note here..." />
-						<ValidationMessage For="@(() => _note.Content)" class="validation-message" />
-					</div>
-					<div class="form-actions">
-						@if (IsEditing && OnConvertToTodo.HasDelegate)
-						{
-							<button type="button" class="btn btn-ghost" style="margin-right: auto" @onclick="async () => { await OnConvertToTodo.InvokeAsync(_note); await Close(); }">
-								<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-									<rect x="3" y="3" width="18" height="18" rx="2"/>
-									<path d="M9 12l2 2 4-4"/>
-								</svg>
-								Convert to Task
-							</button>
-						}
-						<button type="button" class="btn btn-outline-secondary" @onclick="Close">Cancel</button>
-						<button type="submit" class="btn btn-primary">
-							@(IsEditing ? "Save Changes" : "Add Note")
+						<button type="button" class="btn btn-ghost" style="margin-right: auto" @onclick="async () => { await OnConvertToTodo.InvokeAsync(_note); await Close(); }">
+							<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+								<rect x="3" y="3" width="18" height="18" rx="2"/>
+								<path d="M9 12l2 2 4-4"/>
+							</svg>
+							Convert to Task
 						</button>
-					</div>
-				</EditForm>
-			</div>
+					}
+					<button type="button" class="btn btn-outline-secondary" @onclick="Close">Cancel</button>
+					<button type="submit" class="btn btn-primary">
+						@(IsEditing ? "Save Changes" : "Add Note")
+					</button>
+				</div>
+			</EditForm>
 		</div>
-	</div>
-}
+	</ChildContent>
+</Modal>
 
 <style>
-	.modal-overlay {
-		position: fixed;
-		inset: 0;
-		background: rgba(15, 23, 42, 0.6);
-		backdrop-filter: blur(4px);
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		z-index: 1000;
-		padding: var(--space-4);
-		animation: fadeIn var(--transition-fast) ease-out;
-	}
-
-	.modal-container {
-		background: var(--surface);
-		border-radius: var(--radius-xl);
-		box-shadow: var(--shadow-xl);
-		width: 100%;
-		max-width: 75vw;
-		height: 75vh;
-		display: flex;
-		flex-direction: column;
-		overflow: hidden;
-		animation: scaleIn var(--transition-base) ease-out;
-	}
-
-	@@keyframes fadeIn {
-		from { opacity: 0; }
-		to { opacity: 1; }
-	}
-
-	@@keyframes scaleIn {
-		from { opacity: 0; transform: scale(0.95) translateY(10px); }
-		to { opacity: 1; transform: scale(1) translateY(0); }
-	}
-
-	.modal-header {
-		display: flex;
-		align-items: center;
-		justify-content: space-between;
-		padding: var(--space-5) var(--space-6);
-		border-bottom: 1px solid var(--border-light);
-	}
-
-	.modal-title {
-		display: flex;
-		align-items: center;
-		gap: var(--space-3);
-		font-size: 1.125rem;
-		font-weight: 600;
-		color: var(--text-primary);
-		margin: 0;
-	}
-
-	.modal-title svg {
-		color: var(--primary);
-	}
-
-	.modal-close {
-		width: 36px;
-		height: 36px;
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		background: transparent;
-		border: none;
-		border-radius: var(--radius-md);
-		color: var(--text-muted);
-		cursor: pointer;
-		transition: all var(--transition-fast);
-	}
-
-	.modal-close:hover {
-		background: var(--gray-100);
-		color: var(--text-primary);
-	}
-
-	.modal-body {
-		padding: var(--space-6);
-		overflow-y: auto;
-		flex: 1;
-		display: flex;
-		flex-direction: column;
-	}
-
 	.form-field {
 		margin-bottom: var(--space-4);
 	}
@@ -209,13 +112,6 @@
 		justify-content: flex-end;
 		gap: var(--space-3);
 		margin-top: var(--space-5);
-	}
-
-	@@media (max-width: 640px) {
-		.modal-container {
-			max-width: 95vw;
-			height: 90vh;
-		}
 	}
 </style>
 

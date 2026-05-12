@@ -1,5 +1,5 @@
 @page "/statistics"
-@implements IDisposable
+@inherits PageComponentBase
 @inject ITodoService TodoService
 @inject IProjectService ProjectService
 @inject ITagService TagService
@@ -279,19 +279,17 @@ else
     {
         TodoService.OnTodosChanged += StateHasChanged;
         ProjectService.OnProjectsChanged += StateHasChanged;
+        Track(() => TodoService.OnTodosChanged -= StateHasChanged);
+        Track(() => ProjectService.OnProjectsChanged -= StateHasChanged);
     }
 
-    protected override async Task OnAfterRenderAsync(bool firstRender)
+    protected override async Task OnFirstRenderAsync()
     {
-        if (firstRender && !_initialized)
-        {
-            _initialized = true;
-            await ProjectService.InitializeAsync();
-            await TagService.InitializeAsync();
-            await StatusService.InitializeAsync();
-            await TodoService.InitializeAsync();
-            StateHasChanged();
-        }
+        await ProjectService.InitializeAsync();
+        await TagService.InitializeAsync();
+        await StatusService.InitializeAsync();
+        await TodoService.InitializeAsync();
+        _initialized = true;
     }
 
     private string GetAverageCompleted()
@@ -308,11 +306,5 @@ else
         if (projectCount == 0) return "0";
         var total = (double)TodoService.Todos.Count(t => !t.IsDone);
         return (total / projectCount).ToString("F1");
-    }
-
-    public void Dispose()
-    {
-        TodoService.OnTodosChanged -= StateHasChanged;
-        ProjectService.OnProjectsChanged -= StateHasChanged;
     }
 }

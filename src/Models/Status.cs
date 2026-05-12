@@ -2,7 +2,7 @@ using System.ComponentModel.DataAnnotations;
 
 namespace TodoList.Models;
 
-public class Status
+public class Status : IEntity
 {
 	public Guid Id { get; set; } = Guid.NewGuid();
 
@@ -14,6 +14,9 @@ public class Status
 	public string Color { get; set; } = "#6366f1";
 
 	public bool IsBuiltIn { get; set; }
+
+	public DateTime CreatedAt { get; set; } = DateTime.Now;
+	public DateTime? UpdatedAt { get; set; }
 
 	public bool IsValid() => Id != Guid.Empty && !string.IsNullOrWhiteSpace(Name);
 }

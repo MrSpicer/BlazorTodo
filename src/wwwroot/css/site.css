@@ -606,23 +606,119 @@ a:hover, .btn-link:hover {
     box-shadow: var(--shadow-xl);
 }
 
+.modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(15, 23, 42, 0.6);
+    backdrop-filter: blur(4px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+    padding: var(--space-4);
+    animation: modalFadeIn var(--transition-fast) ease-out;
+}
+
+.modal-container {
+    background: var(--surface);
+    border-radius: var(--radius-xl);
+    box-shadow: var(--shadow-xl);
+    width: 100%;
+    max-width: 75vw;
+    height: 75vh;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    animation: modalScaleIn var(--transition-base) ease-out;
+}
+
+.modal-container.modal-compact {
+    max-width: 440px;
+    height: auto;
+}
+
+.modal-container.modal-large {
+    max-width: 90vw;
+    height: 90vh;
+}
+
 .modal-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
     border-bottom: 1px solid var(--border-light);
     padding: var(--space-5) var(--space-6);
 }
 
 .modal-title {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
     font-weight: 600;
     font-size: 1.125rem;
+    color: var(--text-primary);
+    margin: 0;
+}
+
+.modal-title svg {
+    color: var(--primary);
+}
+
+.modal-close {
+    width: 36px;
+    height: 36px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: transparent;
+    border: none;
+    border-radius: var(--radius-md);
+    color: var(--text-muted);
+    cursor: pointer;
+    transition: all var(--transition-fast);
+}
+
+.modal-close:hover {
+    background: var(--gray-100);
+    color: var(--text-primary);
 }
 
 .modal-body {
     padding: var(--space-6);
+    overflow-y: auto;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
 }
 
 .modal-footer {
+    display: flex;
+    justify-content: flex-end;
+    gap: var(--space-3);
     border-top: 1px solid var(--border-light);
     padding: var(--space-4) var(--space-6);
+    background: var(--gray-50);
+}
+
+@keyframes modalFadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+@keyframes modalScaleIn {
+    from { opacity: 0; transform: scale(0.95) translateY(10px); }
+    to { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+@media (max-width: 640px) {
+    .modal-container {
+        max-width: 95vw;
+        height: 90vh;
+    }
+    .modal-container.modal-compact {
+        max-width: 95vw;
+        height: auto;
+    }
 }
 
 /* ========================================

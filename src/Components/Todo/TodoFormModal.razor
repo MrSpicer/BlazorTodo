@@ -3,159 +3,49 @@
 @using TodoList.Services
 @inject ITodoService TodoService
 
-@if (IsVisible)
-{
-	<div class="modal-overlay" @onclick="Close">
-		<div class="modal-container"
-		     role="dialog"
-		     aria-modal="true"
-		     aria-labelledby="todo-modal-title"
-		     @onclick:stopPropagation="true">
-			<div class="modal-header">
-				<h2 class="modal-title" id="todo-modal-title">
-					@if (IsEditing)
-					{
-						<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-							<path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
-							<path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
-						</svg>
-						<span>Edit Task</span>
-					}
-					else
-					{
-						<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-							<rect x="3" y="3" width="18" height="18" rx="2"/>
-							<path d="M12 8v8M8 12h8"/>
-						</svg>
-						<span>New Task</span>
-					}
-				</h2>
-				<button class="modal-close" @onclick="Close" aria-label="Close">
-					<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-						<path d="M18 6L6 18M6 6l12 12"/>
-					</svg>
-				</button>
-			</div>
-			<div class="modal-body">
-				@if (ShowParentSelector)
-				{
-					<div class="form-group" style="margin-bottom: var(--space-5);">
-						<label for="parentTaskSelect" class="form-label">Parent</label>
-						<select id="parentTaskSelect" class="form-input"
-						        value="@(_selectedParentId?.ToString() ?? string.Empty)"
-						        @onchange="e => _selectedParentId = string.IsNullOrEmpty(e.Value?.ToString()) ? (Guid?)null : Guid.Parse(e.Value!.ToString()!)">
-							<option value="">None</option>
-							@foreach (var p in GetAvailableParents())
-							{
-								<option value="@p.Id">@p.Title</option>
-							}
-						</select>
-					</div>
-				}
-				<TodoForm Todo="@_todo"
-				          IsEditing="@IsEditing"
-				          ShowCard="false"
-				          OnSubmit="HandleSubmit"
-				          OnCancel="Close"
-				          OnConvertToNote="HandleConvertToNote" />
-			</div>
-		</div>
-	</div>
-}
-
-<style>
-	.modal-overlay {
-		position: fixed;
-		inset: 0;
-		background: rgba(15, 23, 42, 0.6);
-		backdrop-filter: blur(4px);
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		z-index: 1000;
-		padding: var(--space-4);
-		animation: fadeIn var(--transition-fast) ease-out;
-	}
-
-	.modal-container {
-		background: var(--surface);
-		border-radius: var(--radius-xl);
-		box-shadow: var(--shadow-xl);
-		width: 100%;
-		max-width: 75vw;
-		height: 75vh;
-		display: flex;
-		flex-direction: column;
-		overflow: hidden;
-		animation: scaleIn var(--transition-base) ease-out;
-	}
-
-	@@keyframes fadeIn {
-		from { opacity: 0; }
-		to { opacity: 1; }
-	}
-
-	@@keyframes scaleIn {
-		from { opacity: 0; transform: scale(0.95) translateY(10px); }
-		to { opacity: 1; transform: scale(1) translateY(0); }
-	}
-
-	.modal-header {
-		display: flex;
-		align-items: center;
-		justify-content: space-between;
-		padding: var(--space-5) var(--space-6);
-		border-bottom: 1px solid var(--border-light);
-	}
-
-	.modal-title {
-		display: flex;
-		align-items: center;
-		gap: var(--space-3);
-		font-size: 1.125rem;
-		font-weight: 600;
-		color: var(--text-primary);
-		margin: 0;
-	}
-
-	.modal-title svg {
-		color: var(--primary);
-	}
-
-	.modal-close {
-		width: 36px;
-		height: 36px;
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		background: transparent;
-		border: none;
-		border-radius: var(--radius-md);
-		color: var(--text-muted);
-		cursor: pointer;
-		transition: all var(--transition-fast);
-	}
-
-	.modal-close:hover {
-		background: var(--gray-100);
-		color: var(--text-primary);
-	}
-
-	.modal-body {
-		padding: var(--space-6);
-		overflow-y: auto;
-		flex: 1;
-		display: flex;
-		flex-direction: column;
-	}
-
-	@@media (max-width: 640px) {
-		.modal-container {
-			max-width: 95vw;
-			height: 90vh;
+<Modal IsVisible="IsVisible" OnClose="Close" Title="@(IsEditing ? "Edit Task" : "New Task")">
+	<HeaderIcon>
+		@if (IsEditing)
+		{
+			<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+				<path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+				<path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+			</svg>
 		}
-	}
-</style>
+		else
+		{
+			<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+				<rect x="3" y="3" width="18" height="18" rx="2"/>
+				<path d="M12 8v8M8 12h8"/>
+			</svg>
+		}
+	</HeaderIcon>
+	<ChildContent>
+		<div class="modal-body">
+			@if (ShowParentSelector)
+			{
+				<div class="form-group" style="margin-bottom: var(--space-5);">
+					<label for="parentTaskSelect" class="form-label">Parent</label>
+					<select id="parentTaskSelect" class="form-input"
+					        value="@(_selectedParentId?.ToString() ?? string.Empty)"
+					        @onchange="e => _selectedParentId = string.IsNullOrEmpty(e.Value?.ToString()) ? (Guid?)null : Guid.Parse(e.Value!.ToString()!)">
+						<option value="">None</option>
+						@foreach (var p in GetAvailableParents())
+						{
+							<option value="@p.Id">@p.Title</option>
+						}
+					</select>
+				</div>
+			}
+			<TodoForm Todo="@_todo"
+			          IsEditing="@IsEditing"
+			          ShowCard="false"
+			          OnSubmit="HandleSubmit"
+			          OnCancel="Close"
+			          OnConvertToNote="HandleConvertToNote" />
+		</div>
+	</ChildContent>
+</Modal>
 
 @code {
 	[Parameter]

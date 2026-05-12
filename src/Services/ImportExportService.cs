@@ -6,7 +6,9 @@ using TodoList.Data;
 namespace TodoList.Services;
 
 /// <summary>
-/// Implementation of IImportExportService for importing and exporting todo data.
+/// Orchestrates import/export of app data. Serialization is delegated to
+/// <see cref="AppDataSerializer"/>; this service handles the cross-entity logic:
+/// tag dedup-and-remap, status dedup-and-remap, project/todo/note upserts.
 /// </summary>
 public class ImportExportService : IImportExportService
 {
@@ -15,34 +17,34 @@ public class ImportExportService : IImportExportService
 	private readonly IProjectService _projectService;
 	private readonly INoteService _noteService;
 	private readonly ITagService _tagService;
-	private readonly ITagRepository _tagRepository;
 	private readonly IStatusService _statusService;
-	private readonly IStatusRepository _statusRepository;
+	private readonly AppDataSerializer _serializer;
 	private readonly ILogger<ImportExportService> _logger;
 
-	private static readonly JsonSerializerOptions JsonOptions = new()
-	{
-		WriteIndented = true,
-		PropertyNamingPolicy = JsonNamingPolicy.CamelCase
-	};
-
-	public ImportExportService(ITodoRepository repository, ITodoService todoService, IProjectService projectService, INoteService noteService, ITagService tagService, ITagRepository tagRepository, IStatusService statusService, IStatusRepository statusRepository, ILogger<ImportExportService> logger)
+	public ImportExportService(
+		ITodoRepository repository,
+		ITodoService todoService,
+		IProjectService projectService,
+		INoteService noteService,
+		ITagService tagService,
+		IStatusService statusService,
+		AppDataSerializer serializer,
+		ILogger<ImportExportService> logger)
 	{
 		_repository = repository;
 		_todoService = todoService;
 		_projectService = projectService;
 		_noteService = noteService;
 		_tagService = tagService;
-		_tagRepository = tagRepository;
 		_statusService = statusService;
-		_statusRepository = statusRepository;
+		_serializer = serializer;
 		_logger = logger;
 	}
 
 	public async Task<string> ExportToJsonAsync()
 	{
 		var todos = await _repository.GetTodos();
-		var exportData = new TodoExportData
+		var document = new AppDataDocument
 		{
 			ExportedAt = DateTime.Now,
 			Version = "1.3",
@@ -53,14 +55,14 @@ public class ImportExportService : IImportExportService
 			Statuses = _statusService.Statuses.ToList()
 		};
 
-		return JsonSerializer.Serialize(exportData, JsonOptions);
+		return _serializer.Serialize(document);
 	}
 
 	public async Task<ImportResult> ImportFromJsonAsync(string json, bool replaceExisting = false)
 	{
 		try
 		{
-			var importData = JsonSerializer.Deserialize<TodoExportData>(json, JsonOptions);
+			var importData = _serializer.Deserialize(json);
 
 			if (importData == null)
 			{
@@ -251,18 +253,4 @@ public class ImportExportService : IImportExportService
 		else if (statusIdRemap.TryGetValue(todo.StatusId, out var mapped))
 			todo.StatusId = mapped;
 	}
-}
-
-/// <summary>
-/// Data structure for export/import.
-/// </summary>
-public class TodoExportData
-{
-	public DateTime ExportedAt { get; set; }
-	public string Version { get; set; } = "1.3";
-	public List<Project> Projects { get; set; } = new();
-	public List<TodoItem> Todos { get; set; } = new();
-	public List<ProjectNote> Notes { get; set; } = new();
-	public List<Tag> Tags { get; set; } = new();
-	public List<Status> Statuses { get; set; } = new();
 }

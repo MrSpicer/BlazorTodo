@@ -1,5 +1,5 @@
 @page "/"
-@implements IDisposable
+@inherits PageComponentBase
 @inject ITodoService TodoService
 @inject IProjectService ProjectService
 @inject INoteService NoteService
@@ -475,7 +475,6 @@ else
     private bool _isEditing;
     private TodoFilterCriteria _filterCriteria = new();
     private string _selectedPresetName = FilterPreset.DefaultName;
-    private bool _initialized;
     private bool _isLoading = true;
     private bool _showProjectModal;
     private bool _showTodoModal;
@@ -490,25 +489,23 @@ else
         TodoService.OnTodosChanged += StateHasChanged;
         ProjectService.OnProjectsChanged += StateHasChanged;
         NoteService.OnNotesChanged += StateHasChanged;
+        Track(() => TodoService.OnTodosChanged -= StateHasChanged);
+        Track(() => ProjectService.OnProjectsChanged -= StateHasChanged);
+        Track(() => NoteService.OnNotesChanged -= StateHasChanged);
     }
 
-    protected override async Task OnAfterRenderAsync(bool firstRender)
+    protected override async Task OnFirstRenderAsync()
     {
-        if (firstRender && !_initialized)
-        {
-            _initialized = true;
-            await Task.WhenAll(
-                ProjectService.InitializeAsync(),
-                TagService.InitializeAsync(),
-                StatusService.InitializeAsync(),
-                TodoService.InitializeAsync(),
-                NoteService.InitializeAsync(),
-                PresetService.InitializeAsync()
-            );
-            ApplyRememberedPreset();
-            _isLoading = false;
-            StateHasChanged();
-        }
+        await Task.WhenAll(
+            ProjectService.InitializeAsync(),
+            TagService.InitializeAsync(),
+            StatusService.InitializeAsync(),
+            TodoService.InitializeAsync(),
+            NoteService.InitializeAsync(),
+            PresetService.InitializeAsync()
+        );
+        ApplyRememberedPreset();
+        _isLoading = false;
     }
 
     private IEnumerable<TodoItem> GetFilteredTodos() =>
@@ -726,12 +723,5 @@ else
     {
         _showNoteModal = false;
         _isEditingNote = false;
-    }
-
-    public void Dispose()
-    {
-        TodoService.OnTodosChanged -= StateHasChanged;
-        ProjectService.OnProjectsChanged -= StateHasChanged;
-        NoteService.OnNotesChanged -= StateHasChanged;
     }
 }

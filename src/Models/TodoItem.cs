@@ -4,7 +4,7 @@ using TodoList.Models.Enums;
 
 namespace TodoList.Models;
 
-public class TodoItem
+public class TodoItem : IEntity, IProjectScoped
 {
 	public Guid Id { get; set; } = Guid.NewGuid();
 

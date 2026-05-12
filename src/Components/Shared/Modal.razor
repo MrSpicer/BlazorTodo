@@ -1,0 +1,54 @@
+@*
+	Shared modal shell. Owns overlay, container, header, close button.
+	Consumers provide `Title`, optional `HeaderIcon`, and the modal body via `ChildContent`.
+	The body content is responsible for its own scrolling/layout (use .modal-body / .modal-footer
+	classes from site.css to match the standard look).
+*@
+@if (IsVisible)
+{
+	<div class="modal-overlay" @onclick="HandleOverlayClick">
+		<div class="modal-container @SizeClass"
+		     role="dialog"
+		     aria-modal="true"
+		     aria-labelledby="@_titleId"
+		     @onclick:stopPropagation="true">
+			<div class="modal-header">
+				<h2 class="modal-title" id="@_titleId">
+					@HeaderIcon
+					<span>@Title</span>
+				</h2>
+				<button class="modal-close" @onclick="HandleClose" aria-label="Close">
+					<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+						<path d="M18 6L6 18M6 6l12 12"/>
+					</svg>
+				</button>
+			</div>
+			@ChildContent
+		</div>
+	</div>
+}
+
+@code {
+	[Parameter] public bool IsVisible { get; set; }
+	[Parameter, EditorRequired] public string Title { get; set; } = string.Empty;
+	[Parameter] public RenderFragment? HeaderIcon { get; set; }
+	[Parameter] public RenderFragment? ChildContent { get; set; }
+	[Parameter] public EventCallback OnClose { get; set; }
+
+	/// <summary>"default" (75vw × 75vh), "compact" (440px), or "large" (90vw × 90vh).</summary>
+	[Parameter] public string Size { get; set; } = "default";
+
+	[Parameter] public bool CloseOnOverlayClick { get; set; } = true;
+
+	private readonly string _titleId = $"modal-title-{Guid.NewGuid():N}";
+
+	private string SizeClass => Size switch
+	{
+		"compact" => "modal-compact",
+		"large" => "modal-large",
+		_ => string.Empty
+	};
+
+	private Task HandleClose() => OnClose.InvokeAsync();
+	private Task HandleOverlayClick() => CloseOnOverlayClick ? OnClose.InvokeAsync() : Task.CompletedTask;
+}

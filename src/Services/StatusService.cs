@@ -4,46 +4,49 @@ using TodoList.Models;
 
 namespace TodoList.Services;
 
-public class StatusService : IStatusService
+public class StatusService : EntityServiceBase<Status>, IStatusService
 {
 	private readonly IStatusRepository _statusRepository;
 	private readonly ITodoRepository _todoRepository;
-	private readonly ILogger<StatusService> _logger;
-	private List<Status> _statuses;
 	private bool _initialized;
 
-	public event Action? OnStatusesChanged;
-	public IReadOnlyList<Status> Statuses => _statuses.AsReadOnly();
+	public event Action? OnStatusesChanged
+	{
+		add => OnChanged += value;
+		remove => OnChanged -= value;
+	}
+
+	public IReadOnlyList<Status> Statuses => Items;
 
 	public StatusService(IStatusRepository statusRepository, ITodoRepository todoRepository, ILogger<StatusService> logger)
+		: base((IRepository<Status>)statusRepository, logger)
 	{
 		_statusRepository = statusRepository;
 		_todoRepository = todoRepository;
-		_logger = logger;
-		_statuses = BuiltInStatusIds.Seed().ToList();
+		_items = BuiltInStatusIds.Seed().ToList();
 	}
 
-	public async Task InitializeAsync()
+	public override async Task InitializeAsync()
 	{
 		if (_initialized)
 			return;
 
-		await _statusRepository.InitializeAsync();
-		var stored = await _statusRepository.GetStatuses();
+		await Repository.InitializeAsync();
+		var stored = await Repository.GetAll();
 
 		var seeded = BuiltInStatusIds.Seed();
 		await MigrateLegacyColorsAsync(stored, seeded);
 
 		var missing = seeded.Where(s => stored.All(x => x.Id != s.Id)).ToList();
 		foreach (var s in missing)
-			await _statusRepository.AddOrUpdate(s);
+			await Repository.AddOrUpdate(s);
 
 		if (missing.Count > 0)
 			stored.AddRange(missing);
 
-		_statuses = stored;
+		_items = stored;
 		_initialized = true;
-		Notify();
+		NotifyChanged();
 	}
 
 	// One-time rewrite of statuses persisted under older color schemes:
@@ -76,7 +79,7 @@ public class StatusService : IStatusService
 				s.Color = MapLegacyColor(s.Color);
 			}
 
-			await _statusRepository.AddOrUpdate(s);
+			await Repository.AddOrUpdate(s);
 		}
 	}
 
@@ -97,8 +100,6 @@ public class StatusService : IStatusService
 		return StatusColor.NormalizeBackground(token);
 	}
 
-	public Status? GetById(Guid id) => _statuses.FirstOrDefault(s => s.Id == id);
-
 	public async Task<bool> AddAsync(Status status)
 	{
 		if (status is null)
@@ -108,7 +109,7 @@ public class StatusService : IStatusService
 		if (string.IsNullOrWhiteSpace(trimmed))
 			return false;
 
-		var conflict = _statuses.Any(s => string.Equals(s.Name, trimmed, StringComparison.OrdinalIgnoreCase));
+		var conflict = _items.Any(s => string.Equals(s.Name, trimmed, StringComparison.OrdinalIgnoreCase));
 		if (conflict)
 			return false;
 
@@ -117,12 +118,12 @@ public class StatusService : IStatusService
 			status.Id = Guid.NewGuid();
 		status.IsBuiltIn = false;
 
-		var ok = await _statusRepository.AddOrUpdate(status);
+		var ok = await Repository.AddOrUpdate(status);
 		if (!ok)
 			return false;
 
-		_statuses.Add(status);
-		Notify();
+		_items.Add(status);
+		NotifyChanged();
 		return true;
 	}
 
@@ -135,27 +136,27 @@ public class StatusService : IStatusService
 		if (string.IsNullOrWhiteSpace(trimmed))
 			return false;
 
-		var conflict = _statuses.Any(s => s.Id != status.Id
+		var conflict = _items.Any(s => s.Id != status.Id
 			&& string.Equals(s.Name, trimmed, StringComparison.OrdinalIgnoreCase));
 		if (conflict)
 			return false;
 
-		var existing = _statuses.FirstOrDefault(s => s.Id == status.Id);
+		var existing = _items.FirstOrDefault(s => s.Id == status.Id);
 		if (existing != null)
 			status.IsBuiltIn = existing.IsBuiltIn;
 
 		status.Name = trimmed;
-		var ok = await _statusRepository.AddOrUpdate(status);
+		var ok = await Repository.AddOrUpdate(status);
 		if (!ok)
 			return false;
 
-		var index = _statuses.FindIndex(s => s.Id == status.Id);
+		var index = _items.FindIndex(s => s.Id == status.Id);
 		if (index >= 0)
-			_statuses[index] = status;
+			_items[index] = status;
 		else
-			_statuses.Add(status);
+			_items.Add(status);
 
-		Notify();
+		NotifyChanged();
 		return true;
 	}
 
@@ -183,14 +184,14 @@ public class StatusService : IStatusService
 
 		if (BuiltInStatusIds.IsBuiltIn(status.Id))
 		{
-			_logger.LogWarning("Refusing to delete built-in status {Id}", status.Id);
+			Logger.LogWarning("Refusing to delete built-in status {Id}", status.Id);
 			return false;
 		}
 
 		var deletedId = status.Id;
 		var now = DateTime.Now;
 
-		await _statusRepository.Delete(status);
+		await Repository.Delete(status);
 
 		var todos = await _todoRepository.GetTodos();
 		foreach (var todo in todos)
@@ -219,10 +220,8 @@ public class StatusService : IStatusService
 			}
 		}
 
-		_statuses.RemoveAll(s => s.Id == deletedId);
-		Notify();
+		_items.RemoveAll(s => s.Id == deletedId);
+		NotifyChanged();
 		return true;
 	}
-
-	private void Notify() => OnStatusesChanged?.Invoke();
 }

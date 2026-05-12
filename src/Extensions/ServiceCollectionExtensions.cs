@@ -20,11 +20,13 @@ public static class ServiceCollectionExtensions
         services.AddScoped<ITagService, TagService>();
         services.AddScoped<IStatusRepository, StatusRepository>();
         services.AddScoped<IStatusService, StatusService>();
+        services.AddScoped<IChangeLogFormatter, ChangeLogFormatter>();
         services.AddScoped<ITodoService, TodoService>();
         services.AddScoped<INoteService, NoteService>();
         services.AddScoped<IProjectService, ProjectService>();
         services.AddScoped<IDialogService, DialogService>();
         services.AddScoped<IFileService, FileService>();
+        services.AddScoped<AppDataSerializer>();
         services.AddScoped<IImportExportService, ImportExportService>();
         services.AddScoped<ISyncService, SyncService>();
         services.AddScoped<IFilterPresetRepository, FilterPresetRepository>();

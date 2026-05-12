@@ -1,6 +1,6 @@
 @page "/restore/{SessionId}"
 @using Blazored.LocalStorage
-@implements IDisposable
+@inherits PageComponentBase
 @inject ISyncService SyncService
 @inject ITodoService TodoService
 @inject IProjectService ProjectService
@@ -73,49 +73,38 @@
 	private PageState _state = PageState.Loading;
 	private int _importedCount;
 	private string? _errorMessage;
-	private bool _initialized;
 
 	protected override void OnInitialized()
 	{
 		ProjectService.OnProjectsChanged += StateHasChanged;
 		TodoService.OnTodosChanged += StateHasChanged;
+		Track(() => ProjectService.OnProjectsChanged -= StateHasChanged);
+		Track(() => TodoService.OnTodosChanged -= StateHasChanged);
 	}
 
-	protected override async Task OnAfterRenderAsync(bool firstRender)
+	protected override async Task OnFirstRenderAsync()
 	{
-		if (firstRender && !_initialized)
+		await ProjectService.InitializeAsync();
+		await TagService.InitializeAsync();
+		await StatusService.InitializeAsync();
+		await TodoService.InitializeAsync();
+
+		var result = await SyncService.RestoreFromServerAsync(SessionId);
+
+		if (result.Success)
 		{
-			_initialized = true;
-			await ProjectService.InitializeAsync();
-			await TagService.InitializeAsync();
-			await StatusService.InitializeAsync();
-			await TodoService.InitializeAsync();
-
-			var result = await SyncService.RestoreFromServerAsync(SessionId);
-
-			if (result.Success)
-			{
-				await LocalStorage.SetItemAsStringAsync("SyncSessionId", SessionId);
-				_importedCount = result.ImportedCount;
-				_state = PageState.Success;
-			}
-			else if (result.NotFound)
-			{
-				_state = PageState.NotFound;
-			}
-			else
-			{
-				_errorMessage = result.ErrorMessage ?? "An unexpected error occurred.";
-				_state = PageState.Error;
-			}
-
-			StateHasChanged();
+			await LocalStorage.SetItemAsStringAsync("SyncSessionId", SessionId);
+			_importedCount = result.ImportedCount;
+			_state = PageState.Success;
 		}
-	}
-
-	public void Dispose()
-	{
-		ProjectService.OnProjectsChanged -= StateHasChanged;
-		TodoService.OnTodosChanged -= StateHasChanged;
+		else if (result.NotFound)
+		{
+			_state = PageState.NotFound;
+		}
+		else
+		{
+			_errorMessage = result.ErrorMessage ?? "An unexpected error occurred.";
+			_state = PageState.Error;
+		}
 	}
 }

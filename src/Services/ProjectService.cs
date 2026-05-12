@@ -3,75 +3,67 @@ using TodoList.Models;
 
 namespace TodoList.Services;
 
-/// <summary>
-/// Implementation of IProjectService for managing projects.
-/// </summary>
-public class ProjectService : IProjectService
+public class ProjectService : EntityServiceBase<Project>, IProjectService
 {
-    private readonly IProjectRepository _repository;
-    private List<Project> _projects = new();
-    private Project? _selectedProject;
+	private Project? _selectedProject;
 
-    public event Action? OnProjectsChanged;
-    public IReadOnlyList<Project> Projects => _projects.AsReadOnly();
-    public Project? SelectedProject => _selectedProject;
+	public event Action? OnProjectsChanged
+	{
+		add => OnChanged += value;
+		remove => OnChanged -= value;
+	}
 
-    public ProjectService(IProjectRepository repository)
-    {
-        _repository = repository;
-    }
+	public IReadOnlyList<Project> Projects => Items;
+	public Project? SelectedProject => _selectedProject;
 
-    public async Task InitializeAsync()
-    {
-        await _repository.InitializeAsync();
-        _projects = await _repository.GetProjects();
-        
-        // Select the default project initially
-        _selectedProject = _projects.FirstOrDefault(p => p.IsDefault) ?? _projects.FirstOrDefault();
-        
-        NotifyStateChanged();
-    }
+	public ProjectService(IProjectRepository repository, ILogger<ProjectService> logger)
+		: base((IRepository<Project>)repository, logger)
+	{
+	}
 
-    public async Task<bool> SaveProjectAsync(Project project)
-    {
-        var success = await _repository.AddOrUpdate(project);
-        if (success)
-        {
-            _projects = await _repository.GetProjects();
-            NotifyStateChanged();
-        }
-        return success;
-    }
+	public override async Task InitializeAsync()
+	{
+		await Repository.InitializeAsync();
+		_items = (await Repository.GetAll()).OrderBy(p => p.CreatedAt).ToList();
+		_selectedProject = _items.FirstOrDefault(p => p.IsDefault) ?? _items.FirstOrDefault();
+		NotifyChanged();
+	}
 
-    public async Task DeleteProjectAsync(Project project)
-    {
-        await _repository.Delete(project);
-        _projects = await _repository.GetProjects();
-        
-        // If we deleted the selected project, select the first remaining one
-        if (_selectedProject?.Id == project.Id)
-        {
-            _selectedProject = _projects.FirstOrDefault();
-        }
-        
-        NotifyStateChanged();
-    }
+	public async Task<bool> SaveProjectAsync(Project project)
+	{
+		project.UpdatedAt = DateTime.Now;
+		var success = await Repository.AddOrUpdate(project);
+		if (success)
+		{
+			var idx = _items.FindIndex(p => p.Id == project.Id);
+			if (idx >= 0)
+				_items[idx] = project;
+			else
+				_items.Add(project);
+			NotifyChanged();
+		}
+		return success;
+	}
 
-    public void SelectProject(Project? project)
-    {
-        _selectedProject = project;
-        NotifyStateChanged();
-    }
+	public async Task DeleteProjectAsync(Project project)
+	{
+		await Repository.Delete(project);
+		_items.RemoveAll(p => p.Id == project.Id);
 
-    public Project? GetDefaultProject()
-    {
-        return _projects.FirstOrDefault(p => p.IsDefault);
-    }
+		if (_selectedProject?.Id == project.Id)
+			_selectedProject = _items.FirstOrDefault();
 
-    public int GetTodoCount(Guid projectId, IReadOnlyList<TodoItem> todos)
-    {
-        return todos.Count(t => t.ProjectId == projectId);
-    }
+		NotifyChanged();
+	}
 
-    private void NotifyStateChanged() => OnProjectsChanged?.Invoke();
+	public void SelectProject(Project? project)
+	{
+		_selectedProject = project;
+		NotifyChanged();
+	}
+
+	public Project? GetDefaultProject() => _items.FirstOrDefault(p => p.IsDefault);
+
+	public int GetTodoCount(Guid projectId, IReadOnlyList<TodoItem> todos) =>
+		todos.Count(t => t.ProjectId == projectId);
 }

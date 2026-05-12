@@ -4,44 +4,50 @@ using TodoList.Models.Enums;
 
 namespace TodoList.Services;
 
-/// <summary>
-/// Implementation of ITodoService for managing todo items.
-/// </summary>
-public class TodoService : ITodoService
+public class TodoService : EntityServiceBase<TodoItem>, ITodoService
 {
-	private readonly ITodoRepository _repository;
-	private readonly ITagService _tagService;
+	private readonly ITodoRepository _todoRepository;
+	private readonly IChangeLogFormatter _formatter;
 	private readonly IStatusService _statusService;
-	private List<TodoItem> _todos = new();
 
-	public event Action? OnTodosChanged;
-	public IReadOnlyList<TodoItem> Todos => _todos.AsReadOnly();
-
-	public TodoService(ITodoRepository repository, ITagService tagService, IStatusService statusService)
+	public event Action? OnTodosChanged
 	{
-		_repository = repository;
-		_tagService = tagService;
+		add => OnChanged += value;
+		remove => OnChanged -= value;
+	}
+
+	public IReadOnlyList<TodoItem> Todos => Items;
+
+	public TodoService(
+		ITodoRepository repository,
+		IChangeLogFormatter formatter,
+		IStatusService statusService,
+		ILogger<TodoService> logger)
+		: base((IRepository<TodoItem>)repository, logger)
+	{
+		_todoRepository = repository;
+		_formatter = formatter;
 		_statusService = statusService;
 	}
 
-	public async Task InitializeAsync()
+	public override async Task InitializeAsync()
 	{
-		await _repository.InitializeAsync();
-		_todos = await _repository.GetTodos();
+		await Repository.InitializeAsync();
+		_items = await Repository.GetAll();
 		await MigrateStatusIdsAsync();
 		await ResetStaleTodosAsync();
-		NotifyStateChanged();
+		NotifyChanged();
 	}
 
 	private async Task MigrateStatusIdsAsync()
 	{
-		foreach (var todo in _todos)
+		foreach (var todo in _items)
 		{
 			var changed = TryFillStatusId(todo);
 			foreach (var sub in todo.SubTasks)
 				changed |= TryFillStatusId(sub);
 			if (changed)
-				await _repository.AddOrUpdate(todo);
+				await Repository.AddOrUpdate(todo);
 		}
 
 		static bool TryFillStatusId(TodoItem t)
@@ -57,7 +63,7 @@ public class TodoService : ITodoService
 	{
 		var cutoff = DateTime.Now.AddDays(-7);
 
-		foreach (var todo in _todos)
+		foreach (var todo in _items)
 		{
 			var dirty = false;
 
@@ -77,14 +83,14 @@ public class TodoService : ITodoService
 			}
 
 			if (dirty)
-				await _repository.AddOrUpdate(todo);
+				await Repository.AddOrUpdate(todo);
 		}
 	}
 
 	public async Task<bool> SaveTodoAsync(TodoItem todo)
 	{
 		var now = DateTime.Now;
-		var existed = _todos.Any(t => t.Id == todo.Id);
+		var existed = _items.Any(t => t.Id == todo.Id);
 
 		if ((todo.StatusId == Guid.Empty || todo.StatusId == BuiltInStatusIds.None) && !existed)
 			todo.StatusId = BuiltInStatusIds.New;
@@ -107,7 +113,7 @@ public class TodoService : ITodoService
 		}
 		else
 		{
-			var old = await _repository.Get(todo.Id);
+			var old = await Repository.Get(todo.Id);
 			if (old != null)
 			{
 				var entries = BuildChangeEntries(old, todo, now).ToList();
@@ -147,24 +153,24 @@ public class TodoService : ITodoService
 			}
 		}
 
-		var success = await _repository.AddOrUpdate(todo);
+		var success = await Repository.AddOrUpdate(todo);
 		if (success)
 		{
-			var idx = _todos.FindIndex(t => t.Id == todo.Id);
+			var idx = _items.FindIndex(t => t.Id == todo.Id);
 			if (idx >= 0)
-				_todos[idx] = todo;
+				_items[idx] = todo;
 			else
-				_todos.Add(todo);
-			NotifyStateChanged();
+				_items.Add(todo);
+			NotifyChanged();
 		}
 		return success;
 	}
 
 	public async Task DeleteTodoAsync(TodoItem todo)
 	{
-		await _repository.Delete(todo);
-		_todos.RemoveAll(t => t.Id == todo.Id);
-		NotifyStateChanged();
+		await Repository.Delete(todo);
+		_items.RemoveAll(t => t.Id == todo.Id);
+		NotifyChanged();
 	}
 
 	public async Task UpdateStatusAsync(TodoItem todo, Guid newStatusId)
@@ -191,63 +197,59 @@ public class TodoService : ITodoService
 			todo.UpdatedAt = now;
 		}
 
-		await _repository.AddOrUpdate(todo);
-		NotifyStateChanged();
+		await Repository.AddOrUpdate(todo);
+		NotifyChanged();
 	}
 
-	private string StatusName(Guid id) =>
-		_statusService.GetById(id)?.Name ?? (id == Guid.Empty ? string.Empty : id.ToString());
+	private string StatusName(Guid id) => _formatter.StatusName(id);
 
 	public async Task ClearAllAsync()
 	{
-		await _repository.ClearAll();
-		_todos.Clear();
-		NotifyStateChanged();
+		await Repository.ClearAll();
+		_items.Clear();
+		NotifyChanged();
 	}
 
 	public async Task ClearAllAsync(Guid? projectId = null)
 	{
 		if (projectId == null)
 		{
-			await _repository.ClearAll();
-			_todos.Clear();
+			await Repository.ClearAll();
+			_items.Clear();
 		}
 		else
 		{
-			await _repository.DeleteByProject(projectId.Value);
-			_todos.RemoveAll(t => t.ProjectId == projectId.Value);
+			await _todoRepository.DeleteByProject(projectId.Value);
+			_items.RemoveAll(t => t.ProjectId == projectId.Value);
 		}
-		NotifyStateChanged();
+		NotifyChanged();
 	}
 
 	public async Task DeleteTodosByProjectAsync(Guid projectId)
 	{
-		await _repository.DeleteByProject(projectId);
-		_todos.RemoveAll(t => t.ProjectId == projectId);
-		NotifyStateChanged();
+		await _todoRepository.DeleteByProject(projectId);
+		_items.RemoveAll(t => t.ProjectId == projectId);
+		NotifyChanged();
 	}
 
 	public async Task MarkAllSyncedAsync(DateTime syncedAt)
 	{
-		foreach (var todo in _todos)
+		foreach (var todo in _items)
 		{
 			todo.LastSyncedAt = syncedAt;
 			foreach (var sub in todo.SubTasks)
 				sub.LastSyncedAt = syncedAt;
-			await _repository.AddOrUpdate(todo);
+			await Repository.AddOrUpdate(todo);
 		}
-		NotifyStateChanged();
+		NotifyChanged();
 	}
 
 	public IEnumerable<TodoItem> GetFilteredAndSorted(FilterOption filter, SortOption sort, Guid? projectId = null)
 	{
-		var filtered = _todos.AsEnumerable();
+		var filtered = _items.AsEnumerable();
 
-		// Filter by project if specified
 		if (projectId.HasValue)
-		{
 			filtered = filtered.Where(t => t.ProjectId == projectId.Value);
-		}
 
 		filtered = filter switch
 		{
@@ -266,15 +268,11 @@ public class TodoService : ITodoService
 
 	public IEnumerable<TodoItem> GetFilteredAndSorted(TodoFilterCriteria criteria, Guid? projectId = null)
 	{
-		var filtered = _todos.AsEnumerable();
+		var filtered = _items.AsEnumerable();
 
-		// Filter by project if specified
 		if (projectId.HasValue)
-		{
 			filtered = filtered.Where(t => t.ProjectId == projectId.Value);
-		}
 
-		// Text search - case insensitive search in title and description
 		if (!string.IsNullOrWhiteSpace(criteria.SearchText))
 		{
 			var searchLower = criteria.SearchText.ToLowerInvariant();
@@ -283,19 +281,12 @@ public class TodoService : ITodoService
 				t.Description.ToLowerInvariant().Contains(searchLower));
 		}
 
-		// Filter by selected priorities
 		if (criteria.SelectedPriorities.Any())
-		{
 			filtered = filtered.Where(t => criteria.SelectedPriorities.Contains(t.Priority));
-		}
 
-		// Filter by selected statuses
 		if (criteria.SelectedStatuses.Any())
-		{
 			filtered = filtered.Where(t => criteria.SelectedStatuses.Contains(t.StatusId));
-		}
 
-		// Sort
 		if (criteria.SortCriteria.Count == 0)
 			return filtered;
 		IOrderedEnumerable<TodoItem> sorted = ApplyFirstSort(filtered, criteria.SortCriteria[0]);
@@ -336,16 +327,16 @@ public class TodoService : ITodoService
 	public int GetActiveCount(Guid? projectId = null)
 	{
 		var todos = projectId.HasValue
-			? _todos.Where(t => t.ProjectId == projectId.Value)
-			: _todos;
+			? _items.Where(t => t.ProjectId == projectId.Value)
+			: _items;
 		return todos.Count(t => !BuiltInStatusIds.IsCompletedLike(t.StatusId));
 	}
 
 	public int GetCompletedCount(Guid? projectId = null)
 	{
 		var todos = projectId.HasValue
-			? _todos.Where(t => t.ProjectId == projectId.Value)
-			: _todos;
+			? _items.Where(t => t.ProjectId == projectId.Value)
+			: _items;
 		return todos.Count(t => t.StatusId == BuiltInStatusIds.Done);
 	}
 
@@ -383,17 +374,7 @@ public class TodoService : ITodoService
 		};
 	}
 
-	private string FormatTags(List<Guid>? ids)
-	{
-		if (ids is null || ids.Count == 0)
-			return string.Empty;
-		var names = ids
-			.Select(id => _tagService.GetById(id)?.Name ?? id.ToString("N").Substring(0, 6))
-			.OrderBy(n => n, StringComparer.OrdinalIgnoreCase);
-		return string.Join(", ", names);
-	}
+	private string FormatTags(List<Guid>? ids) => _formatter.FormatTags(ids);
 
 	private static string FormatDate(DateTime? d) => d.HasValue ? d.Value.ToString("yyyy-MM-dd HH:mm") : string.Empty;
-
-	private void NotifyStateChanged() => OnTodosChanged?.Invoke();
 }

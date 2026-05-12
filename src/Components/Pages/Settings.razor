@@ -6,7 +6,7 @@
 @inject IFilterPresetService PresetService
 @inject ILocalStorageService LocalStorage
 @inject NavigationManager NavigationManager
-@implements IDisposable
+@inherits PageComponentBase
 
 <PageTitle>BlazorTodo - Settings</PageTitle>
 
@@ -299,26 +299,16 @@
 	private bool _showTagsModal;
 	private bool _showStatusModal;
 	private ImportExportModal? _importExportModal;
-	private bool _initialized;
 
 	protected override void OnInitialized()
 	{
 		PresetService.OnPresetsChanged += StateHasChanged;
+		Track(() => PresetService.OnPresetsChanged -= StateHasChanged);
 	}
 
-	protected override async Task OnAfterRenderAsync(bool firstRender)
+	protected override async Task OnFirstRenderAsync()
 	{
-		if (firstRender && !_initialized)
-		{
-			_initialized = true;
-			await PresetService.InitializeAsync();
-			StateHasChanged();
-		}
-	}
-
-	public void Dispose()
-	{
-		PresetService.OnPresetsChanged -= StateHasChanged;
+		await PresetService.InitializeAsync();
 	}
 
 	private async Task HandleRememberPresetsChanged(ChangeEventArgs e)

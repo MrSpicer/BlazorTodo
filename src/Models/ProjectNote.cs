@@ -2,7 +2,7 @@ using System.ComponentModel.DataAnnotations;
 
 namespace TodoList.Models;
 
-public class ProjectNote
+public class ProjectNote : IEntity, IProjectScoped
 {
 	public Guid Id { get; set; } = Guid.NewGuid();
 	public Guid ProjectId { get; set; }
@@ -15,6 +15,12 @@ public class ProjectNote
 	public string Content { get; set; } = string.Empty;
 
 	public DateTime CreatedAt { get; set; } = DateTime.Now;
+
+	public DateTime? UpdatedAt { get; set; }
+
+	public DateTime? LastSyncedAt { get; set; }
+
+	public bool IsDirty => LastSyncedAt is null || (UpdatedAt.HasValue && UpdatedAt > LastSyncedAt);
 
 	public bool IsValid()
 	{
