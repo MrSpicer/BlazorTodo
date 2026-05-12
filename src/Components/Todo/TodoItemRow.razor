@@ -1,10 +1,10 @@
 @using TodoList.Models
-@using TodoList.Models.Enums
 @using TodoList.Helpers
 @using TodoList.Components.Shared
 @implements IDisposable
 @inject ITagService TagService
 @inject IStatusService StatusService
+@inject IPriorityService PriorityService
 
 <div class="todo-card @GetStatusClass() @(IsDone ? "completed" : "") @(Depth > 0 ? "subtask-card" : "")"
      data-testid="@(Depth > 0 ? "subtask-card" : "todo-card")">
@@ -38,9 +38,7 @@
 		<div class="todo-header">
 			<h3 class="todo-title @(IsDone ? "done" : "")">@Item.Title</h3>
 			<div class="todo-badges">
-				<span class="priority-badge priority-@Item.Priority.ToString().ToLower()">
-					@Item.Priority
-				</span>
+				<PriorityBadge PriorityId="Item.PriorityId" />
 				@if (Item.StatusId != BuiltInStatusIds.None && Item.StatusId != BuiltInStatusIds.Done)
 				{
 					var st = StatusService.GetById(Item.StatusId);
@@ -388,26 +386,6 @@
 		letter-spacing: 0.025em;
 	}
 
-	.priority-badge.priority-low {
-		background: var(--success-light);
-		color: #065f46;
-	}
-
-	.priority-badge.priority-medium {
-		background: var(--warning-light);
-		color: #92400e;
-	}
-
-	.priority-badge.priority-high {
-		background: #ffedd5;
-		color: #c2410c;
-	}
-
-	.priority-badge.priority-emergency {
-		background: var(--danger-light);
-		color: #991b1b;
-	}
-
 	.todo-description {
 		font-size: 0.875rem;
 		color: var(--text-secondary);
@@ -655,11 +633,13 @@
 	protected override void OnInitialized()
 	{
 		StatusService.OnStatusesChanged += StateHasChanged;
+		PriorityService.OnPrioritiesChanged += StateHasChanged;
 	}
 
 	public void Dispose()
 	{
 		StatusService.OnStatusesChanged -= StateHasChanged;
+		PriorityService.OnPrioritiesChanged -= StateHasChanged;
 	}
 
 	private static string FormatMinutes(int minutes)

@@ -1,20 +1,16 @@
-@using TodoList.Models.Enums
+@using TodoList.Models
 @using TodoList.Helpers
+@using TodoList.Services
+@inject IPriorityService PriorityService
 
-<span class="badge @CssHelpers.GetPriorityBadgeClass(Priority)">
-    @GetPriorityEmoji() @Priority
-</span>
+@{
+	var p = PriorityService.GetById(PriorityId);
+	var name = p?.Name ?? "—";
+	var (bg, fg) = StatusColor.Resolve(p?.Color);
+}
+<span class="priority-badge" style="background-color:@bg;color:@fg">@name</span>
 
 @code {
-    [Parameter, EditorRequired]
-    public Priority Priority { get; set; }
-
-    private string GetPriorityEmoji() => Priority switch
-    {
-        Priority.Low => "🟢",
-        Priority.Medium => "🔵",
-        Priority.High => "🟠",
-        Priority.Emergency => "🔴",
-        _ => "⚪"
-    };
+	[Parameter, EditorRequired]
+	public Guid PriorityId { get; set; }
 }

@@ -11,6 +11,7 @@ namespace TodoList.Services;
 public interface IChangeLogFormatter
 {
 	string StatusName(Guid id);
+	string PriorityName(Guid id);
 	string FormatTags(IEnumerable<Guid>? tagIds);
 }
 
@@ -18,15 +19,20 @@ public class ChangeLogFormatter : IChangeLogFormatter
 {
 	private readonly ITagService _tagService;
 	private readonly IStatusService _statusService;
+	private readonly IPriorityService _priorityService;
 
-	public ChangeLogFormatter(ITagService tagService, IStatusService statusService)
+	public ChangeLogFormatter(ITagService tagService, IStatusService statusService, IPriorityService priorityService)
 	{
 		_tagService = tagService;
 		_statusService = statusService;
+		_priorityService = priorityService;
 	}
 
 	public string StatusName(Guid id) =>
 		_statusService.GetById(id)?.Name ?? (id == Guid.Empty ? string.Empty : id.ToString());
+
+	public string PriorityName(Guid id) =>
+		_priorityService.GetById(id)?.Name ?? (id == Guid.Empty ? string.Empty : id.ToString());
 
 	public string FormatTags(IEnumerable<Guid>? tagIds)
 	{

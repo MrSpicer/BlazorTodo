@@ -18,6 +18,7 @@ public class ImportExportService : IImportExportService
 	private readonly INoteService _noteService;
 	private readonly ITagService _tagService;
 	private readonly IStatusService _statusService;
+	private readonly IPriorityService _priorityService;
 	private readonly AppDataSerializer _serializer;
 	private readonly ILogger<ImportExportService> _logger;
 
@@ -28,6 +29,7 @@ public class ImportExportService : IImportExportService
 		INoteService noteService,
 		ITagService tagService,
 		IStatusService statusService,
+		IPriorityService priorityService,
 		AppDataSerializer serializer,
 		ILogger<ImportExportService> logger)
 	{
@@ -37,6 +39,7 @@ public class ImportExportService : IImportExportService
 		_noteService = noteService;
 		_tagService = tagService;
 		_statusService = statusService;
+		_priorityService = priorityService;
 		_serializer = serializer;
 		_logger = logger;
 	}
@@ -47,12 +50,13 @@ public class ImportExportService : IImportExportService
 		var document = new AppDataDocument
 		{
 			ExportedAt = DateTime.Now,
-			Version = "1.3",
+			Version = "1.4",
 			Projects = _projectService.Projects.ToList(),
 			Todos = todos,
 			Notes = _noteService.Notes.ToList(),
 			Tags = _tagService.Tags.ToList(),
-			Statuses = _statusService.Statuses.ToList()
+			Statuses = _statusService.Statuses.ToList(),
+			Priorities = _priorityService.Priorities.ToList()
 		};
 
 		return _serializer.Serialize(document);
@@ -147,6 +151,38 @@ public class ImportExportService : IImportExportService
 				}
 			}
 
+			// Import priorities. Built-ins are upserted by Guid (peer device may have edited
+			// the name/color/rank); custom priorities dedupe by name (case-insensitive).
+			var priorityIdRemap = new Dictionary<Guid, Guid>();
+			var existingCustomPrioritiesByName = _priorityService.Priorities
+				.Where(p => !p.IsBuiltIn)
+				.ToDictionary(p => p.Name.Trim(), p => p, StringComparer.OrdinalIgnoreCase);
+			foreach (var incoming in importData.Priorities ?? new List<Priority>())
+			{
+				if (incoming.Id == Guid.Empty || string.IsNullOrWhiteSpace(incoming.Name))
+					continue;
+
+				if (BuiltInPriorityIds.IsBuiltIn(incoming.Id))
+				{
+					incoming.IsBuiltIn = true;
+					await _priorityService.UpdateAsync(incoming);
+					continue;
+				}
+
+				incoming.IsBuiltIn = false;
+				if (existingCustomPrioritiesByName.TryGetValue(incoming.Name.Trim(), out var existing))
+				{
+					if (existing.Id != incoming.Id)
+						priorityIdRemap[incoming.Id] = existing.Id;
+				}
+				else
+				{
+					var added = await _priorityService.AddAsync(incoming);
+					if (added)
+						existingCustomPrioritiesByName[incoming.Name.Trim()] = incoming;
+				}
+			}
+
 			// Import todos
 			var existingTodos = await _repository.GetTodos();
 			var existingIds = existingTodos.Select(t => t.Id).ToHashSet();
@@ -175,11 +211,13 @@ public class ImportExportService : IImportExportService
 
 				RemapTagIds(todo, tagIdRemap);
 				FillStatusId(todo, statusIdRemap);
+				FillPriorityId(todo, priorityIdRemap);
 				todo.LastSyncedAt = importedAt;
 				foreach (var sub in todo.SubTasks)
 				{
 					RemapTagIds(sub, tagIdRemap);
 					FillStatusId(sub, statusIdRemap);
+					FillPriorityId(sub, priorityIdRemap);
 					sub.LastSyncedAt = importedAt;
 				}
 
@@ -252,5 +290,15 @@ public class ImportExportService : IImportExportService
 			todo.StatusId = BuiltInStatusIds.FromLegacyEnum((int)todo.Status);
 		else if (statusIdRemap.TryGetValue(todo.StatusId, out var mapped))
 			todo.StatusId = mapped;
+	}
+
+	// Mirrors FillStatusId for priorities. Pre-v1.4 exports populate only the legacy enum;
+	// v1.4 exports may carry a custom-priority Guid that was deduped on this device.
+	private static void FillPriorityId(TodoItem todo, Dictionary<Guid, Guid> priorityIdRemap)
+	{
+		if (todo.PriorityId == Guid.Empty)
+			todo.PriorityId = BuiltInPriorityIds.FromLegacyEnum((int)todo.Priority);
+		else if (priorityIdRemap.TryGetValue(todo.PriorityId, out var mapped))
+			todo.PriorityId = mapped;
 	}
 }

@@ -5,6 +5,7 @@
 @inject INoteService NoteService
 @inject ITagService TagService
 @inject IStatusService StatusService
+@inject IPriorityService PriorityService
 @inject IDialogService DialogService
 @inject IFilterPresetService PresetService
 @inject NavigationManager NavigationManager
@@ -500,6 +501,7 @@ else
             ProjectService.InitializeAsync(),
             TagService.InitializeAsync(),
             StatusService.InitializeAsync(),
+            PriorityService.InitializeAsync(),
             TodoService.InitializeAsync(),
             NoteService.InitializeAsync(),
             PresetService.InitializeAsync()

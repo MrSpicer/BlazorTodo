@@ -15,7 +15,10 @@ public class TodoItem : IEntity, IProjectScoped
 	[StringLength(500, ErrorMessage = "Description cannot exceed 500 characters")]
 	public string Description { get; set; } = string.Empty;
 
-	public Priority Priority { get; set; } = Priority.Medium;
+	/// <summary>Legacy fixed-set priority enum. Kept for one-time migration of pre-entity-Priority data; not authoritative — use <see cref="PriorityId"/>.</summary>
+	public LegacyPriority Priority { get; set; } = LegacyPriority.Medium;
+
+	public Guid PriorityId { get; set; } = Guid.Empty;
 
 	/// <summary>Legacy enum status. Kept for one-time migration of pre-v1.3 data; not authoritative — use <see cref="StatusId"/>.</summary>
 	public TodoItemStatus Status { get; set; } = TodoItemStatus.None;

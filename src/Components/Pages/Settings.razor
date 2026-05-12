@@ -118,6 +118,29 @@
 		</div>
 	</div>
 
+	<!-- Priorities -->
+	<div class="settings-card">
+		<div class="settings-card-header">
+			<div class="settings-card-icon">
+				<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+					<path d="M4 22V4M4 4l8 4-8 4M4 14l12 4-12 4"/>
+				</svg>
+			</div>
+			<div>
+				<h2 class="settings-card-title">Priorities</h2>
+				<p class="settings-card-description">Add custom priorities or rename, recolor, and reorder the built-in ones used to rank todos.</p>
+			</div>
+		</div>
+		<div class="settings-card-actions">
+			<button class="btn btn-outline-secondary" @onclick="ShowPriorityModal">
+				<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+					<path d="M4 22V4M4 4l8 4-8 4M4 14l12 4-12 4"/>
+				</svg>
+				Manage Priorities
+			</button>
+		</div>
+	</div>
+
 	<!-- Filter Presets -->
 	<div class="settings-card">
 		<div class="settings-card-header">
@@ -180,6 +203,8 @@
 <TagsModal IsVisible="@_showTagsModal" OnClose="HideTagsModal" />
 
 <StatusManagementModal IsVisible="@_showStatusModal" OnClose="HideStatusModal" />
+
+<PriorityManagementModal IsVisible="@_showPriorityModal" OnClose="HidePriorityModal" />
 
 <style>
 	.settings-sections {
@@ -298,6 +323,7 @@
 	private bool _showSyncModal;
 	private bool _showTagsModal;
 	private bool _showStatusModal;
+	private bool _showPriorityModal;
 	private ImportExportModal? _importExportModal;
 
 	protected override void OnInitialized()
@@ -326,6 +352,8 @@
 	private void HideTagsModal() => _showTagsModal = false;
 	private void ShowStatusModal() => _showStatusModal = true;
 	private void HideStatusModal() => _showStatusModal = false;
+	private void ShowPriorityModal() => _showPriorityModal = true;
+	private void HidePriorityModal() => _showPriorityModal = false;
 
 	private async Task HandleExport()
 	{

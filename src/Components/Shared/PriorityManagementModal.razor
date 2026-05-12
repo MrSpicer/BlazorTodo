@@ -1,0 +1,404 @@
+@using System.ComponentModel.DataAnnotations
+@using TodoList.Helpers
+@using TodoList.Models
+@implements IDisposable
+@inject IPriorityService PriorityService
+@inject IDialogService DialogService
+
+@if (IsVisible)
+{
+	<div class="modal-overlay" @onclick="Close">
+		<div class="modal-container statuses-modal-container"
+		     role="dialog"
+		     aria-modal="true"
+		     aria-labelledby="priorities-modal-title"
+		     @onclick:stopPropagation="true">
+			<div class="modal-header">
+				<h2 class="modal-title" id="priorities-modal-title">
+					<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+						<path d="M4 22V4M4 4l8 4-8 4M4 14l12 4-12 4"/>
+					</svg>
+					<span>Priorities</span>
+				</h2>
+				<button class="modal-close" @onclick="Close" aria-label="Close">
+					<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+						<path d="M18 6L6 18M6 6l12 12"/>
+					</svg>
+				</button>
+			</div>
+
+			<div class="modal-body">
+				<EditForm Model="@_createForm" OnValidSubmit="HandleCreate">
+					<DataAnnotationsValidator />
+					<div class="status-create-block">
+						<div class="status-create-row">
+							<InputText class="form-input status-create-input"
+							           @bind-Value="_createForm.Name"
+							           placeholder="New priority name..."
+							           data-testid="priority-create-input" />
+							<button type="submit" class="btn btn-primary" data-testid="priority-create-submit">
+								<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+									<path d="M12 5v14M5 12h14"/>
+								</svg>
+								<span>Add</span>
+							</button>
+						</div>
+						<div class="status-create-row">
+							<label class="color-input-label">
+								<span class="color-input-text">Color</span>
+								<input type="color"
+								       class="color-input"
+								       value="@_createForm.Color"
+								       @onchange="e => _createForm.Color = NormalizeHex(e.Value?.ToString())"
+								       aria-label="Priority color"
+								       data-testid="priority-create-color" />
+								<span class="color-input-preview" style="background-color:@_createForm.Color" aria-hidden="true"></span>
+							</label>
+							<label class="rank-input-label">
+								<span class="color-input-text">Rank</span>
+								<InputNumber class="form-input rank-input"
+								             @bind-Value="_createForm.Rank"
+								             data-testid="priority-create-rank" />
+							</label>
+						</div>
+						<ValidationMessage For="@(() => _createForm.Name)" class="validation-error" />
+					</div>
+				</EditForm>
+
+				@if (!string.IsNullOrEmpty(_bannerMessage))
+				{
+					<div class="status-banner @(_bannerIsError ? "status-banner-error" : "status-banner-info")" data-testid="priority-banner">
+						<span>@_bannerMessage</span>
+						<button type="button" class="status-banner-dismiss" @onclick="() => _bannerMessage = null" aria-label="Dismiss">
+							<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+								<path d="M18 6L6 18M6 6l12 12"/>
+							</svg>
+						</button>
+					</div>
+				}
+
+				<ul class="status-list" data-testid="priority-list">
+					@foreach (var priority in OrderedPriorities)
+					{
+						var pid = priority.Id;
+						var count = _usageCounts.TryGetValue(pid, out var c) ? c : 0;
+						<li class="status-row" @key="pid" data-testid="priority-row">
+							@if (_editingId == pid)
+							{
+								<div class="status-edit-block">
+									<div class="status-edit-row">
+										<input type="text"
+										       class="form-input status-name-input"
+										       value="@_editBuffer.Name"
+										       @oninput="e => _editBuffer.Name = e.Value?.ToString() ?? string.Empty"
+										       @onkeydown="e => OnEditKeyDown(e, priority)"
+										       @ref="_editInputRef"
+										       data-testid="priority-edit-name" />
+									</div>
+									<div class="status-edit-row">
+										<label class="color-input-label">
+											<span class="color-input-text">Color</span>
+											<input type="color"
+											       class="color-input"
+											       value="@_editBuffer.Color"
+											       @onchange="e => _editBuffer.Color = NormalizeHex(e.Value?.ToString())"
+											       aria-label="Priority color"
+											       data-testid="priority-edit-color" />
+											<span class="color-input-preview" style="background-color:@_editBuffer.Color" aria-hidden="true"></span>
+										</label>
+										<label class="rank-input-label">
+											<span class="color-input-text">Rank</span>
+											<InputNumber class="form-input rank-input"
+											             @bind-Value="_editBuffer.Rank"
+											             data-testid="priority-edit-rank" />
+										</label>
+									</div>
+									<div class="status-edit-actions">
+										<button class="status-action-btn primary"
+										        @onclick="() => SaveEdit(priority)"
+										        title="Save"
+										        aria-label="Save changes"
+										        data-testid="priority-edit-save">
+											<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+												<path d="M5 12l5 5L20 7"/>
+											</svg>
+										</button>
+										<button class="status-action-btn"
+										        @onclick="CancelEdit"
+										        title="Cancel"
+										        aria-label="Cancel edit"
+										        data-testid="priority-edit-cancel">
+											<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+												<path d="M18 6L6 18M6 6l12 12"/>
+											</svg>
+										</button>
+									</div>
+								</div>
+							}
+							else
+							{
+								var (rowBg, rowFg) = StatusColor.Resolve(priority.Color);
+								<span class="status-badge" style="background-color:@rowBg;color:@rowFg">@priority.Name</span>
+								@if (priority.IsBuiltIn)
+								{
+									<span class="status-built-in" title="Built-in priority — cannot be deleted">built-in</span>
+								}
+								<span class="status-count">rank @priority.Rank</span>
+								<span class="status-count">@count used</span>
+								<div class="status-actions">
+									<button class="status-action-btn"
+									        @onclick="() => StartEdit(priority)"
+									        title="Edit priority"
+									        aria-label="Edit priority @priority.Name"
+									        data-testid="priority-edit-btn">
+										<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+											<path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+											<path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+										</svg>
+									</button>
+									<button class="status-action-btn danger"
+									        @onclick="() => HandleDelete(priority)"
+									        title="@(priority.IsBuiltIn ? "Built-in priorities cannot be deleted" : "Delete priority")"
+									        aria-label="Delete priority @priority.Name"
+									        disabled="@priority.IsBuiltIn"
+									        data-testid="priority-delete-btn">
+										<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+											<path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+										</svg>
+									</button>
+								</div>
+							}
+						</li>
+					}
+				</ul>
+			</div>
+
+			<div class="modal-footer">
+				<button type="button" class="btn btn-ghost" @onclick="Close">Close</button>
+			</div>
+		</div>
+	</div>
+}
+
+<style>
+	.rank-input-label {
+		display: inline-flex;
+		align-items: center;
+		gap: var(--space-2);
+		font-size: 0.8125rem;
+		color: var(--text-secondary);
+	}
+
+	.rank-input {
+		width: 72px;
+		padding: var(--space-1) var(--space-2);
+	}
+</style>
+
+@code {
+	[Parameter]
+	public bool IsVisible { get; set; }
+
+	[Parameter]
+	public EventCallback OnClose { get; set; }
+
+	private class PriorityForm
+	{
+		[Required(ErrorMessage = "Name is required")]
+		[StringLength(40, MinimumLength = 1, ErrorMessage = "Name must be 1-40 characters")]
+		public string Name { get; set; } = string.Empty;
+
+		public string Color { get; set; } = StatusColor.Default;
+		public int Rank { get; set; }
+	}
+
+	private static string NormalizeHex(string? raw)
+	{
+		if (string.IsNullOrWhiteSpace(raw))
+			return StatusColor.Default;
+		var trimmed = raw.Trim();
+		return StatusColor.IsHex(trimmed) ? trimmed.ToLowerInvariant() : StatusColor.Default;
+	}
+
+	private PriorityForm _createForm = new();
+	private Guid? _editingId;
+	private PriorityForm _editBuffer = new();
+	private string? _bannerMessage;
+	private bool _bannerIsError;
+	private Dictionary<Guid, int> _usageCounts = new();
+	private bool _wasVisible;
+	private ElementReference _editInputRef;
+	private bool _focusEditInput;
+
+	private IEnumerable<Priority> OrderedPriorities =>
+		PriorityService.Priorities
+			.OrderBy(p => p.Rank)
+			.ThenBy(p => p.Name, StringComparer.OrdinalIgnoreCase);
+
+	protected override void OnInitialized()
+	{
+		PriorityService.OnPrioritiesChanged += HandlePrioritiesChanged;
+	}
+
+	protected override async Task OnParametersSetAsync()
+	{
+		if (IsVisible && !_wasVisible)
+		{
+			_createForm = new PriorityForm { Rank = NextRank() };
+			_editingId = null;
+			_bannerMessage = null;
+			await PriorityService.InitializeAsync();
+			await RefreshUsageCounts();
+		}
+		_wasVisible = IsVisible;
+	}
+
+	protected override async Task OnAfterRenderAsync(bool firstRender)
+	{
+		if (_focusEditInput)
+		{
+			_focusEditInput = false;
+			try { await _editInputRef.FocusAsync(); } catch { }
+		}
+	}
+
+	private int NextRank()
+	{
+		var max = PriorityService.Priorities.Select(p => p.Rank).DefaultIfEmpty(0).Max();
+		return max + 1;
+	}
+
+	private void HandlePrioritiesChanged()
+	{
+		_ = InvokeAsync(async () =>
+		{
+			await RefreshUsageCounts();
+			StateHasChanged();
+		});
+	}
+
+	private async Task RefreshUsageCounts()
+	{
+		var fresh = new Dictionary<Guid, int>();
+		foreach (var priority in PriorityService.Priorities)
+			fresh[priority.Id] = await PriorityService.GetUsageCountAsync(priority.Id);
+		_usageCounts = fresh;
+	}
+
+	private async Task HandleCreate()
+	{
+		var name = (_createForm.Name ?? string.Empty).Trim();
+		if (string.IsNullOrEmpty(name))
+			return;
+
+		var priority = new Priority
+		{
+			Id = Guid.NewGuid(),
+			Name = name,
+			Color = _createForm.Color,
+			Rank = _createForm.Rank,
+			IsBuiltIn = false,
+		};
+
+		var ok = await PriorityService.AddAsync(priority);
+		if (!ok)
+		{
+			ShowBanner($"A priority named '{name}' already exists.", isError: true);
+			return;
+		}
+
+		_createForm = new PriorityForm { Rank = NextRank() };
+		_bannerMessage = null;
+	}
+
+	private void StartEdit(Priority priority)
+	{
+		_editingId = priority.Id;
+		_editBuffer = new PriorityForm
+		{
+			Name = priority.Name,
+			Color = StatusColor.NormalizeBackground(priority.Color),
+			Rank = priority.Rank,
+		};
+		_bannerMessage = null;
+		_focusEditInput = true;
+	}
+
+	private void CancelEdit()
+	{
+		_editingId = null;
+		_editBuffer = new PriorityForm();
+	}
+
+	private async Task SaveEdit(Priority original)
+	{
+		var name = (_editBuffer.Name ?? string.Empty).Trim();
+		if (string.IsNullOrEmpty(name))
+		{
+			ShowBanner("Priority name cannot be empty.", isError: true);
+			return;
+		}
+
+		var updated = new Priority
+		{
+			Id = original.Id,
+			Name = name,
+			Color = string.IsNullOrEmpty(_editBuffer.Color) ? original.Color : _editBuffer.Color,
+			Rank = _editBuffer.Rank,
+			IsBuiltIn = original.IsBuiltIn,
+		};
+
+		var ok = await PriorityService.UpdateAsync(updated);
+		if (!ok)
+		{
+			ShowBanner($"A priority named '{name}' already exists.", isError: true);
+			return;
+		}
+
+		_editingId = null;
+		_editBuffer = new PriorityForm();
+	}
+
+	private async Task OnEditKeyDown(KeyboardEventArgs e, Priority priority)
+	{
+		if (e.Key == "Enter")
+			await SaveEdit(priority);
+		else if (e.Key == "Escape")
+			CancelEdit();
+	}
+
+	private async Task HandleDelete(Priority priority)
+	{
+		if (priority.IsBuiltIn)
+			return;
+
+		var count = _usageCounts.TryGetValue(priority.Id, out var c) ? c : 0;
+		var prompt = count > 0
+			? $"'{priority.Name}' is used on {count} todo{(count == 1 ? "" : "s")}. Deleting it will reset those todos to 'Medium'. Continue?"
+			: $"Delete priority '{priority.Name}'?";
+
+		var confirmed = await DialogService.ConfirmAsync(prompt);
+		if (!confirmed)
+			return;
+
+		await PriorityService.DeleteAsync(priority);
+		if (_editingId == priority.Id)
+			CancelEdit();
+	}
+
+	private void ShowBanner(string message, bool isError)
+	{
+		_bannerMessage = message;
+		_bannerIsError = isError;
+	}
+
+	private async Task Close()
+	{
+		await OnClose.InvokeAsync();
+	}
+
+	public void Dispose()
+	{
+		PriorityService.OnPrioritiesChanged -= HandlePrioritiesChanged;
+	}
+}

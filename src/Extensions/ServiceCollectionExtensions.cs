@@ -20,6 +20,8 @@ public static class ServiceCollectionExtensions
         services.AddScoped<ITagService, TagService>();
         services.AddScoped<IStatusRepository, StatusRepository>();
         services.AddScoped<IStatusService, StatusService>();
+        services.AddScoped<IPriorityRepository, PriorityRepository>();
+        services.AddScoped<IPriorityService, PriorityService>();
         services.AddScoped<IChangeLogFormatter, ChangeLogFormatter>();
         services.AddScoped<ITodoService, TodoService>();
         services.AddScoped<INoteService, NoteService>();

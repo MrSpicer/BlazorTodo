@@ -13,9 +13,9 @@ public class TodoFilterCriteria
 	public string SearchText { get; set; } = string.Empty;
 
 	/// <summary>
-	/// Selected priorities to filter by. Empty list means no priority filtering.
+	/// Selected priority ids to filter by. Empty list means no priority filtering.
 	/// </summary>
-	public List<Priority> SelectedPriorities { get; set; } = new();
+	public List<Guid> SelectedPriorities { get; set; } = new();
 
 	/// <summary>
 	/// Selected status ids to filter by. Empty list means no status filtering.
@@ -72,14 +72,14 @@ public class TodoFilterCriteria
 	}
 
 	/// <summary>
-	/// Toggles a priority in the selected priorities list.
+	/// Toggles a priority id in the selected priorities list.
 	/// </summary>
-	public void TogglePriority(Priority priority)
+	public void TogglePriority(Guid priorityId)
 	{
-		if (SelectedPriorities.Contains(priority))
-			SelectedPriorities.Remove(priority);
+		if (SelectedPriorities.Contains(priorityId))
+			SelectedPriorities.Remove(priorityId);
 		else
-			SelectedPriorities.Add(priority);
+			SelectedPriorities.Add(priorityId);
 	}
 
 	/// <summary>

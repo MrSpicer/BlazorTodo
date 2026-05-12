@@ -30,10 +30,11 @@ public class AppDataSerializer
 public class AppDataDocument
 {
 	public DateTime ExportedAt { get; set; }
-	public string Version { get; set; } = "1.3";
+	public string Version { get; set; } = "1.4";
 	public List<Project> Projects { get; set; } = new();
 	public List<TodoItem> Todos { get; set; } = new();
 	public List<ProjectNote> Notes { get; set; } = new();
 	public List<Tag> Tags { get; set; } = new();
 	public List<Status> Statuses { get; set; } = new();
+	public List<Priority> Priorities { get; set; } = new();
 }

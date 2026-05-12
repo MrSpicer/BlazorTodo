@@ -1,6 +1,8 @@
 @using TodoList.Models
-@using TodoList.Models.Enums
+@using TodoList.Helpers
 @using Microsoft.AspNetCore.Components.Forms
+@implements IDisposable
+@inject IPriorityService PriorityService
 
 @if (ShowCard)
 {
@@ -90,14 +92,17 @@ else
             <div class="form-group">
                 <label class="form-label">Priority</label>
                 <div class="priority-options">
-                    @foreach (var priority in Enum.GetValues<Priority>())
+                    @foreach (var priority in PriorityService.Priorities.OrderBy(p => p.Rank))
                     {
-                        <label class="priority-option @(Todo.Priority == priority ? "selected" : "") priority-@priority.ToString().ToLower()">
-                            <input type="radio" name="priority" value="@priority" 
-                                   checked="@(Todo.Priority == priority)"
-                                   @onchange="() => Todo.Priority = priority" />
-                            <span class="priority-dot"></span>
-                            <span class="priority-label">@priority</span>
+                        var isSelected = Todo.PriorityId == priority.Id;
+                        var (bg, fg) = StatusColor.Resolve(priority.Color);
+                        <label class="priority-option @(isSelected ? "selected" : "")"
+                               style="@(isSelected ? $"background:{bg};border-color:{priority.Color};color:{fg};" : "")">
+                            <input type="radio" name="priority" value="@priority.Id"
+                                   checked="@isSelected"
+                                   @onchange="() => Todo.PriorityId = priority.Id" />
+                            <span class="priority-dot" style="background-color:@priority.Color"></span>
+                            <span class="priority-label">@priority.Name</span>
                         </label>
                     }
                 </div>
@@ -259,32 +264,6 @@ else
                 border-radius: var(--radius-full);
             }
             
-            .priority-low .priority-dot { background: var(--priority-low); }
-            .priority-medium .priority-dot { background: var(--priority-medium); }
-            .priority-high .priority-dot { background: var(--priority-high); }
-            .priority-emergency .priority-dot { background: var(--priority-emergency); }
-            
-            .priority-option.selected.priority-low { 
-                background: var(--success-light); 
-                border-color: var(--priority-low); 
-                color: #065f46;
-            }
-            .priority-option.selected.priority-medium { 
-                background: var(--warning-light); 
-                border-color: var(--priority-medium); 
-                color: #92400e;
-            }
-            .priority-option.selected.priority-high { 
-                background: #ffedd5; 
-                border-color: var(--priority-high); 
-                color: #c2410c;
-            }
-            .priority-option.selected.priority-emergency { 
-                background: var(--danger-light); 
-                border-color: var(--priority-emergency); 
-                color: #991b1b;
-            }
-            
             .form-actions {
                 display: flex;
                 justify-content: flex-end;
@@ -316,6 +295,22 @@ else
             }
         </style>
     };
+
+    protected override void OnInitialized()
+    {
+        PriorityService.OnPrioritiesChanged += StateHasChanged;
+    }
+
+    protected override void OnParametersSet()
+    {
+        if (Todo.PriorityId == Guid.Empty)
+            Todo.PriorityId = BuiltInPriorityIds.Medium;
+    }
+
+    public void Dispose()
+    {
+        PriorityService.OnPrioritiesChanged -= StateHasChanged;
+    }
 
     private async Task HandleValidSubmit()
     {

@@ -9,6 +9,7 @@ public class TodoService : EntityServiceBase<TodoItem>, ITodoService
 	private readonly ITodoRepository _todoRepository;
 	private readonly IChangeLogFormatter _formatter;
 	private readonly IStatusService _statusService;
+	private readonly IPriorityService _priorityService;
 
 	public event Action? OnTodosChanged
 	{
@@ -22,12 +23,14 @@ public class TodoService : EntityServiceBase<TodoItem>, ITodoService
 		ITodoRepository repository,
 		IChangeLogFormatter formatter,
 		IStatusService statusService,
+		IPriorityService priorityService,
 		ILogger<TodoService> logger)
 		: base((IRepository<TodoItem>)repository, logger)
 	{
 		_todoRepository = repository;
 		_formatter = formatter;
 		_statusService = statusService;
+		_priorityService = priorityService;
 	}
 
 	public override async Task InitializeAsync()
@@ -35,6 +38,7 @@ public class TodoService : EntityServiceBase<TodoItem>, ITodoService
 		await Repository.InitializeAsync();
 		_items = await Repository.GetAll();
 		await MigrateStatusIdsAsync();
+		await MigratePriorityIdsAsync();
 		await ResetStaleTodosAsync();
 		NotifyChanged();
 	}
@@ -55,6 +59,26 @@ public class TodoService : EntityServiceBase<TodoItem>, ITodoService
 			if (t.StatusId != Guid.Empty)
 				return false;
 			t.StatusId = BuiltInStatusIds.FromLegacyEnum((int)t.Status);
+			return true;
+		}
+	}
+
+	private async Task MigratePriorityIdsAsync()
+	{
+		foreach (var todo in _items)
+		{
+			var changed = TryFillPriorityId(todo);
+			foreach (var sub in todo.SubTasks)
+				changed |= TryFillPriorityId(sub);
+			if (changed)
+				await Repository.AddOrUpdate(todo);
+		}
+
+		static bool TryFillPriorityId(TodoItem t)
+		{
+			if (t.PriorityId != Guid.Empty)
+				return false;
+			t.PriorityId = BuiltInPriorityIds.FromLegacyEnum((int)t.Priority);
 			return true;
 		}
 	}
@@ -94,6 +118,9 @@ public class TodoService : EntityServiceBase<TodoItem>, ITodoService
 
 		if ((todo.StatusId == Guid.Empty || todo.StatusId == BuiltInStatusIds.None) && !existed)
 			todo.StatusId = BuiltInStatusIds.New;
+
+		if (todo.PriorityId == Guid.Empty)
+			todo.PriorityId = BuiltInPriorityIds.FromLegacyEnum((int)todo.Priority);
 
 		if (!existed)
 		{
@@ -260,7 +287,7 @@ public class TodoService : EntityServiceBase<TodoItem>, ITodoService
 
 		return sort switch
 		{
-			SortOption.Priority => filtered.OrderByDescending(t => t.Priority),
+			SortOption.Priority => filtered.OrderByDescending(t => PriorityRank(t.PriorityId)),
 			SortOption.Status => filtered.OrderBy(t => StatusRank(t.StatusId)),
 			_ => filtered.OrderByDescending(t => t.CreatedAt)
 		};
@@ -282,7 +309,7 @@ public class TodoService : EntityServiceBase<TodoItem>, ITodoService
 		}
 
 		if (criteria.SelectedPriorities.Any())
-			filtered = filtered.Where(t => criteria.SelectedPriorities.Contains(t.Priority));
+			filtered = filtered.Where(t => criteria.SelectedPriorities.Contains(t.PriorityId));
 
 		if (criteria.SelectedStatuses.Any())
 			filtered = filtered.Where(t => criteria.SelectedStatuses.Contains(t.StatusId));
@@ -298,7 +325,7 @@ public class TodoService : EntityServiceBase<TodoItem>, ITodoService
 	private IOrderedEnumerable<TodoItem> ApplyFirstSort(IEnumerable<TodoItem> source, SortCriterion c) =>
 		c.Option switch
 		{
-			SortOption.Priority => c.Descending ? source.OrderByDescending(t => t.Priority) : source.OrderBy(t => t.Priority),
+			SortOption.Priority => c.Descending ? source.OrderByDescending(t => PriorityRank(t.PriorityId)) : source.OrderBy(t => PriorityRank(t.PriorityId)),
 			SortOption.Status   => c.Descending ? source.OrderByDescending(t => StatusRank(t.StatusId)) : source.OrderBy(t => StatusRank(t.StatusId)),
 			_                   => c.Descending ? source.OrderByDescending(t => t.CreatedAt) : source.OrderBy(t => t.CreatedAt),
 		};
@@ -306,7 +333,7 @@ public class TodoService : EntityServiceBase<TodoItem>, ITodoService
 	private IOrderedEnumerable<TodoItem> ApplyThenSort(IOrderedEnumerable<TodoItem> source, SortCriterion c) =>
 		c.Option switch
 		{
-			SortOption.Priority => c.Descending ? source.ThenByDescending(t => t.Priority) : source.ThenBy(t => t.Priority),
+			SortOption.Priority => c.Descending ? source.ThenByDescending(t => PriorityRank(t.PriorityId)) : source.ThenBy(t => PriorityRank(t.PriorityId)),
 			SortOption.Status   => c.Descending ? source.ThenByDescending(t => StatusRank(t.StatusId)) : source.ThenBy(t => StatusRank(t.StatusId)),
 			_                   => c.Descending ? source.ThenByDescending(t => t.CreatedAt) : source.ThenBy(t => t.CreatedAt),
 		};
@@ -322,6 +349,15 @@ public class TodoService : EntityServiceBase<TodoItem>, ITodoService
 			.ToList();
 		var idx = customs.FindIndex(s => s.Id == id);
 		return idx >= 0 ? 1000 + idx : int.MaxValue;
+	}
+
+	private int PriorityRank(Guid id)
+	{
+		var p = _priorityService.GetById(id);
+		if (p is null)
+			return int.MinValue;
+		// Higher Rank = more important. Builtin natural order falls back via Rank.
+		return p.Rank;
 	}
 
 	public int GetActiveCount(Guid? projectId = null)
@@ -348,8 +384,8 @@ public class TodoService : EntityServiceBase<TodoItem>, ITodoService
 		if (!string.Equals(oldItem.Description, newItem.Description, StringComparison.Ordinal))
 			yield return Entry("Description", oldItem.Description, newItem.Description);
 
-		if (oldItem.Priority != newItem.Priority)
-			yield return Entry("Priority", oldItem.Priority.ToString(), newItem.Priority.ToString());
+		if (oldItem.PriorityId != newItem.PriorityId)
+			yield return Entry("Priority", _formatter.PriorityName(oldItem.PriorityId), _formatter.PriorityName(newItem.PriorityId));
 
 		if (oldItem.StatusId != newItem.StatusId)
 			yield return Entry("Status", StatusName(oldItem.StatusId), StatusName(newItem.StatusId));

@@ -1,7 +1,9 @@
 @using TodoList.Models
 @using TodoList.Models.Enums
+@using TodoList.Helpers
 @implements IDisposable
 @inject IStatusService StatusService
+@inject IPriorityService PriorityService
 @inject IFilterPresetService PresetService
 @inject IDialogService DialogService
 
@@ -105,13 +107,16 @@
                 <div class="filter-group">
                     <span class="filter-group-label">Priority</span>
                     <div class="filter-chips">
-                        @foreach (Priority priority in Enum.GetValues(typeof(Priority)))
+                        @foreach (var priority in PriorityService.Priorities.OrderBy(p => p.Rank))
                         {
-                            var isSelected = FilterCriteria.SelectedPriorities.Contains(priority);
-                            <button class="filter-chip priority-@priority.ToString().ToLower() @(isSelected ? "selected" : "")"
-                                    @onclick="() => OnPriorityToggle(priority)">
-                                <span class="chip-dot"></span>
-                                @priority
+                            var isSelected = FilterCriteria.SelectedPriorities.Contains(priority.Id);
+                            var pid = priority.Id;
+                            var (selBg, selFg) = StatusColor.Resolve(priority.Color);
+                            <button class="filter-chip @(isSelected ? "selected" : "")"
+                                    style="@(isSelected ? $"background:{selBg};border-color:{priority.Color};color:{selFg};" : "")"
+                                    @onclick="() => OnPriorityToggle(pid)">
+                                <span class="chip-dot" style="background-color:@priority.Color"></span>
+                                @priority.Name
                             </button>
                         }
                     </div>
@@ -450,16 +455,6 @@
         border-radius: var(--radius-full);
     }
     
-    .priority-low .chip-dot { background: var(--priority-low); }
-    .priority-medium .chip-dot { background: var(--priority-medium); }
-    .priority-high .chip-dot { background: var(--priority-high); }
-    .priority-emergency .chip-dot { background: var(--priority-emergency); }
-    
-    .priority-low.selected { background: var(--success-light); border-color: var(--priority-low); color: #065f46; }
-    .priority-medium.selected { background: var(--warning-light); border-color: var(--priority-medium); color: #92400e; }
-    .priority-high.selected { background: #ffedd5; border-color: var(--priority-high); color: #c2410c; }
-    .priority-emergency.selected { background: var(--danger-light); border-color: var(--priority-emergency); color: #991b1b; }
-    
     .sort-group { min-width: 180px; }
 
     .sort-criteria-list {
@@ -662,9 +657,9 @@
         await FilterChanged.InvokeAsync();
     }
 
-    private async Task OnPriorityToggle(Priority priority)
+    private async Task OnPriorityToggle(Guid priorityId)
     {
-        FilterCriteria.TogglePriority(priority);
+        FilterCriteria.TogglePriority(priorityId);
         await FilterChanged.InvokeAsync();
     }
 
@@ -677,12 +672,14 @@
     protected override void OnInitialized()
     {
         StatusService.OnStatusesChanged += StateHasChanged;
+        PriorityService.OnPrioritiesChanged += StateHasChanged;
         PresetService.OnPresetsChanged += StateHasChanged;
     }
 
     public void Dispose()
     {
         StatusService.OnStatusesChanged -= StateHasChanged;
+        PriorityService.OnPrioritiesChanged -= StateHasChanged;
         PresetService.OnPresetsChanged -= StateHasChanged;
     }
 

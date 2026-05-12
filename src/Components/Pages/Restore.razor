@@ -6,6 +6,7 @@
 @inject IProjectService ProjectService
 @inject ITagService TagService
 @inject IStatusService StatusService
+@inject IPriorityService PriorityService
 @inject NavigationManager NavigationManager
 @inject ILocalStorageService LocalStorage
 
@@ -87,6 +88,7 @@
 		await ProjectService.InitializeAsync();
 		await TagService.InitializeAsync();
 		await StatusService.InitializeAsync();
+		await PriorityService.InitializeAsync();
 		await TodoService.InitializeAsync();
 
 		var result = await SyncService.RestoreFromServerAsync(SessionId);

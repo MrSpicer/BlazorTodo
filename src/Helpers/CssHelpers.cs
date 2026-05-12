@@ -1,5 +1,4 @@
 using TodoList.Models;
-using TodoList.Models.Enums;
 
 namespace TodoList.Helpers;
 
@@ -8,18 +7,6 @@ namespace TodoList.Helpers;
 /// </summary>
 public static class CssHelpers
 {
-    /// <summary>
-    /// Gets the Bootstrap badge class for a priority level.
-    /// </summary>
-    public static string GetPriorityBadgeClass(Priority priority) => priority switch
-    {
-        Priority.Low => "bg-secondary",
-        Priority.Medium => "bg-primary",
-        Priority.High => "bg-warning text-dark",
-        Priority.Emergency => "bg-danger",
-        _ => "bg-secondary"
-    };
-
     /// <summary>
     /// Gets the Bootstrap list-group-item class for a status id (built-ins only; custom statuses get neutral styling).
     /// </summary>
