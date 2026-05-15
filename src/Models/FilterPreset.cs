@@ -14,6 +14,9 @@ public record FilterPreset(
 {
 	public const string DefaultName = "Default";
 
+	public Guid Id { get; init; } = Guid.NewGuid();
+	public Guid UserId { get; init; } = Guid.Empty;
+
 	public static FilterPreset SystemDefault => new(
 		DefaultName,
 		string.Empty,

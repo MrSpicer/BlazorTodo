@@ -190,8 +190,6 @@ public class ImportExportService : IImportExportService
 			int imported = 0;
 			int skipped = 0;
 
-			var importedAt = DateTime.Now;
-
 			foreach (var todo in importData.Todos ?? new List<TodoItem>())
 			{
 				if (!replaceExisting && existingIds.Contains(todo.Id))
@@ -212,7 +210,6 @@ public class ImportExportService : IImportExportService
 				RemapTagIds(todo, tagIdRemap);
 				FillStatusId(todo, statusIdRemap);
 				FillPriorityId(todo, priorityIdRemap);
-				todo.LastSyncedAt = importedAt;
 
 				// Defensive flatten for legacy (≤ v1.4) exports — children arrive nested
 				// inside the parent. Hoist them to top-level rows with ParentId set.
@@ -238,7 +235,6 @@ public class ImportExportService : IImportExportService
 					RemapTagIds(sub, tagIdRemap);
 					FillStatusId(sub, statusIdRemap);
 					FillPriorityId(sub, priorityIdRemap);
-					sub.LastSyncedAt = importedAt;
 					await _todoService.SaveTodoAsync(sub);
 					imported++;
 				}

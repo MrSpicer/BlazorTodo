@@ -1,0 +1,47 @@
+@implements IAsyncDisposable
+@inject TodoList.Realtime.IUserChangeBus Bus
+@inject TodoList.Identity.ICurrentUserContext User
+@inject ITodoService TodoService
+@inject IProjectService ProjectService
+@inject INoteService NoteService
+
+@* Invisible component. Subscribes to the in-process change bus and refreshes
+   the current circuit's caches when a sibling circuit (same user, other device
+   or tab) commits a mutation. *@
+
+@code {
+	private Func<TodoList.Realtime.UserChangeEvent, Task>? _handler;
+
+	protected override void OnInitialized()
+	{
+		_handler = HandleAsync;
+		Bus.OnChange += _handler;
+	}
+
+	private async Task HandleAsync(TodoList.Realtime.UserChangeEvent ev)
+	{
+		// Filter: only react to events for our authenticated user.
+		if (!User.IsAuthenticated || ev.UserId != User.UserId)
+			return;
+
+		switch (ev.Kind)
+		{
+			case TodoList.Realtime.ChangeKind.Todos:
+				await TodoService.RefreshAsync();
+				break;
+			case TodoList.Realtime.ChangeKind.Projects:
+				await ProjectService.RefreshAsync();
+				break;
+			case TodoList.Realtime.ChangeKind.Notes:
+				await NoteService.RefreshAsync();
+				break;
+		}
+	}
+
+	public ValueTask DisposeAsync()
+	{
+		if (_handler is not null)
+			Bus.OnChange -= _handler;
+		return ValueTask.CompletedTask;
+	}
+}

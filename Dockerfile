@@ -1,33 +1,32 @@
-# Build stage
+# syntax=docker/dockerfile:1.7
+
+# ---- Build stage ------------------------------------------------------------
 FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
 WORKDIR /src
 
-# Copy project file and restore dependencies (layer caching optimization)
+# Restore first (layer cache hits when only source — not the csproj — changes).
 COPY src/TodoList.csproj .
 RUN dotnet restore TodoList.csproj
 
-# Copy source code and build
+# Build + publish.
 COPY src/ .
-ARG BUILD_CONFIGURATION=Release
-RUN dotnet build TodoList.csproj -c ${BUILD_CONFIGURATION} -o /app/build
-
-# Publish stage
-FROM build AS publish
 ARG BUILD_CONFIGURATION=Release
 RUN dotnet publish TodoList.csproj -c ${BUILD_CONFIGURATION} -o /app/publish /p:UseAppHost=false
 
-# Runtime stage
-FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS final
+# ---- Runtime stage ----------------------------------------------------------
+# Alpine variant — smaller image, faster pull. TLS is terminated at Cloudflare's
+# edge (see deploy/docker-stack.yml), so we serve plain HTTP internally.
+FROM mcr.microsoft.com/dotnet/aspnet:10.0-alpine AS final
 WORKDIR /app
 
-# Run as non-root user for security
+ENV ASPNETCORE_URLS=http://+:8080 \
+    DOTNET_RUNNING_IN_CONTAINER=true \
+    DOTNET_USE_POLLING_FILE_WATCHER=false
+
 USER $APP_UID
 
-# Copy published application
-COPY --from=publish /app/publish .
+COPY --from=build /app/publish .
 
-# Expose HTTP port (TLS should be handled at reverse proxy level)
 EXPOSE 8080
 
-# Set entry point
 ENTRYPOINT ["dotnet", "TodoList.dll"]
