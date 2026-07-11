@@ -1,0 +1,29 @@
+services:
+  postgres:
+    image: postgres:17-alpine
+    container_name: blazortodo-postgres
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_DB: todolist
+      POSTGRES_USER: todolist
+      POSTGRES_PASSWORD: dev-password
+    volumes:
+      - blazortodo_pg_data:/var/lib/postgresql/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U todolist -d todolist"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  mailhog:
+    image: mailhog/mailhog:latest
+    container_name: blazortodo-mailhog
+    ports:
+      - "1025:1025"   # SMTP
+      - "8025:8025"   # Web UI
+    restart: unless-stopped
+
+volumes:
+  blazortodo_pg_data:

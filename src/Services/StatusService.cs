@@ -37,14 +37,11 @@ public class StatusService : EntityServiceBase<Status>, IStatusService
 		var seeded = BuiltInStatusIds.Seed();
 		await MigrateLegacyColorsAsync(stored, seeded);
 
-		var missing = seeded.Where(s => stored.All(x => x.Id != s.Id)).ToList();
-		foreach (var s in missing)
-			await Repository.AddOrUpdate(s);
-
-		if (missing.Count > 0)
-			stored.AddRange(missing);
-
-		_items = stored;
+		// Built-ins live in-memory only (seeded from BuiltInStatusIds.Seed). Dedupe stored
+		// rows that share a built-in Id (legacy LocalStorage may have copies) so we don't
+		// show duplicates and so we don't try to re-persist built-ins to a per-user DB.
+		var customStored = stored.Where(s => !BuiltInStatusIds.IsBuiltIn(s.Id)).ToList();
+		_items = seeded.Concat(customStored).ToList();
 		_initialized = true;
 		NotifyChanged();
 	}
@@ -65,20 +62,11 @@ public class StatusService : EntityServiceBase<Status>, IStatusService
 			if (!legacy)
 				continue;
 
+			// Built-ins are filtered out before persistence anyway; only migrate customs.
 			if (BuiltInStatusIds.IsBuiltIn(s.Id))
-			{
-				var canonical = seeded.FirstOrDefault(x => x.Id == s.Id);
-				if (canonical != null)
-				{
-					s.Color = canonical.Color;
-					s.IsBuiltIn = true;
-				}
-			}
-			else
-			{
-				s.Color = MapLegacyColor(s.Color);
-			}
+				continue;
 
+			s.Color = MapLegacyColor(s.Color);
 			await Repository.AddOrUpdate(s);
 		}
 	}
@@ -146,9 +134,14 @@ public class StatusService : EntityServiceBase<Status>, IStatusService
 			status.IsBuiltIn = existing.IsBuiltIn;
 
 		status.Name = trimmed;
-		var ok = await Repository.AddOrUpdate(status);
-		if (!ok)
-			return false;
+
+		// Built-in statuses are in-memory only — apply edits to the local list but skip persistence.
+		if (!status.IsBuiltIn)
+		{
+			var ok = await Repository.AddOrUpdate(status);
+			if (!ok)
+				return false;
+		}
 
 		var index = _items.FindIndex(s => s.Id == status.Id);
 		if (index >= 0)
@@ -178,7 +171,7 @@ public class StatusService : EntityServiceBase<Status>, IStatusService
 		}
 
 		var deletedId = status.Id;
-		var now = DateTime.Now;
+		var now = DateTime.UtcNow;
 
 		await Repository.Delete(status);
 

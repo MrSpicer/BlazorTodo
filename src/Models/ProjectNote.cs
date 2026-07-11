@@ -5,6 +5,7 @@ namespace TodoList.Models;
 public class ProjectNote : IEntity, IProjectScoped
 {
 	public Guid Id { get; set; } = Guid.NewGuid();
+	public Guid UserId { get; set; } = Guid.Empty;
 	public Guid ProjectId { get; set; }
 
 	[Required(ErrorMessage = "Title is required")]
@@ -14,13 +15,9 @@ public class ProjectNote : IEntity, IProjectScoped
 	[StringLength(5000, ErrorMessage = "Content cannot exceed 5000 characters")]
 	public string Content { get; set; } = string.Empty;
 
-	public DateTime CreatedAt { get; set; } = DateTime.Now;
+	public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 
 	public DateTime? UpdatedAt { get; set; }
-
-	public DateTime? LastSyncedAt { get; set; }
-
-	public bool IsDirty => LastSyncedAt is null || (UpdatedAt.HasValue && UpdatedAt > LastSyncedAt);
 
 	public bool IsValid()
 	{

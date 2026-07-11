@@ -28,6 +28,11 @@ public interface IProjectService
     Task InitializeAsync();
 
     /// <summary>
+    /// Re-hydrates the in-memory list from the repository and raises OnProjectsChanged.
+    /// </summary>
+    Task RefreshAsync();
+
+    /// <summary>
     /// Saves a new or existing project.
     /// </summary>
     /// <param name="project">The project to save.</param>

@@ -24,6 +24,12 @@ public interface ITodoService
     Task InitializeAsync();
 
     /// <summary>
+    /// Re-hydrates the in-memory list from the repository and raises OnTodosChanged.
+    /// Used by the multi-device sync listener when another circuit signals a change.
+    /// </summary>
+    Task RefreshAsync();
+
+    /// <summary>
     /// Saves a new or existing todo item.
     /// </summary>
     /// <param name="todo">The todo item to save.</param>
@@ -88,12 +94,6 @@ public interface ITodoService
     /// </summary>
     /// <param name="projectId">The project ID.</param>
     Task DeleteTodosByProjectAsync(Guid projectId);
-
-    /// <summary>
-    /// Marks every todo as synced at the given timestamp.
-    /// Sets LastSyncedAt only — does not touch UpdatedAt.
-    /// </summary>
-    Task MarkAllSyncedAsync(DateTime syncedAt);
 
     /// <summary>
     /// Returns the children of a parent todo (todos whose <c>ParentId</c> matches),

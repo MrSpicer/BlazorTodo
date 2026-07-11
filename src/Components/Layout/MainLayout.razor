@@ -56,9 +56,26 @@
             @* <div class="header-tagline">
                 Organize your work, amplify your productivity
             </div> *@
+            <div class="header-auth ms-auto">
+                <AuthorizeView>
+                    <Authorized>
+                        <span class="me-2 text-truncate" style="max-width:180px;">@context.User.Identity?.Name</span>
+                        <form action="/Identity/Account/Logout" method="post" class="d-inline">
+                            <AntiforgeryToken />
+                            <button type="submit" class="btn btn-sm btn-outline-light">Log out</button>
+                        </form>
+                    </Authorized>
+                    <NotAuthorized>
+                        <a class="btn btn-sm btn-outline-light me-2" href="/Identity/Account/Login">Log in</a>
+                        <a class="btn btn-sm btn-light" href="/Identity/Account/Register">Sign up</a>
+                    </NotAuthorized>
+                </AuthorizeView>
+            </div>
         </div>
     </header>
     
+    <MultiDeviceSyncListener />
+
     <div class="app-body">
         <aside class="sidebar @(_isCollapsed ? "collapsed" : "") @(_isMobileOpen ? "mobile-open" : "")">
             <NavMenu IsCollapsed="@(_isMobileOpen ? false : _isCollapsed)" OnToggleSidebar="ToggleCollapse" />

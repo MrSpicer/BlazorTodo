@@ -1,0 +1,123 @@
+# Single stack file targeting both local Swarm and a single-node Swarm in production.
+# Environment-driven knobs:
+#   TAG                    image tag (default "latest")
+#   ASPNETCORE_ENVIRONMENT "Development" or "Production"
+#   EMAIL_PROVIDER         "mailhog" (dev) or "smtp"/"resend" (prod)
+#   LOCAL_APP_PORT         dev only; e.g. 8080. Leave 0 in prod (cloudflared handles ingress).
+#   LOCAL_MAILHOG_PORT     dev only; e.g. 8025. Leave 0 in prod.
+#   MAILHOG_REPLICAS       1 in dev, 0 in prod.
+#   CLOUDFLARED_REPLICAS   0 in dev, 1 in prod.
+#
+# Required secrets (created with `docker secret create`):
+#   db_password, identity_signing_key, cloudflared_token
+#   resend_api_key (only meaningful in prod with EMAIL_PROVIDER=resend)
+
+services:
+  app:
+    image: blazortodo:${TAG:-latest}
+    networks: [internal]
+    secrets:
+      - db_password
+      - resend_api_key
+      - identity_signing_key
+    volumes:
+      # Persists the Data Protection key ring so auth cookies + antiforgery tokens survive
+      # container restarts/redeploys. Path matches DataProtection__KeysDirectory below.
+      - dataprotection_keys:/keys
+    environment:
+      ASPNETCORE_ENVIRONMENT: ${ASPNETCORE_ENVIRONMENT:-Production}
+      ASPNETCORE_URLS: http://+:8080
+      DisableHttpsRedirect: "true"
+      DataProtection__KeysDirectory: /keys
+      # Restrict to the real public hostname(s) to block Host-header injection (poisoned
+      # links in confirmation/reset emails). Set at deploy time via APP_ALLOWED_HOSTS, e.g.
+      # "todo.example.com" (comma-separate multiples). deploy-prod.sh *requires* it; the
+      # "*" fallback here only applies to the local-swarm dev path (deploy-local.sh).
+      AllowedHosts: ${APP_ALLOWED_HOSTS:-*}
+      # The connection string is composed at runtime by the app from these parts; the
+      # password file is mounted under /run/secrets. The simplest path is to inject
+      # the full string here with the password inlined from the secret at deploy time.
+      # For now we rely on the secret being readable by the app (volume-mounted) and
+      # have the connection string reference it as a file via the Npgsql `Passfile`
+      # option, or read it in Program.cs at startup. We default to the env-injected
+      # full string for dev simplicity; prod operators can swap to Passfile.
+      ConnectionStrings__Default: "Host=postgres;Port=5432;Database=todolist;Username=todolist;Password=${POSTGRES_PASSWORD:-dev-password}"
+      Email__Provider: ${EMAIL_PROVIDER:-smtp}
+      Email__Smtp__Host: ${EMAIL_SMTP_HOST:-mailhog}
+      Email__Smtp__Port: ${EMAIL_SMTP_PORT:-1025}
+      Email__FromAddress: ${EMAIL_FROM_ADDRESS:-noreply@blazortodo.local}
+      Email__FromName: ${EMAIL_FROM_NAME:-BlazorTodo}
+    ports:
+      - target: 8080
+        published: ${LOCAL_APP_PORT:-0}
+        protocol: tcp
+        mode: host
+    deploy:
+      replicas: 1
+      restart_policy:
+        condition: on-failure
+      update_config:
+        order: start-first
+      resources:
+        limits:
+          memory: 512M
+
+  postgres:
+    image: postgres:17-alpine
+    networks: [internal]
+    secrets:
+      - db_password
+    environment:
+      POSTGRES_DB: todolist
+      POSTGRES_USER: todolist
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-dev-password}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    deploy:
+      placement:
+        constraints:
+          - node.role == manager
+
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    networks: [internal]
+    secrets:
+      - cloudflared_token
+    entrypoint:
+      - /bin/sh
+      - -c
+      - 'cloudflared tunnel --no-autoupdate run --token "$$(cat /run/secrets/cloudflared_token)"'
+    deploy:
+      replicas: ${CLOUDFLARED_REPLICAS:-0}
+      restart_policy:
+        condition: any
+
+  mailhog:
+    image: mailhog/mailhog:latest
+    networks: [internal]
+    ports:
+      - target: 8025
+        published: ${LOCAL_MAILHOG_PORT:-0}
+        protocol: tcp
+        mode: host
+    deploy:
+      replicas: ${MAILHOG_REPLICAS:-0}
+
+networks:
+  internal:
+    driver: overlay
+    attachable: false
+
+volumes:
+  postgres_data: {}
+  dataprotection_keys: {}
+
+secrets:
+  db_password:
+    external: true
+  resend_api_key:
+    external: true
+  identity_signing_key:
+    external: true
+  cloudflared_token:
+    external: true

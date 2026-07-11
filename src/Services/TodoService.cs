@@ -1,6 +1,8 @@
 using TodoList.Data;
+using TodoList.Identity;
 using TodoList.Models;
 using TodoList.Models.Enums;
+using TodoList.Realtime;
 
 namespace TodoList.Services;
 
@@ -10,6 +12,8 @@ public class TodoService : EntityServiceBase<TodoItem>, ITodoService
 	private readonly IChangeLogFormatter _formatter;
 	private readonly IStatusService _statusService;
 	private readonly IPriorityService _priorityService;
+	private readonly IUserChangeBus _bus;
+	private readonly ICurrentUserContext _user;
 
 	public event Action? OnTodosChanged
 	{
@@ -24,6 +28,8 @@ public class TodoService : EntityServiceBase<TodoItem>, ITodoService
 		IChangeLogFormatter formatter,
 		IStatusService statusService,
 		IPriorityService priorityService,
+		IUserChangeBus bus,
+		ICurrentUserContext user,
 		ILogger<TodoService> logger)
 		: base((IRepository<TodoItem>)repository, logger)
 	{
@@ -31,6 +37,20 @@ public class TodoService : EntityServiceBase<TodoItem>, ITodoService
 		_formatter = formatter;
 		_statusService = statusService;
 		_priorityService = priorityService;
+		_bus = bus;
+		_user = user;
+	}
+
+	public async Task RefreshAsync()
+	{
+		_items = await Repository.GetAll();
+		NotifyChanged();
+	}
+
+	private Task PublishChange()
+	{
+		if (!_user.IsAuthenticated) return Task.CompletedTask;
+		return _bus.PublishAsync(new UserChangeEvent(_user.UserId, ChangeKind.Todos));
 	}
 
 	public override async Task InitializeAsync()
@@ -111,7 +131,7 @@ public class TodoService : EntityServiceBase<TodoItem>, ITodoService
 
 	private async Task ResetStaleTodosAsync()
 	{
-		var cutoff = DateTime.Now.AddDays(-7);
+		var cutoff = DateTime.UtcNow.AddDays(-7);
 
 		foreach (var todo in _items)
 		{
@@ -125,7 +145,7 @@ public class TodoService : EntityServiceBase<TodoItem>, ITodoService
 
 	public async Task<bool> SaveTodoAsync(TodoItem todo)
 	{
-		var now = DateTime.Now;
+		var now = DateTime.UtcNow;
 		var existed = _items.Any(t => t.Id == todo.Id);
 
 		if ((todo.StatusId == Guid.Empty || todo.StatusId == BuiltInStatusIds.None) && !existed)
@@ -137,7 +157,7 @@ public class TodoService : EntityServiceBase<TodoItem>, ITodoService
 		if (!existed)
 		{
 			// Brand-new todo (UpdatedAt unset and no prior history) → record creation.
-			// Imported todos already have their own UpdatedAt/ChangeLog/LastSyncedAt — preserve them.
+			// Imported todos already have their own UpdatedAt/ChangeLog — preserve them.
 			if (todo.UpdatedAt is null && todo.ChangeLog.Count == 0)
 			{
 				todo.UpdatedAt = now;
@@ -173,6 +193,7 @@ public class TodoService : EntityServiceBase<TodoItem>, ITodoService
 			else
 				_items.Add(todo);
 			NotifyChanged();
+			await PublishChange();
 		}
 		return success;
 	}
@@ -187,6 +208,7 @@ public class TodoService : EntityServiceBase<TodoItem>, ITodoService
 		await Repository.Delete(todo);
 		_items.RemoveAll(t => t.Id == todo.Id || t.ParentId == todo.Id);
 		NotifyChanged();
+		await PublishChange();
 	}
 
 	public async Task UpdateStatusAsync(TodoItem todo, Guid newStatusId)
@@ -195,14 +217,14 @@ public class TodoService : EntityServiceBase<TodoItem>, ITodoService
 		todo.StatusId = newStatusId;
 
 		if (newStatusId == BuiltInStatusIds.Done && !todo.CompletedAt.HasValue)
-			todo.CompletedAt = DateTime.Now;
+			todo.CompletedAt = DateTime.UtcNow;
 
 		if (newStatusId == BuiltInStatusIds.InProgress && !todo.StartedAt.HasValue)
-			todo.StartedAt = DateTime.Now;
+			todo.StartedAt = DateTime.UtcNow;
 
 		if (oldStatusId != newStatusId)
 		{
-			var now = DateTime.Now;
+			var now = DateTime.UtcNow;
 			todo.ChangeLog.Add(new TodoChangeLogEntry
 			{
 				ChangedAt = now,
@@ -215,6 +237,7 @@ public class TodoService : EntityServiceBase<TodoItem>, ITodoService
 
 		await Repository.AddOrUpdate(todo);
 		NotifyChanged();
+		await PublishChange();
 	}
 
 	private string StatusName(Guid id) => _formatter.StatusName(id);
@@ -224,6 +247,7 @@ public class TodoService : EntityServiceBase<TodoItem>, ITodoService
 		await Repository.ClearAll();
 		_items.Clear();
 		NotifyChanged();
+		await PublishChange();
 	}
 
 	public async Task ClearAllAsync(Guid? projectId = null)
@@ -239,6 +263,7 @@ public class TodoService : EntityServiceBase<TodoItem>, ITodoService
 			_items.RemoveAll(t => t.ProjectId == projectId.Value);
 		}
 		NotifyChanged();
+		await PublishChange();
 	}
 
 	public async Task DeleteTodosByProjectAsync(Guid projectId)
@@ -246,16 +271,7 @@ public class TodoService : EntityServiceBase<TodoItem>, ITodoService
 		await _todoRepository.DeleteByProject(projectId);
 		_items.RemoveAll(t => t.ProjectId == projectId);
 		NotifyChanged();
-	}
-
-	public async Task MarkAllSyncedAsync(DateTime syncedAt)
-	{
-		foreach (var todo in _items)
-		{
-			todo.LastSyncedAt = syncedAt;
-			await Repository.AddOrUpdate(todo);
-		}
-		NotifyChanged();
+		await PublishChange();
 	}
 
 	public IReadOnlyList<TodoItem> GetSubTasks(Guid parentId) =>
@@ -405,5 +421,5 @@ public class TodoService : EntityServiceBase<TodoItem>, ITodoService
 
 	private string FormatTags(List<Guid>? ids) => _formatter.FormatTags(ids);
 
-	private static string FormatDate(DateTime? d) => d.HasValue ? d.Value.ToString("yyyy-MM-dd HH:mm") : string.Empty;
+	private static string FormatDate(DateTime? d) => d.HasValue ? d.Value.ToLocalTime().ToString("yyyy-MM-dd HH:mm") : string.Empty;
 }

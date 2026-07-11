@@ -33,15 +33,12 @@ public class PriorityService : EntityServiceBase<Priority>, IPriorityService
 		await Repository.InitializeAsync();
 		var stored = await Repository.GetAll();
 
+		// Built-ins live in-memory only (seeded from BuiltInPriorityIds.Seed). Dedupe stored
+		// rows that share a built-in Id (legacy LocalStorage may have copies) so we don't
+		// show duplicates and so we don't try to re-persist built-ins to a per-user DB.
 		var seeded = BuiltInPriorityIds.Seed();
-		var missing = seeded.Where(s => stored.All(x => x.Id != s.Id)).ToList();
-		foreach (var p in missing)
-			await Repository.AddOrUpdate(p);
-
-		if (missing.Count > 0)
-			stored.AddRange(missing);
-
-		_items = stored;
+		var customStored = stored.Where(s => !BuiltInPriorityIds.IsBuiltIn(s.Id)).ToList();
+		_items = seeded.Concat(customStored).ToList();
 		_initialized = true;
 		NotifyChanged();
 	}
@@ -92,9 +89,14 @@ public class PriorityService : EntityServiceBase<Priority>, IPriorityService
 			priority.IsBuiltIn = existing.IsBuiltIn;
 
 		priority.Name = trimmed;
-		var ok = await Repository.AddOrUpdate(priority);
-		if (!ok)
-			return false;
+
+		// Built-in priorities are in-memory only — apply edits to the local list but skip persistence.
+		if (!priority.IsBuiltIn)
+		{
+			var ok = await Repository.AddOrUpdate(priority);
+			if (!ok)
+				return false;
+		}
 
 		var index = _items.FindIndex(p => p.Id == priority.Id);
 		if (index >= 0)
@@ -124,7 +126,7 @@ public class PriorityService : EntityServiceBase<Priority>, IPriorityService
 		}
 
 		var deletedId = priority.Id;
-		var now = DateTime.Now;
+		var now = DateTime.UtcNow;
 
 		await Repository.Delete(priority);
 

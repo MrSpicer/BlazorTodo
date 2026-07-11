@@ -41,33 +41,6 @@
 		</div>
 	</div>
 
-	<!-- Sync -->
-	<div class="settings-card">
-		<div class="settings-card-header">
-			<div class="settings-card-icon">
-				<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-					<path d="M18 20V10"/>
-					<path d="M12 20V4"/>
-					<path d="M6 20v-6"/>
-				</svg>
-			</div>
-			<div>
-				<h2 class="settings-card-title">Sync</h2>
-				<p class="settings-card-description">Sync your todos to another device or restore from a sync point.</p>
-			</div>
-		</div>
-		<div class="settings-card-actions">
-			<button class="btn btn-outline-secondary" @onclick="ShowSyncModal">
-				<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-					<path d="M18 20V10"/>
-					<path d="M12 20V4"/>
-					<path d="M6 20v-6"/>
-				</svg>
-				Sync
-			</button>
-		</div>
-	</div>
-
 	<!-- Tags -->
 	<div class="settings-card">
 		<div class="settings-card-header">
@@ -198,8 +171,6 @@
                    OnImport="HandleImport"
                    @ref="_importExportModal" />
 
-<SyncModal IsVisible="@_showSyncModal" InitialTab="sync" OnClose="HideSyncModal" />
-
 <TagsModal IsVisible="@_showTagsModal" OnClose="HideTagsModal" />
 
 <StatusManagementModal IsVisible="@_showStatusModal" OnClose="HideStatusModal" />
@@ -320,7 +291,6 @@
 
 @code {
 	private bool _showImportExportModal;
-	private bool _showSyncModal;
 	private bool _showTagsModal;
 	private bool _showStatusModal;
 	private bool _showPriorityModal;
@@ -346,8 +316,6 @@
 
 	private void ShowImportExportModal() => _showImportExportModal = true;
 	private void HideImportExportModal() => _showImportExportModal = false;
-	private void ShowSyncModal() => _showSyncModal = true;
-	private void HideSyncModal() => _showSyncModal = false;
 	private void ShowTagsModal() => _showTagsModal = true;
 	private void HideTagsModal() => _showTagsModal = false;
 	private void ShowStatusModal() => _showStatusModal = true;

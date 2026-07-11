@@ -49,7 +49,6 @@
 					var (stBg, stFg) = StatusColor.Resolve(st?.Color);
 					<span class="status-badge" style="background-color:@stBg;color:@stFg">@(st?.Name ?? "Unknown")</span>
 				}
-				<SyncStatusBadge Item="Item" />
 			</div>
 		</div>
 
@@ -66,7 +65,7 @@
 						<circle cx="12" cy="12" r="10"/>
 						<path d="M12 6v6l4 2"/>
 					</svg>
-					@Item.CreatedAt.ToString("MMM d, yyyy")
+					@Item.CreatedAt.ToLocalTime().ToString("MMM d, yyyy")
 				</span>
 				@if (Item.DueDate.HasValue)
 				{
@@ -77,7 +76,7 @@
 							<line x1="8" y1="2" x2="8" y2="6" />
 							<line x1="3" y1="10" x2="21" y2="10" />
 						</svg>
-						Due @Item.DueDate.Value.ToString("MMM d, h:mm tt")
+						Due @Item.DueDate.Value.ToLocalTime().ToString("MMM d, h:mm tt")
 					</span>
 				}
 				@if (Item.EstimatedMinutes.HasValue)
@@ -631,7 +630,7 @@
 	private bool IsDone => Item.StatusId == BuiltInStatusIds.Done;
 
 	private bool IsOverdue => Item.DueDate.HasValue
-		&& Item.DueDate.Value < DateTime.Now
+		&& Item.DueDate.Value < DateTime.UtcNow
 		&& !BuiltInStatusIds.IsCompletedLike(Item.StatusId);
 
 	protected override void OnInitialized()
@@ -667,9 +666,9 @@
 		{
 			Item.StatusId = statusId;
 			if (statusId == BuiltInStatusIds.Done && !Item.CompletedAt.HasValue)
-				Item.CompletedAt = DateTime.Now;
+				Item.CompletedAt = DateTime.UtcNow;
 			if (statusId == BuiltInStatusIds.InProgress && !Item.StartedAt.HasValue)
-				Item.StartedAt = DateTime.Now;
+				Item.StartedAt = DateTime.UtcNow;
 			await OnSave.InvokeAsync(Item);
 		}
 	}
@@ -679,7 +678,7 @@
 		var newStatusId = IsDone ? BuiltInStatusIds.New : BuiltInStatusIds.Done;
 		Item.StatusId = newStatusId;
 		if (newStatusId == BuiltInStatusIds.Done && !Item.CompletedAt.HasValue)
-			Item.CompletedAt = DateTime.Now;
+			Item.CompletedAt = DateTime.UtcNow;
 		await OnSave.InvokeAsync(Item);
 	}
 

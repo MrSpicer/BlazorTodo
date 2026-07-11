@@ -7,6 +7,8 @@ public class Project : IEntity
 {
     public Guid Id { get; set; } = Guid.NewGuid();
 
+    public Guid UserId { get; set; } = Guid.Empty;
+
     [Required(ErrorMessage = "Project name is required")]
     [StringLength(50, MinimumLength = 1, ErrorMessage = "Project name must be 1-50 characters")]
     public string Name { get; set; } = string.Empty;
@@ -17,15 +19,11 @@ public class Project : IEntity
     [RegularExpression(@"^#[0-9a-fA-F]{3,8}$", ErrorMessage = "Color must be a valid hex color")]
     public string Color { get; set; } = "#6c757d";
 
-    public DateTime CreatedAt { get; set; } = DateTime.Now;
+    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 
     public DateTime? UpdatedAt { get; set; }
 
-    public DateTime? LastSyncedAt { get; set; }
-
     public bool IsDefault { get; set; }
-
-    public bool IsDirty => LastSyncedAt is null || (UpdatedAt.HasValue && UpdatedAt > LastSyncedAt);
 
     public bool IsValid()
     {
