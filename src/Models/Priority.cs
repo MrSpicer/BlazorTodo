@@ -19,7 +19,7 @@ public class Priority : IEntity
 
 	public bool IsBuiltIn { get; set; }
 
-	public DateTime CreatedAt { get; set; } = DateTime.Now;
+	public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 	public DateTime? UpdatedAt { get; set; }
 
 	public bool IsValid() => Id != Guid.Empty && !string.IsNullOrWhiteSpace(Name);

@@ -42,6 +42,11 @@ public static class ServiceCollectionExtensions
 
         services.AddIdentity<ApplicationUser, IdentityRole<Guid>>(options =>
             {
+                // RequireConfirmedAccount gates the Identity UI Register page's post-create
+                // branch: when true it redirects to RegisterConfirmation without auto-signin.
+                // RequireConfirmedEmail gates subsequent password sign-ins via
+                // SignInManager.CanSignInAsync. Both are needed — different jobs.
+                options.SignIn.RequireConfirmedAccount = true;
                 options.SignIn.RequireConfirmedEmail = true;
                 options.Password.RequiredLength = 10;
                 options.Lockout.MaxFailedAccessAttempts = 5;

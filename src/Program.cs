@@ -4,11 +4,6 @@ using Microsoft.AspNetCore.RateLimiting;
 using TodoList.Components;
 using TodoList.Extensions;
 
-// Npgsql 6+ rejects DateTime with Kind=Local for `timestamp with time zone` columns.
-// Models default to DateTime.Now (Kind=Local); rather than rewrite every site to UtcNow,
-// re-enable the legacy timestamp behavior. Tracked for a proper cleanup in Phase 13.
-AppContext.SetSwitch("Npgsql.EnableLegacyTimestampBehavior", true);
-
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.

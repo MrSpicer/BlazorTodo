@@ -52,7 +52,7 @@ public class NoteService : EntityServiceBase<ProjectNote>, INoteService
 
 	public async Task<bool> SaveNoteAsync(ProjectNote note)
 	{
-		note.UpdatedAt = DateTime.Now;
+		note.UpdatedAt = DateTime.UtcNow;
 		var success = await Repository.AddOrUpdate(note);
 		if (success)
 		{

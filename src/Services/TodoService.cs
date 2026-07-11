@@ -131,7 +131,7 @@ public class TodoService : EntityServiceBase<TodoItem>, ITodoService
 
 	private async Task ResetStaleTodosAsync()
 	{
-		var cutoff = DateTime.Now.AddDays(-7);
+		var cutoff = DateTime.UtcNow.AddDays(-7);
 
 		foreach (var todo in _items)
 		{
@@ -145,7 +145,7 @@ public class TodoService : EntityServiceBase<TodoItem>, ITodoService
 
 	public async Task<bool> SaveTodoAsync(TodoItem todo)
 	{
-		var now = DateTime.Now;
+		var now = DateTime.UtcNow;
 		var existed = _items.Any(t => t.Id == todo.Id);
 
 		if ((todo.StatusId == Guid.Empty || todo.StatusId == BuiltInStatusIds.None) && !existed)
@@ -217,14 +217,14 @@ public class TodoService : EntityServiceBase<TodoItem>, ITodoService
 		todo.StatusId = newStatusId;
 
 		if (newStatusId == BuiltInStatusIds.Done && !todo.CompletedAt.HasValue)
-			todo.CompletedAt = DateTime.Now;
+			todo.CompletedAt = DateTime.UtcNow;
 
 		if (newStatusId == BuiltInStatusIds.InProgress && !todo.StartedAt.HasValue)
-			todo.StartedAt = DateTime.Now;
+			todo.StartedAt = DateTime.UtcNow;
 
 		if (oldStatusId != newStatusId)
 		{
-			var now = DateTime.Now;
+			var now = DateTime.UtcNow;
 			todo.ChangeLog.Add(new TodoChangeLogEntry
 			{
 				ChangedAt = now,
@@ -421,5 +421,5 @@ public class TodoService : EntityServiceBase<TodoItem>, ITodoService
 
 	private string FormatTags(List<Guid>? ids) => _formatter.FormatTags(ids);
 
-	private static string FormatDate(DateTime? d) => d.HasValue ? d.Value.ToString("yyyy-MM-dd HH:mm") : string.Empty;
+	private static string FormatDate(DateTime? d) => d.HasValue ? d.Value.ToLocalTime().ToString("yyyy-MM-dd HH:mm") : string.Empty;
 }

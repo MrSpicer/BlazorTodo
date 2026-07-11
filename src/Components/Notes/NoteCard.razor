@@ -12,7 +12,7 @@
 				<circle cx="12" cy="12" r="10"/>
 				<path d="M12 6v6l4 2"/>
 			</svg>
-			<span>@Note.CreatedAt.ToString("MMM d, yyyy")</span>
+			<span>@Note.CreatedAt.ToLocalTime().ToString("MMM d, yyyy")</span>
 		</div>
 	</div>
 	<div class="note-actions">

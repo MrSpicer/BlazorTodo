@@ -68,7 +68,7 @@ public class ProjectService : EntityServiceBase<Project>, IProjectService
 
 	public async Task<bool> SaveProjectAsync(Project project)
 	{
-		project.UpdatedAt = DateTime.Now;
+		project.UpdatedAt = DateTime.UtcNow;
 		var success = await Repository.AddOrUpdate(project);
 		if (success)
 		{

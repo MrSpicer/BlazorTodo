@@ -30,7 +30,7 @@ public class TodoItem : IEntity, IProjectScoped
 
 	public Guid StatusId { get; set; } = Guid.Empty;
 
-	public DateTime CreatedAt { get; set; } = DateTime.Now;
+	public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 	public DateTime? StartedAt { get; set; }
 	public DateTime? CompletedAt { get; set; }
 	public DateTime? DueDate { get; set; }

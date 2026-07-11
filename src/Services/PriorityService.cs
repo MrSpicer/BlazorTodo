@@ -126,7 +126,7 @@ public class PriorityService : EntityServiceBase<Priority>, IPriorityService
 		}
 
 		var deletedId = priority.Id;
-		var now = DateTime.Now;
+		var now = DateTime.UtcNow;
 
 		await Repository.Delete(priority);
 

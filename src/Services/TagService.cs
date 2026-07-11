@@ -98,7 +98,7 @@ public class TagService : EntityServiceBase<Tag>, ITagService
 	public async Task DeleteAsync(Tag tag)
 	{
 		var deletedId = tag.Id;
-		var now = DateTime.Now;
+		var now = DateTime.UtcNow;
 
 		await Repository.Delete(tag);
 

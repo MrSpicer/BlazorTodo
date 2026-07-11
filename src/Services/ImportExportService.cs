@@ -49,7 +49,7 @@ public class ImportExportService : IImportExportService
 		var todos = await _repository.GetTodos();
 		var document = new AppDataDocument
 		{
-			ExportedAt = DateTime.Now,
+			ExportedAt = DateTime.UtcNow,
 			Version = "1.5",
 			Projects = _projectService.Projects.ToList(),
 			Todos = todos,

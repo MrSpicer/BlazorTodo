@@ -34,7 +34,7 @@
 							@foreach (var entry in Item.ChangeLog.OrderByDescending(e => e.ChangedAt))
 							{
 								<tr>
-									<td class="history-when">@entry.ChangedAt.ToString("MMM d, yyyy h:mm tt")</td>
+									<td class="history-when">@entry.ChangedAt.ToLocalTime().ToString("MMM d, yyyy h:mm tt")</td>
 									<td class="history-field">@entry.Field</td>
 									<td class="history-old">@(string.IsNullOrEmpty(entry.OldValue) ? "—" : entry.OldValue)</td>
 									<td class="history-new">@(string.IsNullOrEmpty(entry.NewValue) ? "—" : entry.NewValue)</td>

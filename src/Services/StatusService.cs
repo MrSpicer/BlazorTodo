@@ -171,7 +171,7 @@ public class StatusService : EntityServiceBase<Status>, IStatusService
 		}
 
 		var deletedId = status.Id;
-		var now = DateTime.Now;
+		var now = DateTime.UtcNow;
 
 		await Repository.Delete(status);
 
