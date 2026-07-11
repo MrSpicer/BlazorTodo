@@ -36,6 +36,12 @@ public class EfNoteRepository : EfRepositoryBase, INoteRepository, IRepository<P
 		note.UserId = userId;
 
 		await using var db = await CreateDbAsync();
+
+		// Ownership guard: the target project must belong to the caller — a note may not be
+		// attached to another user's project GUID.
+		if (!await db.Projects.AnyAsync(p => p.Id == note.ProjectId && p.UserId == userId))
+			return false;
+
 		var existing = await db.Notes.FirstOrDefaultAsync(n => n.Id == note.Id && n.UserId == userId);
 		if (existing is null)
 		{

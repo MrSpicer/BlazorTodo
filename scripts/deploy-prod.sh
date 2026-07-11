@@ -7,9 +7,14 @@ cd "$(dirname "$0")/.."
 
 : "${TAG:?must set TAG (e.g. TAG=$(git rev-parse --short HEAD))}"
 : "${POSTGRES_PASSWORD:?must export POSTGRES_PASSWORD — must match the db_password secret}"
+# Required in prod: the public hostname(s) the app accepts in the Host header, e.g.
+# APP_ALLOWED_HOSTS="todo.example.com" (comma-separate multiples). Fail fast rather than
+# silently falling back to "*", which would leave the app open to Host-header injection.
+: "${APP_ALLOWED_HOSTS:?must set APP_ALLOWED_HOSTS to your public hostname(s), e.g. todo.example.com}"
 
 # Ingress is via cloudflared, no host ports published.
 export ASPNETCORE_ENVIRONMENT=Production
+export APP_ALLOWED_HOSTS
 export EMAIL_PROVIDER="${EMAIL_PROVIDER:-resend}"
 export EMAIL_SMTP_HOST="${EMAIL_SMTP_HOST:-}"
 export EMAIL_SMTP_PORT="${EMAIL_SMTP_PORT:-}"

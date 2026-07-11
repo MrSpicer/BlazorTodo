@@ -22,6 +22,16 @@ public class EfTodoRepository : EfRepositoryBase, ITodoRepository, IRepository<T
 		todo.UserId = userId;
 
 		await using var db = await CreateDbAsync();
+
+		// Ownership guard: the target project (and parent, if any) must belong to the caller.
+		// Reads are already user-scoped, but without this a user could attach rows to another
+		// user's project/parent GUID (broken object-level authorization).
+		if (!await db.Projects.AnyAsync(p => p.Id == todo.ProjectId && p.UserId == userId))
+			return false;
+		if (todo.ParentId is Guid parentId &&
+			!await db.Todos.AnyAsync(t => t.Id == parentId && t.UserId == userId))
+			return false;
+
 		var existing = await db.Todos.FirstOrDefaultAsync(t => t.Id == todo.Id && t.UserId == userId);
 		if (existing is null)
 		{

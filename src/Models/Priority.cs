@@ -13,6 +13,7 @@ public class Priority : IEntity
 	public string Name { get; set; } = string.Empty;
 
 	[StringLength(64, ErrorMessage = "Color value is too long")]
+	[RegularExpression(@"^#[0-9a-fA-F]{3,8}$", ErrorMessage = "Color must be a valid hex color")]
 	public string Color { get; set; } = "#6366f1";
 
 	public int Rank { get; set; }
