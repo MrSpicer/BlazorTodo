@@ -127,6 +127,13 @@ builder.Services.AddRateLimiter(options =>
 
 var app = builder.Build();
 
+// Apply pending EF Core migrations and seed the bootstrap admin account before serving traffic,
+// so requests never hit an unmigrated schema and an operator can sign in on first deploy.
+using (var scope = app.Services.CreateScope())
+{
+	await scope.ServiceProvider.GetRequiredService<TodoList.Data.DatabaseInitializer>().RunAsync();
+}
+
 // Must run before anything that reads the scheme or client IP (HTTPS redirect, security
 // headers, rate limiter, auth), so those see the Cloudflare-forwarded values.
 app.UseForwardedHeaders();

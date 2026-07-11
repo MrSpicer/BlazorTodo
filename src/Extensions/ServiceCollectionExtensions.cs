@@ -58,6 +58,12 @@ public static class ServiceCollectionExtensions
 
         services.AddTransient<IEmailSender, SmtpEmailSender>();
 
+        // Deploy-time admin bootstrap: migrate the DB and seed a pre-confirmed admin account at
+        // startup (see DatabaseInitializer, invoked from Program.cs). Bound from the "AdminUser"
+        // section; skipped when unconfigured.
+        services.Configure<AdminSeedOptions>(configuration.GetSection("AdminUser"));
+        services.AddScoped<DatabaseInitializer>();
+
         services.AddHttpContextAccessor();
         services.AddScoped<ICurrentUserContext, HttpContextCurrentUserContext>();
         services.AddScoped<IUserOnboardingService, UserOnboardingService>();

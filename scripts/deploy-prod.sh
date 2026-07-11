@@ -11,10 +11,15 @@ cd "$(dirname "$0")/.."
 # APP_ALLOWED_HOSTS="todo.example.com" (comma-separate multiples). Fail fast rather than
 # silently falling back to "*", which would leave the app open to Host-header injection.
 : "${APP_ALLOWED_HOSTS:?must set APP_ALLOWED_HOSTS to your public hostname(s), e.g. todo.example.com}"
+# Email of the bootstrap admin account seeded at startup. The password comes from the
+# admin_password Docker secret (see scripts/seed-prod-secrets.sh).
+: "${ADMIN_EMAIL:?must set ADMIN_EMAIL for the bootstrap admin account, e.g. you@example.com}"
 
 # Ingress is via cloudflared, no host ports published.
 export ASPNETCORE_ENVIRONMENT=Production
 export APP_ALLOWED_HOSTS
+export ADMIN_EMAIL
+export ADMIN_DISPLAY_NAME="${ADMIN_DISPLAY_NAME:-Administrator}"
 export EMAIL_PROVIDER="${EMAIL_PROVIDER:-resend}"
 export EMAIL_SMTP_HOST="${EMAIL_SMTP_HOST:-}"
 export EMAIL_SMTP_PORT="${EMAIL_SMTP_PORT:-}"

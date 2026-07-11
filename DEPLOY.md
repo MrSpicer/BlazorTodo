@@ -61,11 +61,14 @@ In the Cloudflare Zero Trust dashboard → **Networks → Tunnels → Create tun
 export POSTGRES_PASSWORD="$(openssl rand -base64 32)"
 export RESEND_API_KEY="re_..."             # or "unused" if you'll configure SMTP instead
 export CF_TUNNEL_TOKEN="<token from step 3>"
+# Bootstrap admin password. Must satisfy Identity rules: >=10 chars with upper, lower, digit,
+# and a symbol — the startup seeder rejects anything weaker.
+export ADMIN_PASSWORD='<strong-password>'
 
 ./scripts/seed-prod-secrets.sh
 ```
 
-Secrets created: `db_password`, `resend_api_key`, `cloudflared_token`.
+Secrets created: `db_password`, `resend_api_key`, `cloudflared_token`, `admin_password`.
 
 ### 5. Build the image and deploy
 
@@ -75,11 +78,17 @@ docker build -t blazortodo:$(git rev-parse --short HEAD) -f Dockerfile .
 TAG=$(git rev-parse --short HEAD) \
 POSTGRES_PASSWORD="$POSTGRES_PASSWORD" \
 APP_ALLOWED_HOSTS="todo.example.com" \
+ADMIN_EMAIL="you@example.com" \
+ADMIN_DISPLAY_NAME="Administrator" \
 EMAIL_PROVIDER=resend \
 EMAIL_FROM_ADDRESS="noreply@example.com" \
 EMAIL_FROM_NAME="BlazorTodo" \
 ./scripts/deploy-prod.sh
 ```
+
+On startup the app applies EF Core migrations and seeds this admin account (pre-confirmed, so it
+can sign in immediately without an email-confirmation step) with the `Admin` role. Seeding is
+idempotent and never resets the password of an existing account.
 
 For a registry-based workflow (CI publishes images): change the `image:` in `docker-stack.yml` to reference your registry path, and use `docker pull` on the host before `deploy-prod.sh`.
 
@@ -93,15 +102,16 @@ docker service logs -f todolist_cloudflared
 
 Once both services are running and `cloudflared` reports "Registered tunnel connection", browse to your public hostname. Cloudflare serves the cert.
 
-### 7. Run database migrations
+### 7. Database migrations (automatic)
 
-EF Core migrations are not applied automatically by the image; do it once after first deploy:
+EF Core migrations are applied automatically at startup by the app (see `DatabaseInitializer`,
+invoked from `Program.cs`) — no manual `dotnet ef database update` step is needed. The bootstrap
+admin (step 5) is seeded in the same startup pass, right after migrations.
 
-```bash
-docker exec -it $(docker ps -qf name=todolist_app) dotnet ef database update --no-build
-```
-
-(Or build a one-off migration container and run `dotnet ef` against the prod DB from a developer machine.)
+> **Caveat:** `update_config: { order: start-first }` briefly overlaps two `app` containers, so
+> two `MigrateAsync()` calls can race on a schema change. This is fine for the single-replica
+> hobby deploy here; if you scale out or ship risky migrations, gate migrations behind a Postgres
+> advisory lock or a dedicated one-off migration job.
 
 ## Local dev (Swarm-on-laptop)
 

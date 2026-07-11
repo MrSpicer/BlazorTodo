@@ -9,7 +9,7 @@
 #   CLOUDFLARED_REPLICAS   0 in dev, 1 in prod.
 #
 # Required secrets (created with `docker secret create`):
-#   db_password, cloudflared_token
+#   db_password, cloudflared_token, admin_password
 #   resend_api_key (only meaningful in prod with EMAIL_PROVIDER=resend)
 
 services:
@@ -19,6 +19,7 @@ services:
     secrets:
       - db_password
       - resend_api_key
+      - admin_password
     volumes:
       # Persists the Data Protection key ring so auth cookies + antiforgery tokens survive
       # container restarts/redeploys. Path matches DataProtection__KeysDirectory below.
@@ -46,6 +47,12 @@ services:
       Email__Smtp__Port: ${EMAIL_SMTP_PORT:-1025}
       Email__FromAddress: ${EMAIL_FROM_ADDRESS:-noreply@blazortodo.local}
       Email__FromName: ${EMAIL_FROM_NAME:-BlazorTodo}
+      # Bootstrap admin account seeded at startup (see DatabaseInitializer). The password is read
+      # from the admin_password Docker secret; email/display name come from deploy-time env vars.
+      # Leave ADMIN_EMAIL empty to skip seeding.
+      AdminUser__Email: ${ADMIN_EMAIL:-}
+      AdminUser__DisplayName: ${ADMIN_DISPLAY_NAME:-Administrator}
+      AdminUser__PasswordFile: /run/secrets/admin_password
     ports:
       - target: 8080
         published: ${LOCAL_APP_PORT:-0}
@@ -117,4 +124,6 @@ secrets:
   resend_api_key:
     external: true
   cloudflared_token:
+    external: true
+  admin_password:
     external: true
