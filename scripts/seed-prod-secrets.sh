@@ -20,7 +20,6 @@ create_secret() {
 
 create_secret db_password "$POSTGRES_PASSWORD"
 create_secret resend_api_key "$RESEND_API_KEY"
-create_secret identity_signing_key "$(openssl rand -base64 64)"
 create_secret cloudflared_token "$CF_TUNNEL_TOKEN"
 
 echo

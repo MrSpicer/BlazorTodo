@@ -24,7 +24,7 @@ public class EfProjectRepository : EfRepositoryBase, IProjectRepository, IReposi
 
 	public async Task<bool> AddOrUpdate(Project project)
 	{
-		if (project is null || !project.IsValid()) return false;
+		if (project is null || !project.IsValid() || !PassesDataAnnotations(project)) return false;
 		var userId = RequireUserId();
 		project.UserId = userId;
 

@@ -15,7 +15,7 @@ public class EfStatusRepository : EfRepositoryBase, IStatusRepository, IReposito
 
 	public async Task<bool> AddOrUpdate(Status status)
 	{
-		if (status is null || !status.IsValid()) return false;
+		if (status is null || !status.IsValid() || !PassesDataAnnotations(status)) return false;
 		var userId = RequireUserId();
 		status.UserId = userId;
 

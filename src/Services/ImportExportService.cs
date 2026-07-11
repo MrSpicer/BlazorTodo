@@ -218,8 +218,13 @@ public class ImportExportService : IImportExportService
 				var legacyChildren = todo.SubTasks.ToList();
 				todo.SubTasks.Clear();
 
-				await _todoService.SaveTodoAsync(todo);
-				imported++;
+				if (await _todoService.SaveTodoAsync(todo))
+					imported++;
+				else
+				{
+					skipped++;
+					continue;
+				}
 
 				foreach (var sub in legacyChildren)
 				{
@@ -235,8 +240,10 @@ public class ImportExportService : IImportExportService
 					RemapTagIds(sub, tagIdRemap);
 					FillStatusId(sub, statusIdRemap);
 					FillPriorityId(sub, priorityIdRemap);
-					await _todoService.SaveTodoAsync(sub);
-					imported++;
+					if (await _todoService.SaveTodoAsync(sub))
+						imported++;
+					else
+						skipped++;
 				}
 			}
 

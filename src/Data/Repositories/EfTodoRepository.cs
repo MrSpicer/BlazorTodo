@@ -17,7 +17,7 @@ public class EfTodoRepository : EfRepositoryBase, ITodoRepository, IRepository<T
 
 	public async Task<bool> AddOrUpdate(TodoItem todo)
 	{
-		if (todo is null || !todo.IsValid()) return false;
+		if (todo is null || !todo.IsValid() || !PassesDataAnnotations(todo)) return false;
 		var userId = RequireUserId();
 		todo.UserId = userId;
 

@@ -338,7 +338,7 @@
 		{
 			var message = $"Successfully imported {result.ImportedCount} todo(s).";
 			if (result.SkippedCount > 0)
-				message += $" Skipped {result.SkippedCount} duplicate(s).";
+				message += $" Skipped {result.SkippedCount} failed item(s).";
 			_importExportModal?.ShowMessage(message, false);
 		}
 		else

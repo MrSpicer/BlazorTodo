@@ -15,7 +15,7 @@ public class EfPriorityRepository : EfRepositoryBase, IPriorityRepository, IRepo
 
 	public async Task<bool> AddOrUpdate(Priority priority)
 	{
-		if (priority is null || !priority.IsValid()) return false;
+		if (priority is null || !priority.IsValid() || !PassesDataAnnotations(priority)) return false;
 		var userId = RequireUserId();
 		priority.UserId = userId;
 

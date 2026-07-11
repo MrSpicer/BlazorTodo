@@ -15,7 +15,6 @@ create_secret() {
 }
 create_secret db_password "dev-password"
 create_secret resend_api_key "dummy-not-used-in-dev"
-create_secret identity_signing_key "$(openssl rand -base64 64)"
 create_secret cloudflared_token "unused-in-dev"
 
 # 3. Build the image so the stack has something to pull. Without a registry,

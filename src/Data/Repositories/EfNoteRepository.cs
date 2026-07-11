@@ -31,7 +31,7 @@ public class EfNoteRepository : EfRepositoryBase, INoteRepository, IRepository<P
 
 	public async Task<bool> AddOrUpdate(ProjectNote note)
 	{
-		if (note is null || !note.IsValid()) return false;
+		if (note is null || !note.IsValid() || !PassesDataAnnotations(note)) return false;
 		var userId = RequireUserId();
 		note.UserId = userId;
 

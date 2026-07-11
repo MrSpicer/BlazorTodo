@@ -9,7 +9,7 @@
 #   CLOUDFLARED_REPLICAS   0 in dev, 1 in prod.
 #
 # Required secrets (created with `docker secret create`):
-#   db_password, identity_signing_key, cloudflared_token
+#   db_password, cloudflared_token
 #   resend_api_key (only meaningful in prod with EMAIL_PROVIDER=resend)
 
 services:
@@ -19,7 +19,6 @@ services:
     secrets:
       - db_password
       - resend_api_key
-      - identity_signing_key
     volumes:
       # Persists the Data Protection key ring so auth cookies + antiforgery tokens survive
       # container restarts/redeploys. Path matches DataProtection__KeysDirectory below.
@@ -116,8 +115,6 @@ secrets:
   db_password:
     external: true
   resend_api_key:
-    external: true
-  identity_signing_key:
     external: true
   cloudflared_token:
     external: true

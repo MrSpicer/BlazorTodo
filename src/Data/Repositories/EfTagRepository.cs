@@ -15,7 +15,7 @@ public class EfTagRepository : EfRepositoryBase, ITagRepository, IRepository<Tag
 
 	public async Task<bool> AddOrUpdate(Tag tag)
 	{
-		if (tag is null || !tag.IsValid()) return false;
+		if (tag is null || !tag.IsValid() || !PassesDataAnnotations(tag)) return false;
 		var userId = RequireUserId();
 		tag.UserId = userId;
 
