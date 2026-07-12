@@ -23,6 +23,12 @@ ENV ASPNETCORE_URLS=http://+:8080 \
     DOTNET_RUNNING_IN_CONTAINER=true \
     DOTNET_USE_POLLING_FILE_WATCHER=false
 
+# Pre-create the Data Protection key ring directory owned by the non-root app user.
+# The stack mounts a named volume here (DataProtection__KeysDirectory=/keys); Docker
+# copies this ownership onto the fresh volume so the app can write keys. Without this
+# the volume is root-owned and key creation fails with "Permission denied" → HTTP 500.
+RUN mkdir -p /keys && chown $APP_UID:$APP_UID /keys
+
 USER $APP_UID
 
 COPY --from=build /app/publish .

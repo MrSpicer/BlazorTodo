@@ -2,7 +2,32 @@
     <Found Context="routeData">
         <ErrorBoundary>
             <ChildContent>
-                <RouteView RouteData="@routeData" DefaultLayout="@typeof(MainLayout)" />
+                @* AuthorizeRouteView only gates components that carry [Authorize] (e.g. /admin);
+                   anonymous pages remain open, preserving the local-storage path. *@
+                <AuthorizeRouteView RouteData="@routeData" DefaultLayout="@typeof(MainLayout)">
+                    <NotAuthorized>
+                        @if (context.User.Identity?.IsAuthenticated != true)
+                        {
+                            <RedirectToLogin />
+                        }
+                        else
+                        {
+                            <LayoutView Layout="@typeof(MainLayout)">
+                                <PageTitle>Not authorized</PageTitle>
+                                <div class="not-authorized" role="alert">
+                                    <h1 class="page-title">Access denied</h1>
+                                    <p>You don't have permission to view this page.</p>
+                                    <a class="btn btn-primary" href="">Go home</a>
+                                </div>
+                            </LayoutView>
+                        }
+                    </NotAuthorized>
+                    <Authorizing>
+                        <LayoutView Layout="@typeof(MainLayout)">
+                            <p>Authorizing...</p>
+                        </LayoutView>
+                    </Authorizing>
+                </AuthorizeRouteView>
                 <FocusOnNavigate RouteData="@routeData" Selector="h1" />
             </ChildContent>
             <ErrorContent>

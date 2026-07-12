@@ -1,0 +1,424 @@
+@page "/admin"
+@attribute [Authorize(Roles = "Admin")]
+@inherits PageComponentBase
+@using Microsoft.AspNetCore.Identity
+@using TodoList.Identity
+@using TodoList.Services.Admin
+@inject IAdminService AdminService
+@inject IConnectionTracker ConnectionTracker
+@inject ILoginActivityTracker LoginActivity
+@inject IDialogService DialogService
+@inject NavigationManager Navigation
+
+<PageTitle>BlazorTodo - Admin</PageTitle>
+
+<h1 class="page-title">Admin Dashboard</h1>
+
+@if (_message is not null)
+{
+	<div class="admin-banner @(_messageIsError ? "error" : "success")" role="status">
+		@_message
+		<button class="banner-close" @onclick="() => _message = null" aria-label="Dismiss">&times;</button>
+	</div>
+}
+
+<!-- Usage KPIs -->
+<div class="stats-dashboard">
+	<div class="stat-card">
+		<div class="stat-icon total">
+			<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+				<path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/>
+				<path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/>
+			</svg>
+		</div>
+		<div class="stat-info">
+			<span class="stat-value">@_users.Count</span>
+			<span class="stat-label">Authenticated Users</span>
+		</div>
+	</div>
+	<div class="stat-card">
+		<div class="stat-icon completed">
+			<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+				<path d="M5 12.55a11 11 0 0 1 14.08 0M1.42 9a16 16 0 0 1 21.16 0M8.53 16.11a6 6 0 0 1 6.95 0"/>
+				<line x1="12" y1="20" x2="12.01" y2="20"/>
+			</svg>
+		</div>
+		<div class="stat-info">
+			<span class="stat-value">@ConnectionTracker.TotalConnections</span>
+			<span class="stat-label">Active Connections</span>
+		</div>
+	</div>
+	<div class="stat-card">
+		<div class="stat-icon total">
+			<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+				<path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>
+			</svg>
+		</div>
+		<div class="stat-info">
+			<span class="stat-value">@ConnectionTracker.DistinctUsersOnline</span>
+			<span class="stat-label">Users Online (@ConnectionTracker.AuthenticatedConnections auth conns)</span>
+		</div>
+	</div>
+	<div class="stat-card">
+		<div class="stat-icon pending">
+			<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+				<path d="M18.36 6.64A9 9 0 1 1 5.64 6.64M12 2v10"/>
+			</svg>
+		</div>
+		<div class="stat-info">
+			<span class="stat-value">@LoginActivity.FailedSinceStartup</span>
+			<span class="stat-label">Failed Logins (since @LoginActivity.StartedAtUtc.ToString("MMM d, HH:mm") UTC)</span>
+		</div>
+	</div>
+</div>
+
+<div class="admin-toolbar">
+	<button class="btn btn-outline-secondary btn-sm" @onclick="RefreshAsync" disabled="@_busy">
+		Refresh
+	</button>
+</div>
+
+<!-- Users -->
+<h2 class="section-title">Users</h2>
+@if (!_initialized)
+{
+	<p>Loading users...</p>
+}
+else if (_users.Count == 0)
+{
+	<p class="text-muted">No users found.</p>
+}
+else
+{
+	<div class="users-table-wrap">
+		<div class="users-table">
+			<div class="users-header">
+				<span>Email</span>
+				<span>Confirmed</span>
+				<span>Status</span>
+				<span>Created</span>
+				<span class="col-actions">Actions</span>
+			</div>
+			@foreach (var u in _users)
+			{
+				<div class="users-row" @key="u.Id">
+					<span class="col-email">
+						<span class="email-text">@u.Email</span>
+						@if (!string.IsNullOrWhiteSpace(u.DisplayName))
+						{
+							<span class="display-name">@u.DisplayName</span>
+						}
+					</span>
+					<span>
+						@if (u.EmailConfirmed)
+						{
+							<span class="pill pill-ok">Confirmed</span>
+						}
+						else
+						{
+							<span class="pill pill-warn">Pending</span>
+						}
+					</span>
+					<span class="col-status">
+						@if (u.IsAdmin)
+						{
+							<span class="pill pill-admin">Admin</span>
+						}
+						@if (u.IsLockedOut)
+						{
+							<span class="pill pill-danger">Locked</span>
+						}
+						@if (u.AccessFailedCount > 0)
+						{
+							<span class="pill pill-muted" title="Failed attempts on this account">@u.AccessFailedCount fails</span>
+						}
+					</span>
+					<span class="col-num">@u.CreatedAt.ToString("MMM d, yyyy")</span>
+					<span class="col-actions">
+						@if (!u.EmailConfirmed)
+						{
+							<button class="btn btn-sm btn-outline-success" disabled="@_busy"
+									@onclick="() => ConfirmEmailAsync(u)">Confirm</button>
+							<button class="btn btn-sm btn-outline-secondary" disabled="@_busy"
+									@onclick="() => ResendAsync(u)">Resend</button>
+						}
+						<button class="btn btn-sm btn-outline-primary" disabled="@_busy"
+								@onclick="() => ResetPasswordAsync(u)">Reset PW</button>
+						<button class="btn btn-sm btn-outline-danger" disabled="@(_busy || IsUndeletable(u))"
+								title="@(IsUndeletable(u) ? "This account cannot be deleted" : "Delete user and all their data")"
+								@onclick="() => DeleteAsync(u)">Delete</button>
+					</span>
+				</div>
+			}
+		</div>
+	</div>
+}
+
+@if (LoginActivity.RecentFailures.Count > 0)
+{
+	<h2 class="section-title">Recent Failed Logins</h2>
+	<div class="users-table-wrap">
+		<div class="fails-table">
+			<div class="fails-header">
+				<span>Email</span>
+				<span>When (UTC)</span>
+			</div>
+			@foreach (var f in LoginActivity.RecentFailures)
+			{
+				<div class="fails-row">
+					<span>@f.Email</span>
+					<span class="col-num">@f.AtUtc.ToString("MMM d, HH:mm:ss")</span>
+				</div>
+			}
+		</div>
+	</div>
+}
+
+<style>
+	.page-title {
+		font-size: 1.5rem;
+		font-weight: 700;
+		color: var(--text-primary);
+		margin: 0 0 var(--space-5);
+	}
+
+	.section-title {
+		font-size: 1.125rem;
+		font-weight: 600;
+		color: var(--text-primary);
+		margin: var(--space-6) 0 var(--space-4);
+	}
+
+	.admin-banner {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		gap: var(--space-3);
+		padding: var(--space-3) var(--space-4);
+		border-radius: var(--radius-lg);
+		margin-bottom: var(--space-4);
+		font-size: 0.9rem;
+	}
+
+	.admin-banner.success {
+		background: var(--success-light);
+		color: var(--success);
+		border: 1px solid var(--success);
+	}
+
+	.admin-banner.error {
+		background: var(--warning-light);
+		color: #b91c1c;
+		border: 1px solid #b91c1c;
+	}
+
+	.banner-close {
+		background: none;
+		border: none;
+		font-size: 1.25rem;
+		line-height: 1;
+		cursor: pointer;
+		color: inherit;
+	}
+
+	.stats-dashboard {
+		display: grid;
+		grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+		gap: var(--space-4);
+		margin-bottom: var(--space-5);
+	}
+
+	.stat-card {
+		background: var(--surface);
+		border: 1px solid var(--border-light);
+		border-radius: var(--radius-lg);
+		padding: var(--space-4);
+		display: flex;
+		align-items: center;
+		gap: var(--space-3);
+	}
+
+	.stat-icon {
+		width: 44px;
+		height: 44px;
+		border-radius: var(--radius-lg);
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		flex-shrink: 0;
+	}
+
+	.stat-icon.total { background: var(--primary-50); color: var(--primary); }
+	.stat-icon.pending { background: var(--warning-light); color: #d97706; }
+	.stat-icon.completed { background: var(--success-light); color: var(--success); }
+
+	.stat-info { display: flex; flex-direction: column; }
+	.stat-value { font-size: 1.5rem; font-weight: 700; color: var(--text-primary); line-height: 1; }
+	.stat-label { font-size: 0.75rem; color: var(--text-secondary); margin-top: var(--space-1); }
+
+	.admin-toolbar {
+		display: flex;
+		justify-content: flex-end;
+		margin-bottom: var(--space-3);
+	}
+
+	.users-table-wrap { overflow-x: auto; }
+
+	.users-table, .fails-table {
+		background: var(--surface);
+		border: 1px solid var(--border-light);
+		border-radius: var(--radius-lg);
+		overflow: hidden;
+		min-width: 720px;
+	}
+
+	.users-header, .users-row {
+		display: grid;
+		grid-template-columns: minmax(180px, 1.6fr) 110px 150px 120px minmax(220px, 1fr);
+		padding: var(--space-3) var(--space-4);
+		align-items: center;
+		gap: var(--space-2);
+	}
+
+	.fails-header, .fails-row {
+		display: grid;
+		grid-template-columns: 1fr 160px;
+		padding: var(--space-2) var(--space-4);
+		align-items: center;
+	}
+
+	.users-header, .fails-header {
+		background: var(--gray-50, #f9fafb);
+		font-size: 0.75rem;
+		font-weight: 600;
+		color: var(--text-muted);
+		text-transform: uppercase;
+		letter-spacing: 0.05em;
+		border-bottom: 1px solid var(--border-light);
+	}
+
+	.users-row, .fails-row {
+		border-bottom: 1px solid var(--border-light);
+		font-size: 0.875rem;
+		color: var(--text-primary);
+	}
+
+	.users-row:last-child, .fails-row:last-child { border-bottom: none; }
+	.users-row:hover, .fails-row:hover { background: var(--gray-50, #f9fafb); }
+
+	.col-email { display: flex; flex-direction: column; min-width: 0; }
+	.email-text { font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+	.display-name { font-size: 0.75rem; color: var(--text-secondary); }
+	.col-status { display: flex; flex-wrap: wrap; gap: 4px; }
+	.col-num { font-variant-numeric: tabular-nums; color: var(--text-secondary); }
+	.col-actions { display: flex; flex-wrap: wrap; gap: 6px; }
+
+	.pill {
+		display: inline-block;
+		padding: 2px 8px;
+		border-radius: var(--radius-full);
+		font-size: 0.7rem;
+		font-weight: 600;
+		white-space: nowrap;
+	}
+
+	.pill-ok { background: var(--success-light); color: var(--success); }
+	.pill-warn { background: var(--warning-light); color: #d97706; }
+	.pill-admin { background: var(--primary-50); color: var(--primary); }
+	.pill-danger { background: #fee2e2; color: #b91c1c; }
+	.pill-muted { background: var(--gray-50, #f3f4f6); color: var(--text-muted); }
+</style>
+
+@code {
+	[CascadingParameter]
+	private Task<AuthenticationState>? AuthState { get; set; }
+
+	private readonly List<AdminUserView> _users = new();
+	private bool _initialized;
+	private bool _busy;
+	private string? _message;
+	private bool _messageIsError;
+	private Guid _actingAdminId;
+
+	protected override async Task OnInitializedAsync()
+	{
+		if (AuthState is not null)
+		{
+			var state = await AuthState;
+			var sub = state.User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+			Guid.TryParse(sub, out _actingAdminId);
+		}
+	}
+
+	protected override async Task OnFirstRenderAsync()
+	{
+		await LoadUsersAsync();
+		_initialized = true;
+	}
+
+	private bool IsUndeletable(AdminUserView u) =>
+		u.Id == _actingAdminId || (u.IsAdmin && _users.Count(x => x.IsAdmin) <= 1);
+
+	private async Task LoadUsersAsync()
+	{
+		var users = await AdminService.GetUsersAsync();
+		_users.Clear();
+		_users.AddRange(users);
+	}
+
+	private async Task RefreshAsync()
+	{
+		await LoadUsersAsync();
+		// Also picks up live connection / failed-login counters via re-render.
+	}
+
+	private void ShowResult(AdminResult result)
+	{
+		_message = result.Message;
+		_messageIsError = !result.Success;
+	}
+
+	private async Task ConfirmEmailAsync(AdminUserView u)
+	{
+		await RunAsync(() => AdminService.ConfirmEmailAsync(u.Id));
+	}
+
+	private async Task ResendAsync(AdminUserView u)
+	{
+		await RunAsync(() => AdminService.ResendConfirmationAsync(u.Id, Origin()));
+	}
+
+	private async Task ResetPasswordAsync(AdminUserView u)
+	{
+		await RunAsync(() => AdminService.SendPasswordResetAsync(u.Id, Origin()));
+	}
+
+	private async Task DeleteAsync(AdminUserView u)
+	{
+		var confirmed = await DialogService.ConfirmAsync(
+			$"Permanently delete {u.Email} and ALL of their data? This cannot be undone.",
+			"Delete user");
+		if (!confirmed) return;
+
+		await RunAsync(() => AdminService.DeleteUserAsync(u.Id, _actingAdminId));
+	}
+
+	// Runs an admin action with a busy guard, shows the result, and reloads the user list.
+	private async Task RunAsync(Func<Task<AdminResult>> action)
+	{
+		if (_busy) return;
+		_busy = true;
+		try
+		{
+			var result = await action();
+			ShowResult(result);
+			await LoadUsersAsync();
+		}
+		finally
+		{
+			_busy = false;
+		}
+	}
+
+	private string Origin() => Navigation.BaseUri.TrimEnd('/');
+}

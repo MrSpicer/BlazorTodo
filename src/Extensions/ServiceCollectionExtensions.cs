@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Components.Server.Circuits;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Identity.UI.Services;
 using Microsoft.EntityFrameworkCore;
@@ -6,6 +7,7 @@ using TodoList.Data.Repositories;
 using TodoList.Identity;
 using TodoList.Realtime;
 using TodoList.Services;
+using TodoList.Services.Admin;
 
 namespace TodoList.Extensions;
 
@@ -54,6 +56,9 @@ public static class ServiceCollectionExtensions
             })
             .AddEntityFrameworkStores<AppDbContext>()
             .AddDefaultUI()
+            // TrackingSignInManager records failed sign-ins into the in-memory login tracker so
+            // the admin dashboard can report them without touching the default Login page.
+            .AddSignInManager<TrackingSignInManager>()
             .AddDefaultTokenProviders();
 
         services.AddTransient<IEmailSender, SmtpEmailSender>();
@@ -71,6 +76,13 @@ public static class ServiceCollectionExtensions
         // In-process pub/sub for multi-device change notifications. Singleton because all
         // circuits (regardless of user) share the same bus and filter events by UserId.
         services.AddSingleton<IUserChangeBus, UserChangeBus>();
+
+        // Admin dashboard: in-memory usage trackers (singletons, reset on restart) plus the
+        // per-circuit handler that feeds the connection tracker and the scoped admin service.
+        services.AddSingleton<IConnectionTracker, ConnectionTracker>();
+        services.AddSingleton<ILoginActivityTracker, LoginActivityTracker>();
+        services.AddScoped<CircuitHandler, AdminCircuitHandler>();
+        services.AddScoped<IAdminService, AdminService>();
 
         // LocalStorage repositories (anonymous-user path).
         services.AddScoped<TodoRepository>();
