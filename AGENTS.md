@@ -2,21 +2,27 @@
 
 ## Build & Run Commands
 
+All source lives under `src/`; the solution and non-source files stay at the git root.
+
+The app needs a PostgreSQL connection string to start. For local dev, bring up Postgres + MailHog first
+(`docker compose -f docker-compose.dev.yml up -d`) — the dev connection string and dev admin are already in
+`src/appsettings.Development.json`. See `DEPLOY.md` for production.
+
 ### Build
 ```bash
-dotnet build TodoList.csproj
+dotnet build BlazorTodo.sln
 ```
 
 ### Run Development Server
 ```bash
-dotnet run
+dotnet run --project src/TodoList.csproj
 # or with hot reload:
-dotnet watch run
+cd src && dotnet watch
 ```
 
 ### Publish
 ```bash
-dotnet publish TodoList.csproj
+dotnet publish src/TodoList.csproj
 ```
 
 ### Testing
@@ -27,26 +33,30 @@ Currently no test projects exist. When adding tests:
 
 ## Project Structure
 
-- `/Components` - Reusable Blazor components organized by feature
-  - `/Todo` - Todo-specific components
-  - `/Project` - Project management components  
-  - `/Shared` - Shared components across features
-- `/Data` - Repository implementations (LocalStorage)
-- `/Extensions` - Extension methods (DI registration)
-- `/Helpers` - Helper classes and utilities
-- `/Interfaces` - Interface definitions (I-prefix)
-- `/Models` - Data models and entities
-  - `/Enums` - Enumeration types
-- `/Pages` - Routable Blazor pages
-- `/Services` - Business logic services
-- `/Shared` - Shared layout components
-- `/wwwroot` - Static assets (CSS, images, etc.)
+All source is rooted under `src/`. Interfaces live beside their implementations (in `src/Services`, `src/Data`),
+not in a separate `/Interfaces` folder.
+
+- `src/Components` - Blazor components and pages
+  - `Pages/` - Routable pages (Todo, Statistics, Settings, About, Admin)
+  - `Todo/`, `Project/`, `Notes/` - feature components
+  - `Shared/` - shared components (modals, badges, RedirectToLogin, MultiDeviceSyncListener)
+  - `Layout/` - MainLayout, NavMenu
+- `src/Data` - Repository implementations (`LocalStorage*` for anonymous, `Ef*` for authenticated/PostgreSQL, `Routing*` dispatching by auth state), `AppDbContext`, `Configurations/`, `Migrations/`, `DatabaseInitializer`
+- `src/Identity` - ASP.NET Identity (`ApplicationUser`, `TrackingSignInManager`, `SmtpEmailSender`, onboarding, `ICurrentUserContext`)
+- `src/Realtime` - `IUserChangeBus` pub/sub for real-time multi-device sync
+- `src/Services` - Business logic services; `Services/Admin/` holds the admin dashboard layer
+- `src/Extensions` - Extension methods (DI registration)
+- `src/Helpers` - Helper classes and utilities
+- `src/Models` - Data models, entities, and enums
+- `src/wwwroot` - Static assets (CSS, images, etc.)
 
 ## Technology Stack
 
 - .NET 10.0
 - Blazor Server
-- Blazored.LocalStorage (data persistence)
+- PostgreSQL + EF Core (Npgsql) — server-side persistence for authenticated users
+- ASP.NET Core Identity — accounts, roles, email confirmation, password reset
+- Blazored.LocalStorage — browser persistence for anonymous users
 - Bootstrap 5 (UI framework)
 
 ## Code Style Guidelines
@@ -162,7 +172,7 @@ public class TodoService : ITodoService
 ```
 
 ### Repository Pattern
-- Repositories handle data persistence (LocalStorage)
+- Repositories handle data persistence: `LocalStorage*` (anonymous) and `Ef*`/PostgreSQL (authenticated), dispatched by a `Routing*Repository`
 - Async operations throughout: `Task<T>`, `Task<bool>`, `Task`
 - Return success boolean for add/update operations
 - Initialize with `InitializeAsync()` called from service

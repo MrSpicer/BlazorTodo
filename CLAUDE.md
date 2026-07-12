@@ -20,9 +20,19 @@ dotnet publish src/TodoList.csproj
 
 This is a .NET 10 Blazor Server application. There are no tests configured.
 
+The app requires a PostgreSQL connection string (`ConnectionStrings:Default`) to start — DI throws without it.
+For local dev, bring up Postgres + MailHog first: `docker compose -f docker-compose.dev.yml up -d`. The dev
+connection string and a dev admin (`admin@blazortodo.local` / `DevAdmin!2345`) are already in
+`src/appsettings.Development.json`. EF Core migrations are applied automatically at startup by `DatabaseInitializer`.
+See `DEPLOY.md` for production (Docker Swarm + Cloudflare Tunnel).
+
 ## Architecture Overview
 
-**BlazorTodo** is a todo management app with projects, using Blazor Server with browser local storage persistence via Blazored.LocalStorage.
+**BlazorTodo** is a todo management app with projects, built on Blazor Server. Persistence is **dual-mode**:
+anonymous visitors persist to browser local storage (Blazored.LocalStorage); authenticated users persist to
+**PostgreSQL via EF Core**. The service layer is unaware of which backend is active — `Routing*Repository` classes
+dispatch per request on `ICurrentUserContext.IsAuthenticated`. Authenticated users also get real-time
+multi-device sync. Accounts, email confirmation, password reset, and an `Admin` role come from ASP.NET Core Identity.
 
 ### Layer Structure
 
@@ -33,24 +43,29 @@ All source lives under `src/`. Non-source files (sln, Dockerfile, docs, scripts)
   - `Statistics.razor` (`/statistics`) - Todo stats and charts
   - `Settings.razor` (`/settings`) - App settings
   - `About.razor` (`/about`) - App info
-  - `Restore.razor` (`/restore`) - Restore data from a sync session ID
+  - `Admin.razor` (`/admin`) - Admin dashboard, gated by `[Authorize(Roles = "Admin")]`
 - **src/Components/** - Reusable Blazor components organized by domain:
   - `Todo/` - TodoForm, TodoFilters, TodoListView, TodoItemRow, TodoFormModal
   - `Project/` - ProjectTabs, ProjectModal
   - `Notes/` - NoteCard, NotesList, NoteFormModal
-  - `Shared/` - ImportExportModal, PriorityBadge, StatusBadge, SyncModal
-  - `Layout/` - MainLayout, NavMenu
-- **src/Services/** - Business logic layer with interfaces (ITodoService, IProjectService, IDialogService, IImportExportService, INoteService, ISyncService, IFileService)
-- **src/Data/** - Repository implementations and interfaces (TodoRepository, ProjectRepository, NoteRepository + ITodo/IProject/INoteRepository)
-- **src/Models/** - Domain entities (TodoItem, Project, ProjectNote) and enums (Priority, TodoItemStatus, FilterOption, SortOption)
+  - `Shared/` - ImportExportModal, PriorityBadge, StatusBadge, RedirectToLogin, MultiDeviceSyncListener
+  - `Layout/` - MainLayout (auth header + sync listener), NavMenu (Admin link gated by `<AuthorizeView Roles="Admin">`)
+- **src/Services/** - Business logic layer with interfaces (ITodoService, IProjectService, IDialogService, IImportExportService, INoteService, IFileService, ITagService, IStatusService, IPriorityService, IFilterPresetService, UserOnboardingService)
+  - `Admin/` - Admin layer (IAdminService, IConnectionTracker, ILoginActivityTracker, AdminCircuitHandler)
+- **src/Data/** - Repositories and `AppDbContext`. Three repository implementations per aggregate: `LocalStorage*` (anonymous), `Ef*` (authenticated, in `Repositories/`, per-user scoped via `EfRepositoryBase`/`RequireUserId()`), and `Routing*` (wrapper the interfaces resolve to, dispatching on auth state). Also `Configurations/` (EF `IEntityTypeConfiguration`s), `Migrations/`, and `DatabaseInitializer`.
+- **src/Identity/** - ASP.NET Identity: `ApplicationUser : IdentityUser<Guid>`, `TrackingSignInManager`, `SmtpEmailSender`, `AdminSeedOptions`, `UserOnboardingService`, `ICurrentUserContext`
+- **src/Realtime/** - `IUserChangeBus`/`UserChangeBus` (in-process pub/sub keyed by UserId) powering multi-device sync
+- **src/Models/** - Domain entities (TodoItem, Project, ProjectNote, Tag, Status, Priority, FilterPreset) and enums (Priority, TodoItemStatus, FilterOption, SortOption). Server-persisted entities carry a `UserId`.
 
 ### Key Patterns
 
-1. **Service/Repository separation**: Services handle business logic; repositories handle Blazored.LocalStorage persistence
-2. **Event-driven UI updates**: Services expose `OnTodosChanged`/`OnProjectsChanged` events that components subscribe to
-3. **DI registration**: All services registered in `Extensions/ServiceCollectionExtensions.cs` as scoped
-4. **Component communication**: Parent components pass callbacks (`OnEdit`, `OnDelete`, `OnStatusChange`) to child components
-5. **Device sync**: `SyncService` stores exported JSON in server-side `IMemoryCache` (48hr TTL, 15min rate limit). Generates QR codes via `Net.Codecrete.QrCodeGenerator`. Restore page accepts a session ID to pull data from cache.
+1. **Service/Repository separation**: Services handle business logic; repositories handle persistence
+2. **Routing repositories**: The `ITodoRepository`/`IProjectRepository`/etc. interfaces resolve to `Routing*Repository` wrappers that delegate to the `Ef*` (server/Postgres) repo when `ICurrentUserContext.IsAuthenticated`, else the `LocalStorage*` (browser) repo. EF repos scope every query by `UserId` and re-validate DataAnnotations at the persistence boundary (`EfRepositoryBase`)
+3. **Event-driven UI updates**: Services expose `OnTodosChanged`/`OnProjectsChanged` events that components subscribe to
+4. **DI registration**: Services registered in `Extensions/ServiceCollectionExtensions.cs` (scoped). Identity is wired here too: `AddIdentity<ApplicationUser, IdentityRole<Guid>>().AddDefaultUI().AddSignInManager<TrackingSignInManager>()` (RequireConfirmedAccount/Email, password length 10, lockout after 5). `AppDbContext` uses `AddDbContextFactory` (circuits outlive requests, so repos build short-lived contexts) with Npgsql `EnableDynamicJson()` for `jsonb` columns
+5. **Component communication**: Parent components pass callbacks (`OnEdit`, `OnDelete`, `OnStatusChange`) to child components
+6. **Multi-device sync**: For authenticated users, `IUserChangeBus` (`src/Realtime/`, in-process pub/sub keyed by UserId) notifies the `MultiDeviceSyncListener` in `MainLayout` so changes made on one device refresh others in real time
+7. **Admin & Identity**: `DatabaseInitializer` (invoked from `Program.cs`) applies migrations and seeds the `Admin` role + admin user from the `AdminUser` config section (or `/run/secrets/admin_password`). `TrackingSignInManager` records failed logins for the admin dashboard; `AdminCircuitHandler`/`IConnectionTracker` track live connections; `ILoginActivityTracker` holds recent failures. `src/Program.cs` adds production hardening (HSTS, ForwardedHeaders for Cloudflare, secure auth cookies, CSP, per-IP rate limiting)
 
 ### Domain Model
 
