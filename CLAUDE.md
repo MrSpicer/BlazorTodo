@@ -21,7 +21,7 @@ dotnet publish src/TodoList.csproj
 This is a .NET 10 Blazor Server application. There are no tests configured.
 
 The app requires a PostgreSQL connection string (`ConnectionStrings:Default`) to start — DI throws without it.
-For local dev, bring up Postgres + MailHog first: `docker compose -f docker-compose.dev.yml up -d`. The dev
+For local dev, bring up Postgres + smtp4dev first: `docker compose -f docker-compose.dev.yml up -d`. The dev
 connection string and a dev admin (`admin@blazortodo.local` / `DevAdmin!2345`) are already in
 `src/appsettings.Development.json`. EF Core migrations are applied automatically at startup by `DatabaseInitializer`.
 See `DEPLOY.md` for production (Docker Swarm + Cloudflare Tunnel).

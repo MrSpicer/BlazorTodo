@@ -122,12 +122,12 @@ admin (step 5) is seeded in the same startup pass, right after migrations.
 This builds the image, initializes a single-node swarm if needed, creates dummy secrets, and deploys with:
 
 - App on `http://localhost:8080`
-- MailHog on `http://localhost:8025` (catches all outbound mail)
+- smtp4dev on `http://localhost:8025` (catches all outbound mail)
 - No `cloudflared` container
 
 Tear down: `docker stack rm todolist`. Volumes persist — remove them with `docker volume rm blazortodo_postgres_data` if you want a clean DB.
 
-Note: the simpler `dotnet run` + `docker-compose.dev.yml` (Postgres + MailHog only) is still the fastest iteration loop for code changes. Use the Swarm deploy when you want to verify the production stack end-to-end.
+Note: the simpler `dotnet run` + `docker-compose.dev.yml` (Postgres + smtp4dev only) is still the fastest iteration loop for code changes. Use the Swarm deploy when you want to verify the production stack end-to-end.
 
 ## Updates
 
@@ -161,9 +161,9 @@ Make sure the image for the previous tag still exists on the host (or is pullabl
 
 **Swarm stack shadows compose ports.** If you previously ran `./scripts/deploy-local.sh`
 and later switch back to the plain `docker-compose.dev.yml` workflow, the Swarm-managed
-`todolist_mailhog` service can hold onto container names and networks the compose file
+`todolist_smtp4dev` service can hold onto container names and networks the compose file
 expects. Symptom: `docker ps` shows containers up but with no host port bindings, and the
-.NET app fails to connect to `localhost:1025` (MailHog SMTP).
+.NET app fails to connect to `localhost:1025` (smtp4dev SMTP).
 
 ```bash
 docker stack rm todolist

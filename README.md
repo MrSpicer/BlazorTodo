@@ -34,7 +34,7 @@ and a dev admin are already configured in `src/appsettings.Development.json`.
 git clone https://github.com/MrSpicer/BlazorTodo.git
 cd BlazorTodo
 
-# Start Postgres (5432) + MailHog (SMTP 1025 / UI 8025)
+# Start Postgres (5432) + smtp4dev (SMTP 1025 / UI 8025)
 docker compose -f docker-compose.dev.yml up -d
 
 # Run the app
@@ -44,7 +44,7 @@ dotnet run --project src/TodoList.csproj
 Open [http://localhost:5217](http://localhost:5217).
 
 Dev admin login: `admin@blazortodo.local` / `DevAdmin!2345`. Confirmation and password-reset emails are captured by
-MailHog at [http://localhost:8025](http://localhost:8025).
+smtp4dev at [http://localhost:8025](http://localhost:8025).
 
 ## Deployment
 

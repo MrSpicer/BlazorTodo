@@ -26,12 +26,12 @@ if [[ -z "${SKIP_BUILD:-}" ]]; then
 	docker build -t blazortodo:latest -f Dockerfile .
 fi
 
-# 4. Configure environment for dev: app + mailhog exposed on localhost, no
+# 4. Configure environment for dev: app + smtp4dev exposed on localhost, no
 #    cloudflared.
 export TAG="${TAG:-latest}"
 export ASPNETCORE_ENVIRONMENT=Development
 export EMAIL_PROVIDER=smtp
-export EMAIL_SMTP_HOST=mailhog
+export EMAIL_SMTP_HOST=smtp4dev
 export EMAIL_SMTP_PORT=1025
 export EMAIL_FROM_ADDRESS="noreply@blazortodo.local"
 export EMAIL_FROM_NAME="BlazorTodo (Dev)"
@@ -41,16 +41,16 @@ export POSTGRES_PASSWORD="dev-password"
 export ADMIN_EMAIL="admin@blazortodo.local"
 export ADMIN_DISPLAY_NAME="Dev Admin"
 export LOCAL_APP_PORT=8080
-export LOCAL_MAILHOG_PORT=8025
-export MAILHOG_REPLICAS=1
+export LOCAL_SMTP4DEV_PORT=8025
+export SMTP4DEV_REPLICAS=1
 export CLOUDFLARED_REPLICAS=0
 
-docker stack deploy --detach=false -c docker-stack.yml todolist
+docker stack deploy --detach=false --prune -c docker-stack.yml todolist
 
 echo
 echo "Stack deployed."
 echo "  App:     http://localhost:8080"
-echo "  MailHog: http://localhost:8025"
+echo "  smtp4dev: http://localhost:8025"
 echo
 echo "Watch services with: docker stack ps todolist"
 echo "Tear down with:      docker stack rm todolist"

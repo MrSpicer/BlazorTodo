@@ -4,7 +4,7 @@
 
 All source lives under `src/`; the solution and non-source files stay at the git root.
 
-The app needs a PostgreSQL connection string to start. For local dev, bring up Postgres + MailHog first
+The app needs a PostgreSQL connection string to start. For local dev, bring up Postgres + smtp4dev first
 (`docker compose -f docker-compose.dev.yml up -d`) — the dev connection string and dev admin are already in
 `src/appsettings.Development.json`. See `DEPLOY.md` for production.
 

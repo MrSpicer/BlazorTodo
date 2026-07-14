@@ -26,11 +26,11 @@ export EMAIL_SMTP_PORT="${EMAIL_SMTP_PORT:-}"
 export EMAIL_FROM_ADDRESS="${EMAIL_FROM_ADDRESS:-noreply@example.com}"
 export EMAIL_FROM_NAME="${EMAIL_FROM_NAME:-BlazorTodo}"
 export LOCAL_APP_PORT=0
-export LOCAL_MAILHOG_PORT=0
-export MAILHOG_REPLICAS=0
+export LOCAL_SMTP4DEV_PORT=0
+export SMTP4DEV_REPLICAS=0
 export CLOUDFLARED_REPLICAS=1
 
-docker stack deploy --detach=false -c docker-stack.yml todolist
+docker stack deploy --detach=false --prune -c docker-stack.yml todolist
 
 echo
 echo "Prod stack deployed (TAG=$TAG)."

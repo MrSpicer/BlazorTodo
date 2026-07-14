@@ -2,10 +2,10 @@
 # Environment-driven knobs:
 #   TAG                    image tag (default "latest")
 #   ASPNETCORE_ENVIRONMENT "Development" or "Production"
-#   EMAIL_PROVIDER         "mailhog" (dev) or "smtp"/"resend" (prod)
+#   EMAIL_PROVIDER         "smtp4dev" (dev) or "smtp"/"resend" (prod)
 #   LOCAL_APP_PORT         dev only; e.g. 8080. Leave 0 in prod (cloudflared handles ingress).
-#   LOCAL_MAILHOG_PORT     dev only; e.g. 8025. Leave 0 in prod.
-#   MAILHOG_REPLICAS       1 in dev, 0 in prod.
+#   LOCAL_SMTP4DEV_PORT    dev only; e.g. 8025. Leave 0 in prod.
+#   SMTP4DEV_REPLICAS      1 in dev, 0 in prod.
 #   CLOUDFLARED_REPLICAS   0 in dev, 1 in prod.
 #
 # Required secrets (created with `docker secret create`):
@@ -43,7 +43,7 @@ services:
       # full string for dev simplicity; prod operators can swap to Passfile.
       ConnectionStrings__Default: "Host=postgres;Port=5432;Database=todolist;Username=todolist;Password=${POSTGRES_PASSWORD:-dev-password}"
       Email__Provider: ${EMAIL_PROVIDER:-smtp}
-      Email__Smtp__Host: ${EMAIL_SMTP_HOST:-mailhog}
+      Email__Smtp__Host: ${EMAIL_SMTP_HOST:-smtp4dev}
       Email__Smtp__Port: ${EMAIL_SMTP_PORT:-1025}
       Email__FromAddress: ${EMAIL_FROM_ADDRESS:-noreply@blazortodo.local}
       Email__FromName: ${EMAIL_FROM_NAME:-BlazorTodo}
@@ -98,16 +98,22 @@ services:
       restart_policy:
         condition: any
 
-  mailhog:
-    image: mailhog/mailhog:latest
+  smtp4dev:
+    image: rnwood/smtp4dev:v3
     networks: [internal]
+    environment:
+      # SMTP on 1025 so the app's Email__Smtp__Port default (1025) reaches it over the
+      # overlay network. The web UI stays on smtp4dev's default container port 80 and is
+      # published to the host below (ServerOptions__Urls does not relocate the web listener).
+      ServerOptions__Port: 1025
+      ServerOptions__HostName: smtp4dev
     ports:
-      - target: 8025
-        published: ${LOCAL_MAILHOG_PORT:-0}
+      - target: 80
+        published: ${LOCAL_SMTP4DEV_PORT:-0}
         protocol: tcp
         mode: host
     deploy:
-      replicas: ${MAILHOG_REPLICAS:-0}
+      replicas: ${SMTP4DEV_REPLICAS:-0}
 
 networks:
   internal:
