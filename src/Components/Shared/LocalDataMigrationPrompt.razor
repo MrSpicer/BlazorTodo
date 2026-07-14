@@ -1,0 +1,128 @@
+@inject ILocalDataMigrationService Migration
+
+@* Invisible until, on first render of an authenticated circuit, the migration service
+   reports this browser holds pre-sign-in data that hasn't been uploaded or opted out of.
+   Offers a one-time upload that merges local data into the account then clears it locally. *@
+
+@if (_show)
+{
+	<Modal IsVisible="true"
+	       Title="Upload local data to your account"
+	       Size="compact"
+	       CloseOnOverlayClick="false"
+	       OnClose="NotNow">
+		<div class="modal-body">
+			@if (_succeeded)
+			{
+				<p>Your local data was uploaded to your account.</p>
+				<p class="ldm-summary">@_summary</p>
+			}
+			else
+			{
+				<p>
+					This browser has to-dos, projects, or notes you created before signing in.
+					Uploading merges them into your account, then removes them from this browser.
+				</p>
+				@if (_error is not null)
+				{
+					<p class="ldm-error">@_error</p>
+				}
+			}
+		</div>
+		<div class="modal-footer">
+			@if (_succeeded)
+			{
+				<button class="btn btn-primary" @onclick="Close">Close</button>
+			}
+			else
+			{
+				<button class="btn btn-primary" @onclick="Upload" disabled="@_busy">
+					@(_busy ? "Uploading…" : (_error is null ? "Upload" : "Try again"))
+				</button>
+				<button class="btn btn-outline-secondary" @onclick="NotNow" disabled="@_busy">Not now</button>
+				<button class="btn btn-ghost" @onclick="DontAskAgain" disabled="@_busy">Don't ask again</button>
+			}
+		</div>
+	</Modal>
+}
+
+<style>
+	.ldm-summary {
+		font-size: 0.875rem;
+		color: var(--text-secondary);
+		margin: var(--space-2) 0 0;
+	}
+
+	.ldm-error {
+		font-size: 0.875rem;
+		color: var(--danger);
+		margin: var(--space-2) 0 0;
+	}
+</style>
+
+@code {
+	private bool _show;
+	private bool _busy;
+	private bool _succeeded;
+	private string? _error;
+	private string _summary = string.Empty;
+
+	// OnAfterRenderAsync is the earliest JS-interop-safe point, and ShouldPromptAsync reads
+	// localStorage. One check per circuit → "Not now" naturally re-asks on the next session.
+	protected override async Task OnAfterRenderAsync(bool firstRender)
+	{
+		if (!firstRender)
+			return;
+
+		if (await Migration.ShouldPromptAsync())
+		{
+			_show = true;
+			StateHasChanged();
+		}
+	}
+
+	private async Task Upload()
+	{
+		_busy = true;
+		_error = null;
+		StateHasChanged();
+
+		var result = await Migration.MigrateAsync();
+		_busy = false;
+
+		if (result.Success)
+		{
+			_succeeded = true;
+			_summary = BuildSummary(result);
+		}
+		else
+		{
+			_error = result.ErrorMessage ?? "Upload failed. Please try again.";
+		}
+		StateHasChanged();
+	}
+
+	private void NotNow() => _show = false;
+
+	private async Task DontAskAgain()
+	{
+		await Migration.SetDontAskAgainAsync();
+		_show = false;
+	}
+
+	private void Close() => _show = false;
+
+	private static string BuildSummary(ImportResult r)
+	{
+		var parts = new List<string> { $"{r.ImportedCount} item(s) uploaded" };
+		if (r.RemappedToDefaultCount > 0)
+			parts.Add($"{r.RemappedToDefaultCount} moved to the default project");
+		if (r.SkippedCount > 0)
+			parts.Add($"{r.SkippedCount} skipped");
+
+		var summary = string.Join(", ", parts) + ".";
+		if (r.Warnings.Count > 0)
+			summary += " " + string.Join(" ", r.Warnings);
+		return summary;
+	}
+}

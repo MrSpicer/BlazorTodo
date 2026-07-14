@@ -1,10 +1,11 @@
 @page "/settings"
-@using Blazored.LocalStorage
+@using TodoList.Identity
 @inject IImportExportService ImportExportService
 @inject IFileService FileService
 @inject IDialogService DialogService
 @inject IFilterPresetService PresetService
-@inject ILocalStorageService LocalStorage
+@inject ILocalDataMigrationService MigrationService
+@inject ICurrentUserContext UserContext
 @inject NavigationManager NavigationManager
 @inherits PageComponentBase
 
@@ -136,6 +137,36 @@
 			</label>
 		</div>
 	</div>
+
+	<!-- Upload local data to account -->
+	@if (_canUploadLocalData)
+	{
+		<div class="settings-card">
+			<div class="settings-card-header">
+				<div class="settings-card-icon">
+					<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+						<path d="M20.39 18.39A5 5 0 0 0 18 9h-1.26A8 8 0 1 0 3 16.3"/>
+						<polyline points="16 16 12 12 8 16"/>
+						<line x1="12" y1="12" x2="12" y2="21"/>
+					</svg>
+				</div>
+				<div>
+					<h2 class="settings-card-title">Upload local data to your account</h2>
+					<p class="settings-card-description">This browser has to-dos, projects, or notes created before you signed in. Upload them to merge them into your account, then remove them from this browser.</p>
+				</div>
+			</div>
+			<div class="settings-card-actions">
+				<button class="btn btn-outline-secondary" @onclick="HandleUploadLocalData" disabled="@_isUploadingLocalData">
+					<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+						<path d="M20.39 18.39A5 5 0 0 0 18 9h-1.26A8 8 0 1 0 3 16.3"/>
+						<polyline points="16 16 12 12 8 16"/>
+						<line x1="12" y1="12" x2="12" y2="21"/>
+					</svg>
+					@(_isUploadingLocalData ? "Uploading…" : "Upload to account")
+				</button>
+			</div>
+		</div>
+	}
 
 	<!-- Danger Zone -->
 	<div class="settings-card danger-zone">
@@ -295,6 +326,8 @@
 	private bool _showStatusModal;
 	private bool _showPriorityModal;
 	private ImportExportModal? _importExportModal;
+	private bool _canUploadLocalData;
+	private bool _isUploadingLocalData;
 
 	protected override void OnInitialized()
 	{
@@ -305,6 +338,8 @@
 	protected override async Task OnFirstRenderAsync()
 	{
 		await PresetService.InitializeAsync();
+		_canUploadLocalData = UserContext.IsAuthenticated && await MigrationService.HasLocalDataAsync();
+		StateHasChanged();
 	}
 
 	private async Task HandleRememberPresetsChanged(ChangeEventArgs e)
@@ -336,9 +371,13 @@
 
 		if (result.Success)
 		{
-			var message = $"Successfully imported {result.ImportedCount} todo(s).";
+			var message = $"Successfully imported {result.ImportedCount} item(s).";
+			if (result.RemappedToDefaultCount > 0)
+				message += $" {result.RemappedToDefaultCount} moved to the default project.";
 			if (result.SkippedCount > 0)
 				message += $" Skipped {result.SkippedCount} failed item(s).";
+			foreach (var warning in result.Warnings)
+				message += $" {warning}";
 			_importExportModal?.ShowMessage(message, false);
 		}
 		else
@@ -347,11 +386,36 @@
 		}
 	}
 
+	private async Task HandleUploadLocalData()
+	{
+		if (!await DialogService.ConfirmAsync("Upload local data to your account? This merges the todos, projects, and notes stored in this browser into your account, then removes them from this browser."))
+			return;
+
+		_isUploadingLocalData = true;
+		var result = await MigrationService.MigrateAsync();
+		_isUploadingLocalData = false;
+
+		if (result.Success)
+		{
+			_canUploadLocalData = false;
+			var message = $"Uploaded {result.ImportedCount} item(s) to your account.";
+			if (result.RemappedToDefaultCount > 0)
+				message += $" {result.RemappedToDefaultCount} moved to the default project.";
+			if (result.SkippedCount > 0)
+				message += $" {result.SkippedCount} skipped.";
+			await DialogService.AlertAsync(message, "Upload complete");
+		}
+		else
+		{
+			await DialogService.AlertAsync(result.ErrorMessage ?? "Upload failed. Please try again.", "Upload failed");
+		}
+	}
+
 	private async Task HandleClearLocalStorage()
 	{
 		if (await DialogService.ConfirmAsync("Clear local storage? This permanently deletes the todos, projects, and notes stored in this browser. Data saved to your account is not affected. This cannot be undone."))
 		{
-			await LocalStorage.ClearAsync();
+			await MigrationService.ClearLocalDataAsync();
 			NavigationManager.NavigateTo("/", forceLoad: true);
 		}
 	}

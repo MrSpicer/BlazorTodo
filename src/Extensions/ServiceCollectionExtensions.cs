@@ -122,6 +122,7 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IFileService, FileService>();
         services.AddScoped<AppDataSerializer>();
         services.AddScoped<IImportExportService, ImportExportService>();
+        services.AddScoped<ILocalDataMigrationService, LocalDataMigrationService>();
         services.AddScoped<IFilterPresetService, FilterPresetService>();
         return services;
     }

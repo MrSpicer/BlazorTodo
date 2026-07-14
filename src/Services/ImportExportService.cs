@@ -21,6 +21,7 @@ public class ImportExportService : IImportExportService
 	private readonly IPriorityService _priorityService;
 	private readonly AppDataSerializer _serializer;
 	private readonly ILogger<ImportExportService> _logger;
+	private bool _servicesInitialized;
 
 	public ImportExportService(
 		ITodoRepository repository,
@@ -44,8 +45,27 @@ public class ImportExportService : IImportExportService
 		_logger = logger;
 	}
 
+	// Export/import both read the services' in-memory caches, which are only populated by each
+	// service's InitializeAsync(). A fresh circuit landing directly on /settings (without first
+	// visiting a page that initializes them) would otherwise export/dedup against empty caches.
+	// All six InitializeAsync() calls are idempotent, so this is safe to call repeatedly.
+	private async Task EnsureServicesInitializedAsync()
+	{
+		if (_servicesInitialized)
+			return;
+
+		await _projectService.InitializeAsync();
+		await _tagService.InitializeAsync();
+		await _statusService.InitializeAsync();
+		await _priorityService.InitializeAsync();
+		await _todoService.InitializeAsync();
+		await _noteService.InitializeAsync();
+		_servicesInitialized = true;
+	}
+
 	public async Task<string> ExportToJsonAsync()
 	{
+		await EnsureServicesInitializedAsync();
 		var todos = await _repository.GetTodos();
 		var document = new AppDataDocument
 		{
@@ -64,14 +84,34 @@ public class ImportExportService : IImportExportService
 
 	public async Task<ImportResult> ImportFromJsonAsync(string json, bool replaceExisting = false)
 	{
+		AppDataDocument? importData;
 		try
 		{
-			var importData = _serializer.Deserialize(json);
-
-			if (importData == null)
+			importData = _serializer.Deserialize(json);
+		}
+		catch (JsonException ex)
+		{
+			_logger.LogWarning(ex, "Import failed: invalid JSON");
+			return new ImportResult
 			{
-				return new ImportResult { Success = false, ErrorMessage = "Invalid import data." };
-			}
+				Success = false,
+				ErrorMessage = "Invalid JSON format. Please check the file and try again."
+			};
+		}
+
+		if (importData == null)
+			return new ImportResult { Success = false, ErrorMessage = "Invalid import data." };
+
+		return await ImportAsync(importData, replaceExisting);
+	}
+
+	public async Task<ImportResult> ImportAsync(AppDataDocument importData, bool replaceExisting = false)
+	{
+		try
+		{
+			await EnsureServicesInitializedAsync();
+
+			var result = new ImportResult { Success = true };
 
 			if (replaceExisting)
 			{
@@ -84,12 +124,16 @@ public class ImportExportService : IImportExportService
 
 			// Import projects
 			var existingProjectIds = _projectService.Projects.Select(p => p.Id).ToHashSet();
+			int projectsRejected = 0;
 			foreach (var project in importData.Projects ?? new List<Project>())
 			{
 				if (project.Id == Guid.Empty)
 					project.Id = Guid.NewGuid();
 				if (!IsValid(project))
+				{
+					projectsRejected++;
 					continue;
+				}
 				if (replaceExisting || !existingProjectIds.Contains(project.Id))
 					await _projectService.SaveProjectAsync(project);
 			}
@@ -183,23 +227,59 @@ public class ImportExportService : IImportExportService
 				}
 			}
 
-			// Import todos
+			// Every imported/existing todo and note must reference a project the user owns —
+			// otherwise the EF ownership guard silently rejects the save. Build the set of valid
+			// project ids (pre-existing + just-imported) and guarantee a default to catch orphans.
+			var validProjectIds = _projectService.Projects.Select(p => p.Id).ToHashSet();
+			var defaultProject = _projectService.GetDefaultProject() ?? _projectService.Projects.FirstOrDefault();
+			if (defaultProject is null)
+			{
+				defaultProject = new Project { Name = "Personal", IsDefault = true };
+				await _projectService.SaveProjectAsync(defaultProject);
+				validProjectIds.Add(defaultProject.Id);
+			}
+
+			// Import todos. Order parents-first (nesting is one level deep) so a child's parent has
+			// already landed when we validate its ParentId.
 			var existingTodos = await _repository.GetTodos();
-			var existingIds = existingTodos.Select(t => t.Id).ToHashSet();
+			var landedTodoIds = existingTodos.Select(t => t.Id).ToHashSet();
+			var existingIds = new HashSet<Guid>(landedTodoIds);
 
 			int imported = 0;
 			int skipped = 0;
+			int remapped = 0;
+			int duplicates = 0;
+			int reparented = 0;
 
-			foreach (var todo in importData.Todos ?? new List<TodoItem>())
+			var incomingTodos = (importData.Todos ?? new List<TodoItem>())
+				.OrderBy(t => t.ParentId.HasValue ? 1 : 0)
+				.ToList();
+
+			foreach (var todo in incomingTodos)
 			{
 				if (!replaceExisting && existingIds.Contains(todo.Id))
 				{
-					skipped++;
+					duplicates++;
 					continue;
 				}
 
 				if (todo.Id == Guid.Empty)
 					todo.Id = Guid.NewGuid();
+
+				// Orphaned project reference (empty, or a project that failed validation / isn't
+				// owned) → move to the default project rather than silently dropping the todo.
+				if (todo.ProjectId == Guid.Empty || !validProjectIds.Contains(todo.ProjectId))
+				{
+					todo.ProjectId = defaultProject.Id;
+					remapped++;
+				}
+
+				// Parent hasn't landed (missing, or listed but rejected) → import as top-level.
+				if (todo.ParentId is Guid parentId && !landedTodoIds.Contains(parentId))
+				{
+					todo.ParentId = null;
+					reparented++;
+				}
 
 				if (!IsValid(todo))
 				{
@@ -219,7 +299,10 @@ public class ImportExportService : IImportExportService
 				todo.SubTasks.Clear();
 
 				if (await _todoService.SaveTodoAsync(todo))
+				{
 					imported++;
+					landedTodoIds.Add(todo.Id);
+				}
 				else
 				{
 					skipped++;
@@ -232,6 +315,16 @@ public class ImportExportService : IImportExportService
 					sub.ProjectId = todo.ProjectId;
 					if (sub.Id == Guid.Empty)
 						sub.Id = Guid.NewGuid();
+					if (!replaceExisting && existingIds.Contains(sub.Id))
+					{
+						duplicates++;
+						continue;
+					}
+					if (sub.ProjectId == Guid.Empty || !validProjectIds.Contains(sub.ProjectId))
+					{
+						sub.ProjectId = defaultProject.Id;
+						remapped++;
+					}
 					if (!IsValid(sub))
 					{
 						skipped++;
@@ -241,39 +334,58 @@ public class ImportExportService : IImportExportService
 					FillStatusId(sub, statusIdRemap);
 					FillPriorityId(sub, priorityIdRemap);
 					if (await _todoService.SaveTodoAsync(sub))
+					{
 						imported++;
+						landedTodoIds.Add(sub.Id);
+					}
 					else
 						skipped++;
 				}
 			}
 
-			// Import notes
+			// Import notes — same orphan-project remap; count save failures.
 			var existingNoteIds = _noteService.Notes.Select(n => n.Id).ToHashSet();
 			foreach (var note in importData.Notes ?? new List<ProjectNote>())
 			{
 				if (note.Id == Guid.Empty)
 					note.Id = Guid.NewGuid();
+
+				if (note.ProjectId == Guid.Empty || !validProjectIds.Contains(note.ProjectId))
+				{
+					note.ProjectId = defaultProject.Id;
+					remapped++;
+				}
+
 				if (!IsValid(note))
+				{
+					skipped++;
 					continue;
-				if (replaceExisting || !existingNoteIds.Contains(note.Id))
-					await _noteService.SaveNoteAsync(note);
+				}
+
+				if (!replaceExisting && existingNoteIds.Contains(note.Id))
+				{
+					duplicates++;
+					continue;
+				}
+
+				if (await _noteService.SaveNoteAsync(note))
+					imported++;
+				else
+					skipped++;
 			}
 
-			return new ImportResult
-			{
-				Success = true,
-				ImportedCount = imported,
-				SkippedCount = skipped
-			};
-		}
-		catch (JsonException ex)
-		{
-			_logger.LogWarning(ex, "Import failed: invalid JSON");
-			return new ImportResult
-			{
-				Success = false,
-				ErrorMessage = "Invalid JSON format. Please check the file and try again."
-			};
+			result.ImportedCount = imported;
+			result.SkippedCount = skipped;
+			result.RemappedToDefaultCount = remapped;
+
+			if (duplicates > 0)
+				result.Warnings.Add($"{duplicates} item(s) already existed and were skipped.");
+			if (reparented > 0)
+				result.Warnings.Add($"{reparented} sub-task(s) referenced a missing parent and were imported as top-level items.");
+			if (projectsRejected > 0)
+				result.Warnings.Add($"{projectsRejected} project(s) could not be imported; their items were moved to the default project.");
+
+			return result;
 		}
 		catch (Exception ex)
 		{

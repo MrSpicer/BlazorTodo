@@ -25,4 +25,13 @@ public class AppDbContext : IdentityDbContext<ApplicationUser, IdentityRole<Guid
 		base.OnModelCreating(modelBuilder);
 		modelBuilder.ApplyConfigurationsFromAssembly(typeof(AppDbContext).Assembly);
 	}
+
+	protected override void ConfigureConventions(ModelConfigurationBuilder configurationBuilder)
+	{
+		base.ConfigureConventions(configurationBuilder);
+
+		// timestamptz columns only accept Kind=Utc; see UtcDateTimeConverter.
+		configurationBuilder.Properties<DateTime>().HaveConversion<UtcDateTimeConverter>();
+		configurationBuilder.Properties<DateTime?>().HaveConversion<NullableUtcDateTimeConverter>();
+	}
 }
