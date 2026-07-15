@@ -49,6 +49,17 @@
 		</div>
 	</div>
 	<div class="stat-card">
+		<div class="stat-icon completed">
+			<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+				<path d="M9 12l2 2 4-4"/><circle cx="12" cy="12" r="10"/>
+			</svg>
+		</div>
+		<div class="stat-info">
+			<span class="stat-value">@ConnectionTracker.UniqueConnections</span>
+			<span class="stat-label">Unique Connections</span>
+		</div>
+	</div>
+	<div class="stat-card">
 		<div class="stat-icon total">
 			<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
 				<path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>
@@ -96,6 +107,7 @@ else
 				<span>Email</span>
 				<span>Confirmed</span>
 				<span>Status</span>
+				<span>Conns</span>
 				<span>Created</span>
 				<span class="col-actions">Actions</span>
 			</div>
@@ -131,6 +143,19 @@ else
 						@if (u.AccessFailedCount > 0)
 						{
 							<span class="pill pill-muted" title="Failed attempts on this account">@u.AccessFailedCount fails</span>
+						}
+					</span>
+					<span class="col-conns">
+						@{
+							var conns = _connectionsPerUser.GetValueOrDefault(u.Id);
+						}
+						@if (conns > 0)
+						{
+							<span class="pill pill-ok" title="Live connections (tabs/devices)">@conns</span>
+						}
+						else
+						{
+							<span class="text-muted">—</span>
 						}
 					</span>
 					<span class="col-num">@u.CreatedAt.ToString("MMM d, yyyy")</span>
@@ -274,7 +299,7 @@ else
 
 	.users-header, .users-row {
 		display: grid;
-		grid-template-columns: minmax(180px, 1.6fr) 110px 150px 120px minmax(220px, 1fr);
+		grid-template-columns: minmax(180px, 1.6fr) 110px 150px 80px 120px minmax(220px, 1fr);
 		padding: var(--space-3) var(--space-4);
 		align-items: center;
 		gap: var(--space-2);
@@ -311,6 +336,7 @@ else
 	.display-name { font-size: 0.75rem; color: var(--text-secondary); }
 	.col-status { display: flex; flex-wrap: wrap; gap: 4px; }
 	.col-num { font-variant-numeric: tabular-nums; color: var(--text-secondary); }
+	.col-conns { font-variant-numeric: tabular-nums; }
 	.col-actions { display: flex; flex-wrap: wrap; gap: 6px; }
 
 	.pill {
@@ -334,6 +360,7 @@ else
 	private Task<AuthenticationState>? AuthState { get; set; }
 
 	private readonly List<AdminUserView> _users = new();
+	private IReadOnlyDictionary<Guid, int> _connectionsPerUser = new Dictionary<Guid, int>();
 	private bool _initialized;
 	private bool _busy;
 	private string? _message;
@@ -364,6 +391,7 @@ else
 		var users = await AdminService.GetUsersAsync();
 		_users.Clear();
 		_users.AddRange(users);
+		_connectionsPerUser = ConnectionTracker.ConnectionsPerUser();
 	}
 
 	private async Task RefreshAsync()

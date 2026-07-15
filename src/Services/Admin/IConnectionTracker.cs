@@ -16,9 +16,19 @@ public interface IConnectionTracker
 	/// <summary>Distinct signed-in users currently online (one user may hold several circuits).</summary>
 	int DistinctUsersOnline { get; }
 
+	/// <summary>
+	/// Unique connections: each signed-in user counts once regardless of how many circuits
+	/// (tabs/devices) they hold, plus every anonymous circuit counted individually (no account
+	/// or session id is captured for anonymous visitors to dedupe them further).
+	/// </summary>
+	int UniqueConnections { get; }
+
 	/// <summary>Records a circuit as connected, optionally bound to an authenticated user.</summary>
 	void Add(string circuitId, Guid? userId);
 
 	/// <summary>Records a circuit as disconnected.</summary>
 	void Remove(string circuitId);
+
+	/// <summary>Live circuit count per signed-in user id. Users with no live circuit are absent.</summary>
+	IReadOnlyDictionary<Guid, int> ConnectionsPerUser();
 }

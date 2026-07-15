@@ -18,7 +18,7 @@
 
 services:
   app:
-    image: blazortodo:${TAG:-latest}
+    image: mylsotol/blazortodo:${TAG:-latest}
     networks: [internal]
     secrets:
       - source: blazortodo_db_password
