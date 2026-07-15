@@ -1,25 +1,32 @@
 # Single stack file targeting both local Swarm and a single-node Swarm in production.
+# Ingress: cloudflared runs on the host (outside this stack) and proxies the tunnel
+# to http://localhost:${APP_PORT}.
 # Environment-driven knobs:
 #   TAG                    image tag (default "latest")
 #   ASPNETCORE_ENVIRONMENT "Development" or "Production"
 #   EMAIL_PROVIDER         "smtp4dev" (dev) or "smtp"/"resend" (prod)
-#   LOCAL_APP_PORT         dev only; e.g. 8080. Leave 0 in prod (cloudflared handles ingress).
+#   APP_PORT               host port for the app; 8080 in dev and prod (the host-run
+#                          cloudflared points its tunnel route at localhost:8080).
 #   LOCAL_SMTP4DEV_PORT    dev only; e.g. 8025. Leave 0 in prod.
 #   SMTP4DEV_REPLICAS      1 in dev, 0 in prod.
-#   CLOUDFLARED_REPLICAS   0 in dev, 1 in prod.
 #
-# Required secrets (created with `docker secret create`):
-#   db_password, cloudflared_token, admin_password
-#   resend_api_key (only meaningful in prod with EMAIL_PROVIDER=resend)
+# Required secrets (created with `docker secret create`). Names are prefixed so they
+# stay distinguishable on a shared Swarm hosting other stacks; the app mounts them at
+# the short in-container paths via source/target:
+#   blazortodo_db_password, blazortodo_admin_password
+#   blazortodo_resend_api_key (only meaningful in prod with EMAIL_PROVIDER=resend)
 
 services:
   app:
     image: blazortodo:${TAG:-latest}
     networks: [internal]
     secrets:
-      - db_password
-      - resend_api_key
-      - admin_password
+      - source: blazortodo_db_password
+        target: db_password
+      - source: blazortodo_resend_api_key
+        target: resend_api_key
+      - source: blazortodo_admin_password
+        target: admin_password
     volumes:
       # Persists the Data Protection key ring so auth cookies + antiforgery tokens survive
       # container restarts/redeploys. Path matches DataProtection__KeysDirectory below.
@@ -45,17 +52,24 @@ services:
       Email__Provider: ${EMAIL_PROVIDER:-smtp}
       Email__Smtp__Host: ${EMAIL_SMTP_HOST:-smtp4dev}
       Email__Smtp__Port: ${EMAIL_SMTP_PORT:-1025}
+      # SMTP auth for a real relay (e.g. Resend: username "resend", password = API key).
+      # Left empty for dev/smtp4dev, where no username means credentials are skipped.
+      # Port 587 + EnableSsl=true = STARTTLS (the only TLS mode SmtpClient supports).
+      Email__Smtp__Username: ${EMAIL_SMTP_USERNAME:-}
+      Email__Smtp__Password: ${EMAIL_SMTP_PASSWORD:-}
+      Email__Smtp__EnableSsl: ${EMAIL_SMTP_ENABLE_SSL:-false}
       Email__FromAddress: ${EMAIL_FROM_ADDRESS:-noreply@blazortodo.local}
       Email__FromName: ${EMAIL_FROM_NAME:-BlazorTodo}
       # Bootstrap admin account seeded at startup (see DatabaseInitializer). The password is read
-      # from the admin_password Docker secret; email/display name come from deploy-time env vars.
+      # from the blazortodo_admin_password Docker secret (mounted at /run/secrets/admin_password);
+      # email/display name come from deploy-time env vars.
       # Leave ADMIN_EMAIL empty to skip seeding.
       AdminUser__Email: ${ADMIN_EMAIL:-}
       AdminUser__DisplayName: ${ADMIN_DISPLAY_NAME:-Administrator}
       AdminUser__PasswordFile: /run/secrets/admin_password
     ports:
       - target: 8080
-        published: ${LOCAL_APP_PORT:-0}
+        published: ${APP_PORT:-0}
         protocol: tcp
         mode: host
     deploy:
@@ -69,34 +83,21 @@ services:
           memory: 512M
 
   postgres:
-    image: postgres:17-alpine
+    image: postgres:18-alpine
     networks: [internal]
     secrets:
-      - db_password
+      - source: blazortodo_db_password
+        target: db_password
     environment:
       POSTGRES_DB: todolist
       POSTGRES_USER: todolist
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-dev-password}
     volumes:
-      - postgres_data:/var/lib/postgresql/data
+      - postgres_data:/var/lib/postgresql
     deploy:
       placement:
         constraints:
           - node.role == manager
-
-  cloudflared:
-    image: cloudflare/cloudflared:latest
-    networks: [internal]
-    secrets:
-      - cloudflared_token
-    entrypoint:
-      - /bin/sh
-      - -c
-      - 'cloudflared tunnel --no-autoupdate run --token "$$(cat /run/secrets/cloudflared_token)"'
-    deploy:
-      replicas: ${CLOUDFLARED_REPLICAS:-0}
-      restart_policy:
-        condition: any
 
   smtp4dev:
     image: rnwood/smtp4dev:v3
@@ -125,11 +126,9 @@ volumes:
   dataprotection_keys: {}
 
 secrets:
-  db_password:
+  blazortodo_db_password:
     external: true
-  resend_api_key:
+  blazortodo_resend_api_key:
     external: true
-  cloudflared_token:
-    external: true
-  admin_password:
+  blazortodo_admin_password:
     external: true

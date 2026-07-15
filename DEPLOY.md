@@ -1,31 +1,31 @@
 # Deployment Runbook
 
-BlazorTodo deploys to a single-node Docker Swarm with Cloudflare Tunnel for ingress.
+BlazorTodo deploys to a single-node Docker Swarm with Cloudflare Tunnel for ingress. `cloudflared` runs on the host (systemd or standalone container), **not** in the stack — the stack publishes the app on `localhost:8080` and the tunnel routes to it.
 
 Local dev uses the same stack file as production with different environment knobs — there is no second config to drift out of sync.
 
 ## Architecture in one diagram
 
 ```
-                 ┌─────────────────────────────────────────────┐
-                 │              VPS (one node)                 │
-                 │                                             │
-  user browser   │   ┌──────────────┐    ┌─────────────────┐   │
-        │        │   │ cloudflared  │◄──►│  app:8080       │   │
-        │        │   │  (outbound)  │    │  (Blazor Server)│   │
-        ▼        │   └──────┬───────┘    └─────────┬───────┘   │
- https://todo... │          │ overlay net           │           │
-        │        │          │                       ▼           │
-        ▼        │          │              ┌────────────────┐   │
- ┌────────────┐  │          │              │  postgres:17   │   │
- │ Cloudflare │──┼──────────┘              │  (volume:      │   │
- │   edge     │  │                         │  postgres_data)│   │
- └────────────┘  │                         └────────────────┘   │
-                 │                                             │
-                 └─────────────────────────────────────────────┘
+                 ┌───────────────────────────────────────────────┐
+                 │                VPS (one node)                 │
+                 │                                               │
+  user browser   │  ┌──────────────┐   ┌ Swarm stack ─────────┐  │
+        │        │  │ cloudflared  │   │ ┌─────────────────┐  │  │
+        │        │  │ (host-run,   │◄──┼►│ app             │  │  │
+        ▼        │  │  outbound)   │   │ │ localhost:8080  │  │  │
+ https://todo... │  └──────┬───────┘   │ └────────┬────────┘  │  │
+        │        │         │           │          ▼           │  │
+        ▼        │         │           │ ┌────────────────┐   │  │
+ ┌────────────┐  │         │           │ │  postgres:17   │   │  │
+ │ Cloudflare │──┼─────────┘           │ │  (volume:      │   │  │
+ │   edge     │  │                     │ │  postgres_data)│   │  │
+ └────────────┘  │                     │ └────────────────┘   │  │
+                 │                     └──────────────────────┘  │
+                 └───────────────────────────────────────────────┘
 ```
 
-- The VPS opens **no** inbound ports. `cloudflared` connects outbound to Cloudflare's edge and proxies requests to `app:8080` over the Swarm overlay network.
+- The VPS opens **no** inbound ports. `cloudflared` runs on the host, connects outbound to Cloudflare's edge, and proxies requests to `http://localhost:8080` — the host port the stack publishes for the `app` service (`APP_PORT`). The firewall stays closed, so the port is only reachable from the host itself.
 - TLS is terminated by Cloudflare; the app speaks plain HTTP internally.
 
 ## Production bring-up (one-time)
@@ -41,26 +41,25 @@ curl -fsSL https://get.docker.com | sh
 docker swarm init
 ```
 
-### 3. Create the Cloudflare Tunnel
+### 3. Set up the Cloudflare Tunnel (host-level, outside this stack)
+
+`cloudflared` is a server prerequisite — install and run it on the host however you prefer (systemd service via `cloudflared service install <token>`, or a standalone container with host networking). This stack does not manage it.
 
 In the Cloudflare Zero Trust dashboard → **Networks → Tunnels → Create tunnel**:
 
-1. Connector type: **Docker**.
-2. Name the tunnel (e.g. `blazortodo`).
-3. Cloudflare gives you a token — copy it.
-4. Under **Public Hostnames**, add a route:
+1. Name the tunnel (e.g. `blazortodo`) and install the connector on the host with the token Cloudflare gives you.
+2. Under **Public Hostnames**, add a route:
    - Subdomain: `todo`
    - Domain: your zone (e.g. `example.com`)
    - Service type: **HTTP**
-   - URL: `app:8080`
-   (The hostname `app` resolves over the Swarm overlay network from inside the `cloudflared` container.)
+   - URL: `localhost:8080`
+   (The stack publishes the app on host port 8080 — `APP_PORT` in `deploy-prod.sh`.)
 
 ### 4. Seed secrets on the swarm
 
 ```bash
 export POSTGRES_PASSWORD="$(openssl rand -base64 32)"
 export RESEND_API_KEY="re_..."             # or "unused" if you'll configure SMTP instead
-export CF_TUNNEL_TOKEN="<token from step 3>"
 # Bootstrap admin password. Must satisfy Identity rules: >=10 chars with upper, lower, digit,
 # and a symbol — the startup seeder rejects anything weaker.
 export ADMIN_PASSWORD='<strong-password>'
@@ -68,7 +67,7 @@ export ADMIN_PASSWORD='<strong-password>'
 ./scripts/seed-prod-secrets.sh
 ```
 
-Secrets created: `db_password`, `resend_api_key`, `cloudflared_token`, `admin_password`.
+Secrets created: `blazortodo_db_password`, `blazortodo_resend_api_key`, `blazortodo_admin_password`.
 
 ### 5. Build the image and deploy
 
@@ -97,10 +96,9 @@ For a registry-based workflow (CI publishes images): change the `image:` in `doc
 ```bash
 docker stack ps todolist
 docker service logs -f todolist_app
-docker service logs -f todolist_cloudflared
 ```
 
-Once both services are running and `cloudflared` reports "Registered tunnel connection", browse to your public hostname. Cloudflare serves the cert.
+Once the app is running and the host's `cloudflared` reports "Registered tunnel connection" (`journalctl -u cloudflared -f` for the systemd install), browse to your public hostname. Cloudflare serves the cert.
 
 ### 7. Database migrations (automatic)
 
@@ -123,7 +121,6 @@ This builds the image, initializes a single-node swarm if needed, creates dummy 
 
 - App on `http://localhost:8080`
 - smtp4dev on `http://localhost:8025` (catches all outbound mail)
-- No `cloudflared` container
 
 Tear down: `docker stack rm todolist`. Volumes persist — remove them with `docker volume rm blazortodo_postgres_data` if you want a clean DB.
 
@@ -137,6 +134,8 @@ TAG=$(git rev-parse --short HEAD) POSTGRES_PASSWORD="$POSTGRES_PASSWORD" ./scrip
 ```
 
 `update_config: { order: start-first }` in the stack file means the new replica starts before the old one stops — minimum downtime for a single-replica deploy.
+
+**Migrating from the old stack-managed cloudflared:** `docker stack deploy --prune` removes the retired `cloudflared` service automatically on the next deploy. Set up the host-level `cloudflared` (step 3) *before* deploying, then delete the orphaned secret: `docker secret rm cloudflared_token`.
 
 ## Rolling back
 

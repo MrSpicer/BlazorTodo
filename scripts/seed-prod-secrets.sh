@@ -6,7 +6,6 @@ set -euo pipefail
 
 : "${POSTGRES_PASSWORD:?must export a Postgres password to seed}"
 : "${RESEND_API_KEY:?must export a Resend API key (or set to 'unused' if not using Resend)}"
-: "${CF_TUNNEL_TOKEN:?must export the Cloudflare Tunnel token from the Zero Trust dashboard}"
 # Bootstrap admin password. Must satisfy Identity rules: >=10 chars with upper, lower, digit,
 # and a non-alphanumeric symbol — otherwise the startup seeder logs an error and creates no user.
 : "${ADMIN_PASSWORD:?must export an admin password (>=10 chars, upper+lower+digit+symbol)}"
@@ -21,10 +20,9 @@ create_secret() {
 	fi
 }
 
-create_secret db_password "$POSTGRES_PASSWORD"
-create_secret resend_api_key "$RESEND_API_KEY"
-create_secret cloudflared_token "$CF_TUNNEL_TOKEN"
-create_secret admin_password "$ADMIN_PASSWORD"
+create_secret blazortodo_db_password "$POSTGRES_PASSWORD"
+create_secret blazortodo_resend_api_key "$RESEND_API_KEY"
+create_secret blazortodo_admin_password "$ADMIN_PASSWORD"
 
 echo
 echo "Secrets ready. Next: TAG=<git-sha> POSTGRES_PASSWORD=$POSTGRES_PASSWORD ADMIN_EMAIL=you@example.com ./scripts/deploy-prod.sh"

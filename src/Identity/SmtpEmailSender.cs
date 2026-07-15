@@ -30,6 +30,9 @@ public class SmtpEmailSender : IEmailSender
 			EnableSsl = enableSsl,
 			DeliveryMethod = SmtpDeliveryMethod.Network,
 			UseDefaultCredentials = false,
+			// Fail fast (15s) so a blocked/filtered outbound SMTP port surfaces quickly
+			// instead of hanging on the default ~100s timeout.
+			Timeout = 15000,
 		};
 
 		if (!string.IsNullOrWhiteSpace(username))

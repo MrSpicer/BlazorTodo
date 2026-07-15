@@ -13,12 +13,11 @@ create_secret() {
 	local name=$1 value=$2
 	docker secret inspect "$name" >/dev/null 2>&1 || printf '%s' "$value" | docker secret create "$name" -
 }
-create_secret db_password "dev-password"
-create_secret resend_api_key "dummy-not-used-in-dev"
-create_secret cloudflared_token "unused-in-dev"
-# admin_password is consumed by the app service (AdminUser__PasswordFile). Must satisfy
+create_secret blazortodo_db_password "dev-password"
+create_secret blazortodo_resend_api_key "dummy-not-used-in-dev"
+# blazortodo_admin_password is consumed by the app service (AdminUser__PasswordFile). Must satisfy
 # Identity rules: >=10 chars with upper, lower, digit, and a symbol. Matches appsettings.Development.json.
-create_secret admin_password "DevAdmin!2345"
+create_secret blazortodo_admin_password "DevAdmin!2345"
 
 # 3. Build the image so the stack has something to pull. Without a registry,
 #    Swarm reads the image from the local Docker daemon for single-node deploys.
@@ -26,8 +25,7 @@ if [[ -z "${SKIP_BUILD:-}" ]]; then
 	docker build -t blazortodo:latest -f Dockerfile .
 fi
 
-# 4. Configure environment for dev: app + smtp4dev exposed on localhost, no
-#    cloudflared.
+# 4. Configure environment for dev: app + smtp4dev exposed on localhost.
 export TAG="${TAG:-latest}"
 export ASPNETCORE_ENVIRONMENT=Development
 export EMAIL_PROVIDER=smtp
@@ -37,13 +35,12 @@ export EMAIL_FROM_ADDRESS="noreply@blazortodo.local"
 export EMAIL_FROM_NAME="BlazorTodo (Dev)"
 export POSTGRES_PASSWORD="dev-password"
 # Seed a dev admin at startup so you can log in. Email/display name are env; the
-# password comes from the admin_password secret created above.
+# password comes from the blazortodo_admin_password secret created above.
 export ADMIN_EMAIL="admin@blazortodo.local"
 export ADMIN_DISPLAY_NAME="Dev Admin"
-export LOCAL_APP_PORT=8080
+export APP_PORT=8080
 export LOCAL_SMTP4DEV_PORT=8025
 export SMTP4DEV_REPLICAS=1
-export CLOUDFLARED_REPLICAS=0
 
 docker stack deploy --detach=false --prune -c docker-stack.yml todolist
 
