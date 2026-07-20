@@ -81,6 +81,7 @@ public static class ServiceCollectionExtensions
         // per-circuit handler that feeds the connection tracker and the scoped admin service.
         services.AddSingleton<IConnectionTracker, ConnectionTracker>();
         services.AddSingleton<ILoginActivityTracker, LoginActivityTracker>();
+        services.AddSingleton<IAnonymousSessionTracker, AnonymousSessionTracker>();
         services.AddScoped<CircuitHandler, AdminCircuitHandler>();
         services.AddScoped<IAdminService, AdminService>();
 

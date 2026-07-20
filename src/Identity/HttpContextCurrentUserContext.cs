@@ -1,4 +1,5 @@
 using System.Security.Claims;
+using TodoList.Services.Admin;
 
 namespace TodoList.Identity;
 
@@ -25,4 +26,13 @@ public class HttpContextCurrentUserContext : ICurrentUserContext
 
 	public Guid UserId
 		=> UserIdOrNull ?? throw new InvalidOperationException("No authenticated user on the current request/circuit.");
+
+	public string? AnonymousSessionId
+	{
+		get
+		{
+			var sid = _httpContextAccessor.HttpContext?.Request.Cookies[AnonymousSessionTracker.CookieName];
+			return string.IsNullOrWhiteSpace(sid) ? null : sid;
+		}
+	}
 }

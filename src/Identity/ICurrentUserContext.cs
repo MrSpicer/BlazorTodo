@@ -10,4 +10,11 @@ public interface ICurrentUserContext
 	bool IsAuthenticated { get; }
 	Guid? UserIdOrNull { get; }
 	Guid UserId { get; }
+
+	/// <summary>
+	/// The anonymous visitor's session id from the <c>anon_sid</c> cookie, or <c>null</c> when the
+	/// user is authenticated or no cookie is present. Only resolvable during an HTTP request
+	/// (prerender); it is <c>null</c> once running inside a SignalR circuit.
+	/// </summary>
+	string? AnonymousSessionId { get; }
 }

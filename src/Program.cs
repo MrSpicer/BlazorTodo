@@ -190,6 +190,10 @@ app.UseRateLimiter();
 app.UseAuthentication();
 app.UseAuthorization();
 
+// After auth (needs HttpContext.User) and on the HTTP page response (a cookie can't be set over
+// the SignalR circuit): give anonymous visitors a stable anon_sid cookie and track their activity.
+app.UseMiddleware<TodoList.Middleware.AnonymousSessionMiddleware>();
+
 app.UseAntiforgery();
 
 app.MapRazorComponents<App>()

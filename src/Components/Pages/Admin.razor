@@ -7,6 +7,7 @@
 @inject IAdminService AdminService
 @inject IConnectionTracker ConnectionTracker
 @inject ILoginActivityTracker LoginActivity
+@inject IAnonymousSessionTracker AnonSessions
 @inject IDialogService DialogService
 @inject NavigationManager Navigation
 
@@ -79,6 +80,17 @@
 		<div class="stat-info">
 			<span class="stat-value">@LoginActivity.FailedSinceStartup</span>
 			<span class="stat-label">Failed Logins (since @LoginActivity.StartedAtUtc.ToString("MMM d, HH:mm") UTC)</span>
+		</div>
+	</div>
+	<div class="stat-card">
+		<div class="stat-icon pending">
+			<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+				<circle cx="12" cy="8" r="5"/><path d="M3 21a9 9 0 0 1 18 0"/>
+			</svg>
+		</div>
+		<div class="stat-info">
+			<span class="stat-value">@AnonSessions.TotalSessions</span>
+			<span class="stat-label">Anonymous Sessions (@AnonSessions.OnlineSessions online)</span>
 		</div>
 	</div>
 </div>
@@ -199,6 +211,49 @@ else
 	</div>
 }
 
+<h2 class="section-title">Anonymous Sessions</h2>
+@if (_anonSessions.Count == 0)
+{
+	<p class="admin-empty">No anonymous sessions tracked yet (in-memory, resets on restart).</p>
+}
+else
+{
+	<div class="users-table-wrap">
+		<div class="anon-table">
+			<div class="anon-header">
+				<span>Session</span>
+				<span>Status</span>
+				<span>Requests</span>
+				<span>First Seen (UTC)</span>
+				<span>Last Seen (UTC)</span>
+				<span>IP</span>
+				<span>User Agent</span>
+			</div>
+			@foreach (var s in _anonSessions)
+			{
+				<div class="anon-row">
+					<span class="col-num" title="@s.SessionId">@Shorten(s.SessionId)</span>
+					<span>
+						@if (s.LiveConnections > 0)
+						{
+							<span class="pill pill-ok">Online@(s.LiveConnections > 1 ? $" ×{s.LiveConnections}" : "")</span>
+						}
+						else
+						{
+							<span class="pill pill-muted">Offline</span>
+						}
+					</span>
+					<span class="col-num">@s.RequestCount</span>
+					<span class="col-num">@s.FirstSeenUtc.ToString("MMM d, HH:mm:ss")</span>
+					<span class="col-num">@s.LastSeenUtc.ToString("MMM d, HH:mm:ss")</span>
+					<span class="col-num">@(s.LastIp ?? "—")</span>
+					<span class="anon-ua" title="@s.LastUserAgent">@(string.IsNullOrEmpty(s.LastUserAgent) ? "—" : s.LastUserAgent)</span>
+				</div>
+			}
+		</div>
+	</div>
+}
+
 <style>
 	.page-title {
 		font-size: 1.5rem;
@@ -289,13 +344,42 @@ else
 
 	.users-table-wrap { overflow-x: auto; }
 
-	.users-table, .fails-table {
+	.users-table, .fails-table, .anon-table {
 		background: var(--surface);
 		border: 1px solid var(--border-light);
 		border-radius: var(--radius-lg);
 		overflow: hidden;
 		min-width: 720px;
 	}
+
+	.anon-header, .anon-row {
+		display: grid;
+		grid-template-columns: 110px 90px 80px 130px 130px 130px minmax(200px, 1fr);
+		padding: var(--space-2) var(--space-4);
+		align-items: center;
+		gap: var(--space-2);
+	}
+
+	.anon-header {
+		background: var(--gray-50, #f9fafb);
+		font-size: 0.75rem;
+		font-weight: 600;
+		color: var(--text-muted);
+		text-transform: uppercase;
+		letter-spacing: 0.05em;
+		border-bottom: 1px solid var(--border-light);
+	}
+
+	.anon-row {
+		border-bottom: 1px solid var(--border-light);
+		font-size: 0.875rem;
+		color: var(--text-primary);
+	}
+
+	.anon-row:last-child { border-bottom: none; }
+	.anon-row:hover { background: var(--gray-50, #f9fafb); }
+	.anon-ua { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text-secondary); font-size: 0.8rem; }
+	.admin-empty { color: var(--text-secondary); font-size: 0.9rem; }
 
 	.users-header, .users-row {
 		display: grid;
@@ -361,6 +445,7 @@ else
 
 	private readonly List<AdminUserView> _users = new();
 	private IReadOnlyDictionary<Guid, int> _connectionsPerUser = new Dictionary<Guid, int>();
+	private IReadOnlyList<AnonymousSessionInfo> _anonSessions = Array.Empty<AnonymousSessionInfo>();
 	private bool _initialized;
 	private bool _busy;
 	private string? _message;
@@ -392,7 +477,11 @@ else
 		_users.Clear();
 		_users.AddRange(users);
 		_connectionsPerUser = ConnectionTracker.ConnectionsPerUser();
+		_anonSessions = AnonSessions.Sessions();
 	}
+
+	private static string Shorten(string sessionId) =>
+		sessionId.Length <= 10 ? sessionId : sessionId[..10];
 
 	private async Task RefreshAsync()
 	{

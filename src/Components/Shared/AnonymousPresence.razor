@@ -1,0 +1,56 @@
+@implements IDisposable
+@inject TodoList.Identity.ICurrentUserContext User
+@inject TodoList.Services.Admin.IAnonymousSessionTracker Tracker
+@inject PersistentComponentState ApplicationState
+
+@* Invisible component. For anonymous visitors, reports this circuit as an online presence for
+   their anon_sid session so the admin dashboard can show who's connected. The cookie is HttpOnly
+   and HttpContext is null inside the circuit, so the session id is read from the cookie during
+   prerender and carried into the circuit via PersistentComponentState. *@
+
+@code {
+	private const string StateKey = "anon_sid";
+
+	private PersistingComponentStateSubscription _subscription;
+	private string? _sessionId;
+	private string? _connectionKey;
+
+	protected override void OnInitialized()
+	{
+		if (ApplicationState.TryTakeFromJson<string>(StateKey, out var restored))
+		{
+			// Running in the circuit: use the id captured during prerender.
+			_sessionId = restored;
+		}
+		else
+		{
+			// Prerender (HttpContext available): read the cookie, but only for anonymous users.
+			_sessionId = User.IsAuthenticated ? null : User.AnonymousSessionId;
+		}
+
+		_subscription = ApplicationState.RegisterOnPersisting(() =>
+		{
+			if (_sessionId is not null)
+				ApplicationState.PersistAsJson(StateKey, _sessionId);
+			return Task.CompletedTask;
+		});
+	}
+
+	// OnAfterRender only fires in the interactive circuit, never during prerender/SSR — the right
+	// moment to register a live connection.
+	protected override void OnAfterRender(bool firstRender)
+	{
+		if (firstRender && _sessionId is not null && _connectionKey is null)
+		{
+			_connectionKey = Guid.NewGuid().ToString("N");
+			Tracker.MarkOnline(_sessionId, _connectionKey);
+		}
+	}
+
+	public void Dispose()
+	{
+		_subscription.Dispose();
+		if (_connectionKey is not null)
+			Tracker.MarkOffline(_connectionKey);
+	}
+}
