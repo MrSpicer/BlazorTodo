@@ -17,17 +17,20 @@ namespace TodoList.Services.Admin;
 public sealed class AdminService : IAdminService
 {
 	private readonly UserManager<ApplicationUser> _userManager;
+	private readonly RoleManager<IdentityRole<Guid>> _roleManager;
 	private readonly IDbContextFactory<AppDbContext> _dbFactory;
 	private readonly IEmailSender _emailSender;
 	private readonly ILogger<AdminService> _logger;
 
 	public AdminService(
 		UserManager<ApplicationUser> userManager,
+		RoleManager<IdentityRole<Guid>> roleManager,
 		IDbContextFactory<AppDbContext> dbFactory,
 		IEmailSender emailSender,
 		ILogger<AdminService> logger)
 	{
 		_userManager = userManager;
+		_roleManager = roleManager;
 		_dbFactory = dbFactory;
 		_emailSender = emailSender;
 		_logger = logger;
@@ -41,23 +44,105 @@ public sealed class AdminService : IAdminService
 				.OrderBy(u => u.Email)
 				.ToListAsync();
 
-			var admins = await _userManager.GetUsersInRoleAsync(DatabaseInitializer.AdminRole);
-			var adminIds = admins.Select(a => a.Id).ToHashSet();
+			var views = new List<AdminUserView>(users.Count);
+			foreach (var u in users)
+			{
+				var roles = (await _userManager.GetRolesAsync(u)).ToList();
+				views.Add(new AdminUserView(
+					u.Id,
+					u.Email ?? string.Empty,
+					u.DisplayName,
+					u.EmailConfirmed,
+					u.LockoutEnd,
+					u.AccessFailedCount,
+					u.CreatedAt,
+					roles));
+			}
 
-			return users.Select(u => new AdminUserView(
-				u.Id,
-				u.Email ?? string.Empty,
-				u.DisplayName,
-				u.EmailConfirmed,
-				u.LockoutEnd,
-				u.AccessFailedCount,
-				u.CreatedAt,
-				adminIds.Contains(u.Id))).ToList();
+			return views;
 		}
 		catch (Exception ex)
 		{
 			_logger.LogError(ex, "Failed to load users for admin dashboard.");
 			return Array.Empty<AdminUserView>();
+		}
+	}
+
+	public async Task<IReadOnlyList<string>> GetRolesAsync()
+	{
+		try
+		{
+			return await _roleManager.Roles
+				.Select(r => r.Name!)
+				.OrderBy(n => n)
+				.ToListAsync();
+		}
+		catch (Exception ex)
+		{
+			_logger.LogError(ex, "Failed to load roles for admin dashboard.");
+			return Array.Empty<string>();
+		}
+	}
+
+	public async Task<AdminResult> SetUserRolesAsync(Guid userId, IReadOnlyList<string> roleNames, Guid actingAdminId)
+	{
+		try
+		{
+			var user = await _userManager.FindByIdAsync(userId.ToString());
+			if (user is null)
+				return AdminResult.Fail("User not found.");
+
+			var current = await _userManager.GetRolesAsync(user);
+			var toAdd = roleNames.Except(current).ToList();
+			var toRemove = current.Except(roleNames).ToList();
+
+			if (toAdd.Count == 0 && toRemove.Count == 0)
+				return AdminResult.Ok("No role changes.");
+
+			// Guard the Admin role the same way DeleteUserAsync does, so the site can't be
+			// locked out of its own dashboard.
+			if (toRemove.Contains(DatabaseInitializer.AdminRole))
+			{
+				if (userId == actingAdminId)
+					return AdminResult.Fail("You cannot remove your own admin role.");
+
+				var admins = await _userManager.GetUsersInRoleAsync(DatabaseInitializer.AdminRole);
+				if (admins.Count <= 1)
+					return AdminResult.Fail("You cannot remove the last remaining admin.");
+			}
+
+			// Ignore any role that doesn't actually exist to avoid Identity errors.
+			var addable = new List<string>();
+			foreach (var role in toAdd)
+			{
+				if (await _roleManager.RoleExistsAsync(role))
+					addable.Add(role);
+			}
+
+			var email = user.Email ?? user.Id.ToString();
+
+			if (addable.Count > 0)
+			{
+				var addResult = await _userManager.AddToRolesAsync(user, addable);
+				if (!addResult.Succeeded)
+					return AdminResult.Fail("Could not grant one or more roles.");
+			}
+
+			if (toRemove.Count > 0)
+			{
+				var removeResult = await _userManager.RemoveFromRolesAsync(user, toRemove);
+				if (!removeResult.Succeeded)
+					return AdminResult.Fail("Could not revoke one or more roles.");
+			}
+
+			_logger.LogInformation("Admin {Admin} updated roles for {Email} ({UserId}). Granted: [{Added}]; revoked: [{Removed}].",
+				actingAdminId, email, userId, string.Join(", ", addable), string.Join(", ", toRemove));
+			return AdminResult.Ok($"Updated roles for {email}.");
+		}
+		catch (Exception ex)
+		{
+			_logger.LogError(ex, "Failed to update roles for user {UserId}.", userId);
+			return AdminResult.Fail("Could not update the user's roles.");
 		}
 	}
 

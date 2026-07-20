@@ -1,0 +1,133 @@
+@using TodoList.Data
+@using TodoList.Services.Admin
+
+<Modal IsVisible="IsVisible" OnClose="Close" Title="@($"Manage roles — {User?.Email}")" Size="compact">
+	<HeaderIcon>
+		<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+			<path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
+			<circle cx="9" cy="7" r="4"/>
+			<path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/>
+		</svg>
+	</HeaderIcon>
+	<ChildContent>
+		<div class="modal-body">
+			@if (AvailableRoles.Count == 0)
+			{
+				<p class="text-muted">No roles are defined.</p>
+			}
+			else
+			{
+				<p class="roles-hint">Select the roles this account should have.</p>
+				<div class="roles-list">
+					@foreach (var role in AvailableRoles)
+					{
+						var locked = IsRoleLocked(role);
+						<label class="role-option @(locked ? "role-locked" : "")"
+						       title="@(locked ? "This role can't be removed from this account" : null)">
+							<input type="checkbox"
+							       checked="@_selected.Contains(role)"
+							       disabled="@locked"
+							       @onchange="e => Toggle(role, (bool)e.Value!)" />
+							<span class="role-name">@role</span>
+						</label>
+					}
+				</div>
+			}
+		</div>
+		<div class="modal-footer">
+			<button type="button" class="btn btn-ghost" @onclick="Close">Cancel</button>
+			<button type="button" class="btn btn-primary" @onclick="Save">Save</button>
+		</div>
+	</ChildContent>
+</Modal>
+
+<style>
+	.roles-hint {
+		font-size: 0.875rem;
+		color: var(--text-secondary);
+		margin: 0 0 var(--space-3);
+	}
+
+	.roles-list {
+		display: flex;
+		flex-direction: column;
+		gap: var(--space-2);
+	}
+
+	.role-option {
+		display: flex;
+		align-items: center;
+		gap: var(--space-3);
+		padding: var(--space-3) var(--space-4);
+		border: 1.5px solid var(--border);
+		border-radius: var(--radius-lg);
+		cursor: pointer;
+		transition: all var(--transition-fast);
+	}
+
+	.role-option:hover {
+		border-color: var(--primary);
+	}
+
+	.role-option.role-locked {
+		cursor: not-allowed;
+		opacity: 0.7;
+	}
+
+	.role-name {
+		font-size: 0.9375rem;
+		font-weight: 600;
+		color: var(--text-primary);
+	}
+</style>
+
+@code {
+	[Parameter] public bool IsVisible { get; set; }
+	[Parameter] public AdminUserView? User { get; set; }
+	[Parameter] public IReadOnlyList<string> AvailableRoles { get; set; } = Array.Empty<string>();
+	[Parameter] public Guid ActingAdminId { get; set; }
+	[Parameter] public bool IsLastAdmin { get; set; }
+	[Parameter] public EventCallback OnClose { get; set; }
+	[Parameter] public EventCallback<IReadOnlyList<string>> OnSave { get; set; }
+
+	private HashSet<string> _selected = new();
+	private Guid? _snapshotFor;
+
+	protected override void OnParametersSet()
+	{
+		// Snapshot the target's current roles once per open (or when the target changes),
+		// so in-progress checkbox edits survive incidental parent re-renders.
+		if (IsVisible && User is not null)
+		{
+			if (_snapshotFor != User.Id)
+			{
+				_selected = new HashSet<string>(User.Roles);
+				_snapshotFor = User.Id;
+			}
+		}
+		else
+		{
+			_snapshotFor = null;
+		}
+	}
+
+	/// <summary>The Admin role can't be unchecked when doing so would be self-demotion or
+	/// would strip the last remaining admin — mirrors the delete guard.</summary>
+	private bool IsRoleLocked(string role) =>
+		role == DatabaseInitializer.AdminRole
+		&& _selected.Contains(role)
+		&& User is not null
+		&& (User.Id == ActingAdminId || IsLastAdmin);
+
+	private void Toggle(string role, bool isChecked)
+	{
+		if (isChecked)
+			_selected.Add(role);
+		else
+			_selected.Remove(role);
+	}
+
+	private async Task Save() => await OnSave.InvokeAsync(_selected.ToList());
+
+	private async Task Close() => await OnClose.InvokeAsync();
+}

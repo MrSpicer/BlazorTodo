@@ -181,6 +181,9 @@ else
 						}
 						<button class="btn btn-sm btn-outline-primary" disabled="@_busy"
 								@onclick="() => ResetPasswordAsync(u)">Reset PW</button>
+						<button class="btn btn-sm btn-outline-secondary" disabled="@_busy"
+								title="Manage this user's roles"
+								@onclick="() => OpenRolesModal(u)">Roles</button>
 						<button class="btn btn-sm btn-outline-danger" disabled="@(_busy || IsUndeletable(u))"
 								title="@(IsUndeletable(u) ? "This account cannot be deleted" : "Delete user and all their data")"
 								@onclick="() => DeleteAsync(u)">Delete</button>
@@ -253,6 +256,14 @@ else
 		</div>
 	</div>
 }
+
+<RoleManagementModal IsVisible="_showRolesModal"
+                     User="_rolesTarget"
+                     AvailableRoles="_availableRoles"
+                     ActingAdminId="_actingAdminId"
+                     IsLastAdmin="@(_rolesTarget is not null && IsLastAdmin(_rolesTarget))"
+                     OnClose="() => _showRolesModal = false"
+                     OnSave="HandleRolesSaved" />
 
 <style>
 	.page-title {
@@ -451,6 +462,9 @@ else
 	private string? _message;
 	private bool _messageIsError;
 	private Guid _actingAdminId;
+	private IReadOnlyList<string> _availableRoles = Array.Empty<string>();
+	private bool _showRolesModal;
+	private AdminUserView? _rolesTarget;
 
 	protected override async Task OnInitializedAsync()
 	{
@@ -476,6 +490,7 @@ else
 		var users = await AdminService.GetUsersAsync();
 		_users.Clear();
 		_users.AddRange(users);
+		_availableRoles = await AdminService.GetRolesAsync();
 		_connectionsPerUser = ConnectionTracker.ConnectionsPerUser();
 		_anonSessions = AnonSessions.Sessions();
 	}
@@ -518,6 +533,40 @@ else
 		if (!confirmed) return;
 
 		await RunAsync(() => AdminService.DeleteUserAsync(u.Id, _actingAdminId));
+	}
+
+	private void OpenRolesModal(AdminUserView u)
+	{
+		_rolesTarget = u;
+		_showRolesModal = true;
+	}
+
+	private bool IsLastAdmin(AdminUserView u) =>
+		u.IsAdmin && _users.Count(x => x.IsAdmin) <= 1;
+
+	private async Task HandleRolesSaved(IReadOnlyList<string> roles)
+	{
+		var target = _rolesTarget;
+		if (target is null) return;
+
+		var added = roles.Except(target.Roles).ToList();
+		var removed = target.Roles.Except(roles).ToList();
+
+		if (added.Count == 0 && removed.Count == 0)
+		{
+			_showRolesModal = false;
+			return;
+		}
+
+		var grant = added.Count > 0 ? string.Join(", ", added) : "none";
+		var revoke = removed.Count > 0 ? string.Join(", ", removed) : "none";
+		var confirmed = await DialogService.ConfirmAsync(
+			$"Grant: {grant}. Revoke: {revoke}. Apply to {target.Email}?",
+			"Change roles");
+		if (!confirmed) return;
+
+		_showRolesModal = false;
+		await RunAsync(() => AdminService.SetUserRolesAsync(target.Id, roles, _actingAdminId));
 	}
 
 	// Runs an admin action with a busy guard, shows the result, and reloads the user list.

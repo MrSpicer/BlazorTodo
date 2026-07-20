@@ -17,6 +17,16 @@ public interface IAdminService
 	/// <summary>All accounts, metadata only, ordered by email.</summary>
 	Task<IReadOnlyList<AdminUserView>> GetUsersAsync();
 
+	/// <summary>All role names known to the app, ordered alphabetically.</summary>
+	Task<IReadOnlyList<string>> GetRolesAsync();
+
+	/// <summary>
+	/// Sets the account's roles to exactly <paramref name="roleNames"/> (the service computes the
+	/// add/remove diff). Refuses to remove the Admin role from the acting admin or the last
+	/// remaining admin.
+	/// </summary>
+	Task<AdminResult> SetUserRolesAsync(Guid userId, IReadOnlyList<string> roleNames, Guid actingAdminId);
+
 	/// <summary>Marks the account's email as confirmed.</summary>
 	Task<AdminResult> ConfirmEmailAsync(Guid userId);
 
