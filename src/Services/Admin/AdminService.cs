@@ -84,6 +84,33 @@ public sealed class AdminService : IAdminService
 		}
 	}
 
+	public async Task<AdminResult> CreateRoleAsync(string name)
+	{
+		try
+		{
+			name = name?.Trim() ?? string.Empty;
+			if (name.Length == 0)
+				return AdminResult.Fail("Role name is required.");
+			if (name.Length > 256)
+				return AdminResult.Fail("Role name is too long.");
+
+			if (await _roleManager.RoleExistsAsync(name))
+				return AdminResult.Fail("A role with that name already exists.");
+
+			var result = await _roleManager.CreateAsync(new IdentityRole<Guid>(name));
+			if (!result.Succeeded)
+				return AdminResult.Fail("Could not create the role.");
+
+			_logger.LogInformation("Admin created role {Role}.", name);
+			return AdminResult.Ok($"Created role '{name}'.");
+		}
+		catch (Exception ex)
+		{
+			_logger.LogError(ex, "Failed to create role {Role}.", name);
+			return AdminResult.Fail("Could not create the role.");
+		}
+	}
+
 	public async Task<AdminResult> SetUserRolesAsync(Guid userId, IReadOnlyList<string> roleNames, Guid actingAdminId)
 	{
 		try

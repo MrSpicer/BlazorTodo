@@ -78,6 +78,7 @@ else
                  Todos="@TodoService.Todos"
                  OnProjectSelected="HandleProjectSelected"
                  OnNewProjectClick="ShowProjectModal"
+                 OnEditProject="ShowEditProjectModal"
                  OnDeleteProject="HandleDeleteProject" />
 
     <!-- Stats Dashboard -->
@@ -213,7 +214,8 @@ else
 
 <!-- Modals -->
 <ProjectModal IsVisible="@_showProjectModal"
-              IsEditing="false"
+              IsEditing="@_isEditingProject"
+              EditingProject="@_editingProject"
               OnClose="HideProjectModal"
               OnSave="HandleSaveProject" />
 
@@ -482,6 +484,8 @@ else
     private string _selectedPresetName = FilterPreset.DefaultName;
     private bool _isLoading = true;
     private bool _showProjectModal;
+    private bool _isEditingProject;
+    private Project? _editingProject;
     private bool _showTodoModal;
 
     private string _activeTab = "tasks";
@@ -619,8 +623,26 @@ else
         _isEditing = false;
     }
 
-    private void ShowProjectModal() => _showProjectModal = true;
-    private void HideProjectModal() => _showProjectModal = false;
+    private void ShowProjectModal()
+    {
+        _isEditingProject = false;
+        _editingProject = null;
+        _showProjectModal = true;
+    }
+
+    private void ShowEditProjectModal(Project project)
+    {
+        _editingProject = project;
+        _isEditingProject = true;
+        _showProjectModal = true;
+    }
+
+    private void HideProjectModal()
+    {
+        _showProjectModal = false;
+        _isEditingProject = false;
+        _editingProject = null;
+    }
     private void ShowTodoModal() => _showTodoModal = true;
     private void HideTodoModal()
     {

@@ -20,6 +20,9 @@ public interface IAdminService
 	/// <summary>All role names known to the app, ordered alphabetically.</summary>
 	Task<IReadOnlyList<string>> GetRolesAsync();
 
+	/// <summary>Creates a new role. Fails if the name is blank, too long, or already exists.</summary>
+	Task<AdminResult> CreateRoleAsync(string name);
+
 	/// <summary>
 	/// Sets the account's roles to exactly <paramref name="roleNames"/> (the service computes the
 	/// add/remove diff). Refuses to remove the Admin role from the acting admin or the last

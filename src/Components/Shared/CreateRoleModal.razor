@@ -1,0 +1,130 @@
+@using TodoList.Services.Admin
+
+<Modal IsVisible="IsVisible" OnClose="Close" Title="Create role" Size="compact">
+	<HeaderIcon>
+		<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+			<circle cx="9" cy="7" r="4"/>
+			<path d="M3 21v-2a4 4 0 0 1 4-4h4a4 4 0 0 1 4 4v2"/>
+			<path d="M19 8v6M22 11h-6"/>
+		</svg>
+	</HeaderIcon>
+	<ChildContent>
+		<EditForm Model="@this" OnValidSubmit="Submit">
+			<div class="modal-body">
+				<div class="form-group">
+					<label for="roleName" class="form-label">Role name</label>
+					<input id="roleName" class="form-input" maxlength="256"
+					       placeholder="e.g., Manager, Support..."
+					       @bind="_name" @bind:event="oninput" />
+					@if (!string.IsNullOrEmpty(_error))
+					{
+						<span class="validation-error">@_error</span>
+					}
+				</div>
+			</div>
+			<div class="modal-footer">
+				<button type="button" class="btn btn-ghost" @onclick="Close" disabled="@_submitting">Cancel</button>
+				<button type="submit" class="btn btn-primary" disabled="@_submitting">Create</button>
+			</div>
+		</EditForm>
+	</ChildContent>
+</Modal>
+
+<style>
+	.form-group {
+		display: flex;
+		flex-direction: column;
+		gap: var(--space-2);
+	}
+
+	.form-label {
+		font-size: 0.875rem;
+		font-weight: 600;
+		color: var(--text-primary);
+	}
+
+	.form-input {
+		padding: var(--space-3) var(--space-4);
+		border: 1.5px solid var(--border);
+		border-radius: var(--radius-lg);
+		font-size: 0.9375rem;
+		transition: all var(--transition-fast);
+		background: var(--surface);
+		width: 100%;
+	}
+
+	.form-input:focus {
+		outline: none;
+		border-color: var(--primary);
+		box-shadow: 0 0 0 3px var(--primary-light);
+	}
+
+	.form-input::placeholder {
+		color: var(--text-muted);
+	}
+
+	.validation-error {
+		font-size: 0.8125rem;
+		color: var(--danger);
+	}
+</style>
+
+@code {
+	[Parameter] public bool IsVisible { get; set; }
+	[Parameter] public EventCallback OnClose { get; set; }
+
+	/// <summary>Invoked with the trimmed role name; returns the result so the modal can show an
+	/// inline error and stay open on failure (the page banner is hidden behind the overlay).</summary>
+	[Parameter] public Func<string, Task<AdminResult>>? OnCreate { get; set; }
+
+	private string _name = string.Empty;
+	private string? _error;
+	private bool _submitting;
+	private bool _wasVisible;
+
+	protected override void OnParametersSet()
+	{
+		// Reset the form each time the modal opens, without clobbering typing on re-renders.
+		if (IsVisible && !_wasVisible)
+		{
+			_name = string.Empty;
+			_error = null;
+			_submitting = false;
+		}
+		_wasVisible = IsVisible;
+	}
+
+	private async Task Submit()
+	{
+		if (_submitting || OnCreate is null) return;
+
+		var name = _name.Trim();
+		if (name.Length == 0)
+		{
+			_error = "Role name is required.";
+			return;
+		}
+
+		_submitting = true;
+		_error = null;
+		try
+		{
+			var result = await OnCreate(name);
+			if (result.Success)
+			{
+				_name = string.Empty;
+				await OnClose.InvokeAsync();
+			}
+			else
+			{
+				_error = result.Message;
+			}
+		}
+		finally
+		{
+			_submitting = false;
+		}
+	}
+
+	private async Task Close() => await OnClose.InvokeAsync();
+}

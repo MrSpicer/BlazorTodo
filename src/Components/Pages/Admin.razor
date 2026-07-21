@@ -99,6 +99,9 @@
 	<button class="btn btn-outline-secondary btn-sm" @onclick="RefreshAsync" disabled="@_busy">
 		Refresh
 	</button>
+	<button class="btn btn-outline-primary btn-sm" @onclick="() => _showCreateRoleModal = true" disabled="@_busy">
+		New role
+	</button>
 </div>
 
 <!-- Users -->
@@ -264,6 +267,10 @@ else
                      IsLastAdmin="@(_rolesTarget is not null && IsLastAdmin(_rolesTarget))"
                      OnClose="() => _showRolesModal = false"
                      OnSave="HandleRolesSaved" />
+
+<CreateRoleModal IsVisible="_showCreateRoleModal"
+                 OnClose="() => _showCreateRoleModal = false"
+                 OnCreate="CreateRoleAsync" />
 
 <style>
 	.page-title {
@@ -465,6 +472,7 @@ else
 	private IReadOnlyList<string> _availableRoles = Array.Empty<string>();
 	private bool _showRolesModal;
 	private AdminUserView? _rolesTarget;
+	private bool _showCreateRoleModal;
 
 	protected override async Task OnInitializedAsync()
 	{
@@ -567,6 +575,17 @@ else
 
 		_showRolesModal = false;
 		await RunAsync(() => AdminService.SetUserRolesAsync(target.Id, roles, _actingAdminId));
+	}
+
+	private async Task<AdminResult> CreateRoleAsync(string name)
+	{
+		var result = await AdminService.CreateRoleAsync(name);
+		if (result.Success)
+		{
+			ShowResult(result);
+			await LoadUsersAsync();
+		}
+		return result;
 	}
 
 	// Runs an admin action with a busy guard, shows the result, and reloads the user list.

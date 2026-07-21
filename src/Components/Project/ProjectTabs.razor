@@ -10,7 +10,16 @@
                     <span class="tab-color" style="background-color: @project.Color;"></span>
                     <span class="tab-name">@project.Name</span>
                     <span class="tab-count">@GetTodoCount(project.Id)</span>
-                    <button class="tab-close" 
+                    <button class="tab-edit"
+                            @onclick:stopPropagation="true"
+                            @onclick="() => OnEditProject.InvokeAsync(project)"
+                            aria-label="Edit project">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+                            <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+                        </svg>
+                    </button>
+                    <button class="tab-close"
                             @onclick:stopPropagation="true"
                             @onclick="() => OnDeleteProject.InvokeAsync(project)"
                             aria-label="Delete project">
@@ -109,6 +118,7 @@
         color: var(--text-inverse);
     }
     
+    .tab-edit,
     .tab-close {
         display: flex;
         align-items: center;
@@ -124,11 +134,17 @@
         transition: all var(--transition-fast);
         margin-left: var(--space-1);
     }
-    
+
+    .project-tab:hover .tab-edit,
     .project-tab:hover .tab-close {
         opacity: 1;
     }
-    
+
+    .tab-edit:hover {
+        background: var(--primary-50);
+        color: var(--primary);
+    }
+
     .tab-close:hover {
         background: var(--danger-light);
         color: var(--danger);
@@ -172,6 +188,7 @@
             align-self: flex-start;
         }
 
+        .tab-edit,
         .tab-close {
             opacity: 1;
         }
@@ -193,6 +210,9 @@
 
     [Parameter]
     public EventCallback OnNewProjectClick { get; set; }
+
+    [Parameter]
+    public EventCallback<Project> OnEditProject { get; set; }
 
     [Parameter]
     public EventCallback<Project> OnDeleteProject { get; set; }
