@@ -1,0 +1,418 @@
+@using TodoList.Models
+@using TodoList.Models.Enums
+@using TodoList.Services
+@using TodoList.Services.Access
+@using Microsoft.AspNetCore.Components.Authorization
+@using Microsoft.AspNetCore.Identity
+@using System.Security.Claims
+@inject IProjectService ProjectService
+@inject IProjectMembershipService Membership
+@inject RoleManager<IdentityRole<Guid>> RoleManager
+
+<Modal IsVisible="IsVisible" OnClose="Close" Title="Project Members & Access" Size="default">
+	<HeaderIcon>
+		<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+			<path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
+			<circle cx="9" cy="7" r="4"/>
+			<path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/>
+		</svg>
+	</HeaderIcon>
+	<ChildContent>
+		<div class="modal-body">
+			@if (_manageableProjects.Count == 0)
+			{
+				<p class="members-empty">You don't own or manage any shared projects yet. Invite members from a project's edit dialog to get started.</p>
+			}
+			else
+			{
+				<div class="form-group">
+					<label class="form-label" for="memberProjectPicker">Project</label>
+					<select id="memberProjectPicker" class="form-input"
+					        value="@_selectedProjectId"
+					        @onchange="OnProjectChanged">
+						@foreach (var p in _manageableProjects)
+						{
+							<option value="@p.Id">@p.Name</option>
+						}
+					</select>
+				</div>
+
+				@if (_canManage)
+				{
+					<div class="form-group">
+						<label class="form-label">Members</label>
+						<div class="members-table">
+							@foreach (var m in _members)
+							{
+								<div class="members-row">
+									<div class="members-identity">
+										<span class="members-name">@(string.IsNullOrWhiteSpace(m.DisplayName) ? m.Email : m.DisplayName)</span>
+										<span class="members-email">@m.Email</span>
+									</div>
+									@if (m.IsOwner)
+									{
+										<span class="members-owner-tag">Owner</span>
+									}
+									else
+									{
+										<select class="form-input members-role"
+										        value="@m.RoleId"
+										        @onchange="e => ChangeRoleAsync(m.UserId, e.Value?.ToString())">
+											@foreach (var r in _roles)
+											{
+												<option value="@r.Id">@r.Name</option>
+											}
+										</select>
+										<span class="member-status @(m.Status == ProjectMemberStatus.Accepted ? "accepted" : "pending")">@m.Status</span>
+										@if (_isOwner)
+										{
+											<label class="members-manage" title="Allow this member to manage members/access">
+												<input type="checkbox" checked="@m.CanManageAccess"
+												       @onchange="e => SetCanManageAsync(m.UserId, (bool)(e.Value ?? false))" />
+												Can manage
+											</label>
+										}
+										<button type="button" class="members-remove" title="Remove member"
+										        @onclick="() => RemoveAsync(m.UserId)">Remove</button>
+									}
+								</div>
+							}
+						</div>
+					</div>
+
+					@if (_isOwner)
+					{
+						<div class="form-group">
+							<label class="form-label">Role permissions</label>
+							<p class="members-hint">For each role, choose what its members may do in this project. The owner always has full access.</p>
+							@if (_rolePermissions.Count == 0)
+							{
+								<p class="members-empty">No roles are assigned yet. Invite a member with a role, then set its permissions here.</p>
+							}
+							@foreach (var role in _rolePermissions)
+							{
+								<div class="perm-card">
+									<div class="perm-role-name">@(string.IsNullOrWhiteSpace(role.RoleName) ? "(unnamed role)" : role.RoleName)</div>
+									<table class="perm-matrix">
+										<thead>
+											<tr>
+												<th></th>
+												<th>Read</th>
+												<th>Add</th>
+												<th>Modify</th>
+												<th>Remove</th>
+											</tr>
+										</thead>
+										<tbody>
+											@foreach (var row in Matrix)
+											{
+												<tr>
+													<th scope="row">@row.Resource</th>
+													@foreach (var cell in row.Cells)
+													{
+														<td>
+															@switch (cell.Kind)
+															{
+																case CellKind.Editable:
+																	<input type="checkbox"
+																	       checked="@role.Permissions.HasFlag(cell.Bit)"
+																	       @onchange="e => TogglePermAsync(role, cell.Bit, (bool)(e.Value ?? false))" />
+																	break;
+																case CellKind.AlwaysOn:
+																	<input type="checkbox" checked disabled title="Always granted" />
+																	break;
+																default:
+																	<span class="perm-na">—</span>
+																	break;
+															}
+														</td>
+													}
+												</tr>
+											}
+										</tbody>
+									</table>
+								</div>
+							}
+						</div>
+					}
+
+					@if (!string.IsNullOrEmpty(_message))
+					{
+						<p class="invite-ok">@_message</p>
+					}
+					@if (!string.IsNullOrEmpty(_error))
+					{
+						<p class="validation-error">@_error</p>
+					}
+				}
+				else
+				{
+					<p class="members-empty">You don't have permission to manage this project's members.</p>
+				}
+			}
+		</div>
+		<div class="modal-footer">
+			<button type="button" class="btn btn-primary" @onclick="Close">Done</button>
+		</div>
+	</ChildContent>
+</Modal>
+
+<style>
+	.members-empty, .members-hint {
+		color: var(--text-secondary);
+		font-size: 0.875rem;
+	}
+
+	.members-table {
+		display: flex;
+		flex-direction: column;
+		gap: var(--space-2);
+	}
+
+	.members-row {
+		display: flex;
+		align-items: center;
+		gap: var(--space-3);
+		flex-wrap: wrap;
+		padding: var(--space-2) var(--space-3);
+		border: 1px solid var(--border-light);
+		border-radius: var(--radius-lg);
+	}
+
+	.members-identity {
+		display: flex;
+		flex-direction: column;
+		flex: 1;
+		min-width: 160px;
+	}
+
+	.members-name { font-weight: 600; font-size: 0.9375rem; }
+	.members-email { color: var(--text-muted); font-size: 0.8125rem; }
+
+	.members-role { width: auto; min-width: 140px; }
+
+	.members-owner-tag {
+		font-weight: 600;
+		color: var(--primary);
+		font-size: 0.875rem;
+	}
+
+	.member-status {
+		font-size: 0.6875rem;
+		font-weight: 600;
+		text-transform: uppercase;
+		padding: 0.0625rem 0.375rem;
+		border-radius: var(--radius-full);
+	}
+	.member-status.accepted { background: var(--success-light, #d1fae5); color: var(--success, #059669); }
+	.member-status.pending { background: var(--gray-200); color: var(--text-secondary); }
+
+	.members-manage {
+		display: flex;
+		align-items: center;
+		gap: var(--space-1);
+		font-size: 0.8125rem;
+		color: var(--text-secondary);
+	}
+
+	.members-remove {
+		background: transparent;
+		border: 1px solid var(--border);
+		color: var(--danger);
+		border-radius: var(--radius-md);
+		padding: 0.25rem 0.625rem;
+		font-size: 0.8125rem;
+		cursor: pointer;
+	}
+	.members-remove:hover { background: var(--danger-light); }
+
+	.perm-card {
+		border: 1px solid var(--border-light);
+		border-radius: var(--radius-lg);
+		padding: var(--space-2) var(--space-3);
+		margin-bottom: var(--space-2);
+	}
+	.perm-role-name { font-weight: 600; font-size: 0.9375rem; margin-bottom: var(--space-2); }
+	.perm-matrix { width: 100%; border-collapse: collapse; font-size: 0.8125rem; }
+	.perm-matrix th, .perm-matrix td { padding: 0.25rem 0.375rem; text-align: center; }
+	.perm-matrix thead th { color: var(--text-secondary); font-weight: 600; }
+	.perm-matrix th[scope="row"] { text-align: left; color: var(--text-secondary); font-weight: 500; }
+	.perm-na { color: var(--text-muted); }
+
+	.invite-ok { font-size: 0.8125rem; color: var(--success, #059669); }
+	.validation-error { font-size: 0.8125rem; color: var(--danger); }
+</style>
+
+@code {
+	[Parameter] public bool IsVisible { get; set; }
+	[Parameter] public EventCallback OnClose { get; set; }
+
+	[CascadingParameter]
+	private Task<AuthenticationState>? AuthState { get; set; }
+
+	private Guid _currentUserId;
+	private List<Project> _manageableProjects = new();
+	private Guid _selectedProjectId;
+	private bool _canManage;
+	private bool _isOwner;
+	private IReadOnlyList<ProjectMemberView> _members = Array.Empty<ProjectMemberView>();
+	private List<IdentityRole<Guid>> _roles = new();
+	private IReadOnlyList<RolePermissionView> _rolePermissions = Array.Empty<RolePermissionView>();
+	private bool _loaded;
+	private string? _message;
+	private string? _error;
+
+	private enum CellKind { Editable, AlwaysOn, NotApplicable }
+	private record Cell(CellKind Kind, ProjectPermission Bit = ProjectPermission.None);
+	private record MatrixRow(string Resource, Cell[] Cells);
+
+	// Rows = resources, columns = Read/Add/Modify/Remove. Reference reads and project reads are
+	// always granted to members (shared todos must render); reference add and project add/read are
+	// not separately enforced, shown as N/A. The Members "Add" column means "invite".
+	private static readonly MatrixRow[] Matrix =
+	{
+		new("Todos", new[]
+		{
+			new Cell(CellKind.Editable, ProjectPermission.TodosRead),
+			new Cell(CellKind.Editable, ProjectPermission.TodosAdd),
+			new Cell(CellKind.Editable, ProjectPermission.TodosModify),
+			new Cell(CellKind.Editable, ProjectPermission.TodosRemove),
+		}),
+		new("Notes", new[]
+		{
+			new Cell(CellKind.Editable, ProjectPermission.NotesRead),
+			new Cell(CellKind.Editable, ProjectPermission.NotesAdd),
+			new Cell(CellKind.Editable, ProjectPermission.NotesModify),
+			new Cell(CellKind.Editable, ProjectPermission.NotesRemove),
+		}),
+		new("Reference data", new[]
+		{
+			new Cell(CellKind.AlwaysOn),
+			new Cell(CellKind.NotApplicable),
+			new Cell(CellKind.Editable, ProjectPermission.ReferenceModify),
+			new Cell(CellKind.Editable, ProjectPermission.ReferenceRemove),
+		}),
+		new("Project settings", new[]
+		{
+			new Cell(CellKind.AlwaysOn),
+			new Cell(CellKind.NotApplicable),
+			new Cell(CellKind.Editable, ProjectPermission.ProjectModify),
+			new Cell(CellKind.Editable, ProjectPermission.ProjectRemove),
+		}),
+		new("Members & access", new[]
+		{
+			new Cell(CellKind.NotApplicable),
+			new Cell(CellKind.Editable, ProjectPermission.MembersInvite),
+			new Cell(CellKind.Editable, ProjectPermission.MembersModify),
+			new Cell(CellKind.Editable, ProjectPermission.MembersRemove),
+		}),
+	};
+
+	protected override async Task OnParametersSetAsync()
+	{
+		if (IsVisible && !_loaded)
+		{
+			_loaded = true;
+			await LoadAsync();
+		}
+		else if (!IsVisible)
+		{
+			_loaded = false;
+		}
+	}
+
+	private async Task LoadAsync()
+	{
+		_message = _error = null;
+		_currentUserId = await GetCurrentUserIdAsync();
+		_roles = RoleManager.Roles.OrderBy(r => r.Name).ToList();
+
+		// Settings may be loaded on a fresh circuit where ProjectService hasn't initialized yet.
+		if (ProjectService.Projects.Count == 0)
+			await ProjectService.InitializeAsync();
+
+		// Only surface projects the current user is actually allowed to manage.
+		_manageableProjects = new List<Project>();
+		foreach (var p in ProjectService.Projects)
+		{
+			if (await Membership.CanManageAccessAsync(p.Id, _currentUserId))
+				_manageableProjects.Add(p);
+		}
+
+		if (_manageableProjects.Count > 0)
+		{
+			_selectedProjectId = _manageableProjects[0].Id;
+			await LoadProjectAsync(_selectedProjectId);
+		}
+	}
+
+	private async Task OnProjectChanged(ChangeEventArgs e)
+	{
+		if (Guid.TryParse(e.Value?.ToString(), out var id))
+		{
+			_selectedProjectId = id;
+			await LoadProjectAsync(id);
+		}
+	}
+
+	private async Task LoadProjectAsync(Guid projectId)
+	{
+		_message = _error = null;
+		_canManage = await Membership.CanManageAccessAsync(projectId, _currentUserId);
+		var project = ProjectService.Projects.FirstOrDefault(p => p.Id == projectId);
+		_isOwner = project is not null && project.UserId == _currentUserId;
+		if (_canManage)
+		{
+			_members = await Membership.GetMembersAsync(projectId);
+			_rolePermissions = _isOwner
+				? await Membership.GetRolePermissionsAsync(projectId)
+				: Array.Empty<RolePermissionView>();
+		}
+	}
+
+	private async Task ChangeRoleAsync(Guid memberUserId, string? roleIdStr)
+	{
+		if (!Guid.TryParse(roleIdStr, out var roleId)) return;
+		await Apply(await Membership.ChangeRoleAsync(_selectedProjectId, _currentUserId, memberUserId, roleId));
+	}
+
+	private async Task SetCanManageAsync(Guid memberUserId, bool value)
+	{
+		await Apply(await Membership.SetCanManageAccessAsync(_selectedProjectId, _currentUserId, memberUserId, value));
+	}
+
+	private async Task RemoveAsync(Guid memberUserId)
+	{
+		await Apply(await Membership.RemoveMemberAsync(_selectedProjectId, _currentUserId, memberUserId));
+	}
+
+	private async Task TogglePermAsync(RolePermissionView role, ProjectPermission bit, bool on)
+	{
+		var updated = on ? (role.Permissions | bit) : (role.Permissions & ~bit);
+		await Apply(await Membership.SetRolePermissionsAsync(_selectedProjectId, _currentUserId, role.RoleId, updated));
+	}
+
+	private async Task Apply(MembershipResult result)
+	{
+		if (result.Succeeded)
+		{
+			_message = result.Message;
+			_error = null;
+		}
+		else
+		{
+			_error = result.Message;
+		}
+		await LoadProjectAsync(_selectedProjectId);
+	}
+
+	private async Task<Guid> GetCurrentUserIdAsync()
+	{
+		if (AuthState is null) return Guid.Empty;
+		var state = await AuthState;
+		var sub = state.User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+		return Guid.TryParse(sub, out var id) ? id : Guid.Empty;
+	}
+
+	private async Task Close() => await OnClose.InvokeAsync();
+}

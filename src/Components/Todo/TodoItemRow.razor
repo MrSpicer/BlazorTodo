@@ -12,6 +12,7 @@
 	<div class="todo-card-left">
 		<button class="todo-checkbox @(IsDone ? "checked" : "")"
 		        @onclick="ToggleComplete"
+		        disabled="@(!CanModify)"
 		        title="@(IsDone ? "Mark as incomplete" : "Mark as complete")"
 		        aria-label="@(IsDone ? "Mark as incomplete" : "Mark as complete")">
 			@if (IsDone)
@@ -109,6 +110,7 @@
 			<select class="status-select"
 			        value="@Item.StatusId"
 			        @onchange="HandleStatusChange"
+			        disabled="@(!CanModify)"
 			        title="Change task status"
 			        aria-label="Change task status for: @Item.Title">
 				@foreach (var status in StatusService.Statuses)
@@ -119,7 +121,7 @@
 		}
 
 		<div class="action-buttons">
-			@if (Depth > 0)
+			@if (Depth > 0 && CanModify)
 			{
 				<button class="action-btn edit-btn" @onclick="() => OnEdit.InvokeAsync(Item)"
 				        title="Edit subtask"
@@ -131,7 +133,7 @@
 					</svg>
 				</button>
 			}
-			else
+			else if (CanModify)
 			{
 				<button class="action-btn edit-btn" @onclick="HandleEdit" title="Edit task" aria-label="Edit task: @Item.Title">
 					<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -140,7 +142,7 @@
 					</svg>
 				</button>
 			}
-			@if (Depth == 0 && subs.Count == 0)
+			@if (Depth == 0 && subs.Count == 0 && CanAdd)
 			{
 				<button class="action-btn add-subtask-btn" @onclick="ShowAddSubTaskModal"
 				        title="Add subtask"
@@ -163,14 +165,17 @@
 					</svg>
 				</button>
 			}
-			<button class="action-btn delete-btn" @onclick="HandleDelete"
-			        title="Delete"
-			        aria-label="Delete"
-			        data-testid="@(Depth > 0 ? "subtask-delete-btn" : "delete-btn")">
-				<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-					<path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
-				</svg>
-			</button>
+			@if (CanRemove)
+			{
+				<button class="action-btn delete-btn" @onclick="HandleDelete"
+				        title="Delete"
+				        aria-label="Delete"
+				        data-testid="@(Depth > 0 ? "subtask-delete-btn" : "delete-btn")">
+					<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+						<path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+					</svg>
+				</button>
+			}
 		</div>
 	</div>
 </div>
@@ -188,15 +193,18 @@
 			</div>
 		}
 
-		<button class="add-subtask-trigger"
-		        @onclick="ShowAddSubTaskModal"
-		        data-testid="add-subtask-trigger"
-		        aria-label="Add subtask">
-			<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
-				<path d="M12 5v14M5 12h14"/>
-			</svg>
-			Add subtask
-		</button>
+		@if (CanAdd)
+		{
+			<button class="add-subtask-trigger"
+			        @onclick="ShowAddSubTaskModal"
+			        data-testid="add-subtask-trigger"
+			        aria-label="Add subtask">
+				<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+					<path d="M12 5v14M5 12h14"/>
+				</svg>
+				Add subtask
+			</button>
+		}
 	</div>
 }
 
@@ -620,6 +628,15 @@
 
 	[Parameter]
 	public EventCallback<TodoItem> OnSave { get; set; }
+
+	// The acting user's effective permissions in this project's content (from Todo.razor). Defaults
+	// to full control so anonymous/local single-user use is unaffected.
+	[CascadingParameter(Name = "ContentPermissions")]
+	private ProjectPermission Permissions { get; set; } = ProjectPermission.All;
+
+	private bool CanModify => Permissions.HasFlag(ProjectPermission.TodosModify);
+	private bool CanAdd => Permissions.HasFlag(ProjectPermission.TodosAdd);
+	private bool CanRemove => Permissions.HasFlag(ProjectPermission.TodosRemove);
 
 	private bool _isExpanded = false;
 	private bool _showSubTaskModal;

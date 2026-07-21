@@ -1,7 +1,9 @@
 @using TodoList.Models
 @using TodoList.Models.Enums
 @using TodoList.Services
+@using TodoList.Services.Access
 @inject ITodoService TodoService
+@inject IProjectMembershipService Membership
 
 <Modal IsVisible="IsVisible" OnClose="Close" Title="@(IsEditing ? "Edit Task" : "New Task")">
 	<HeaderIcon>
@@ -40,6 +42,7 @@
 			<TodoForm Todo="@_todo"
 			          IsEditing="@IsEditing"
 			          ShowCard="false"
+			          Members="@_members"
 			          OnSubmit="HandleSubmit"
 			          OnCancel="Close"
 			          OnConvertToNote="HandleConvertToNote" />
@@ -78,6 +81,24 @@
 	private TodoItem _todo = new();
 	private Guid? _selectedParentId;
 	private Guid? _originalParentId;
+	private IReadOnlyList<ProjectMemberView> _members = Array.Empty<ProjectMemberView>();
+	private Guid _membersLoadedFor;
+
+	// Load the project's members (for the Owner/Assignee selectors) whenever the modal targets a
+	// new project. Returns empty for anonymous/local projects, which hides the selectors.
+	protected override async Task OnParametersSetAsync()
+	{
+		if (IsVisible && _todo.ProjectId != Guid.Empty && _membersLoadedFor != _todo.ProjectId)
+		{
+			_membersLoadedFor = _todo.ProjectId;
+			_members = await Membership.GetMembersAsync(_todo.ProjectId);
+		}
+		else if (!IsVisible)
+		{
+			_membersLoadedFor = Guid.Empty;
+			_members = Array.Empty<ProjectMemberView>();
+		}
+	}
 
 	protected override void OnParametersSet()
 	{
@@ -102,6 +123,8 @@
 					UpdatedAt = EditingTodo.UpdatedAt,
 					ProjectId = EditingTodo.ProjectId,
 					ParentId = EditingTodo.ParentId,
+					OwnerId = EditingTodo.OwnerId,
+					AssigneeId = EditingTodo.AssigneeId,
 					TagIds = EditingTodo.TagIds.ToList(),
 					ChangeLog = EditingTodo.ChangeLog.ToList(),
 				};

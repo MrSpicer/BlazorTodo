@@ -8,6 +8,7 @@
 @inject IPriorityService PriorityService
 @inject IDialogService DialogService
 @inject IFilterPresetService PresetService
+@inject TodoList.Services.Access.IProjectAccessResolver Access
 @inject NavigationManager NavigationManager
 
 <PageTitle>BlazorTodo - Todo Management</PageTitle>
@@ -76,6 +77,7 @@ else
     <ProjectTabs Projects="@ProjectService.Projects"
                  SelectedProject="@ProjectService.SelectedProject"
                  Todos="@TodoService.Todos"
+                 PermissionsByProject="@_projectPerms"
                  OnProjectSelected="HandleProjectSelected"
                  OnNewProjectClick="ShowProjectModal"
                  OnEditProject="ShowEditProjectModal"
@@ -157,15 +159,18 @@ else
         <!-- Action Bar -->
         <div class="action-bar">
             <div class="action-bar-left">
-                <button class="btn btn-primary" @onclick="ShowTodoModal">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
-                        <path d="M12 5v14M5 12h14"/>
-                    </svg>
-                    Add Task
-                </button>
+                @if (_perms.HasFlag(ProjectPermission.TodosAdd))
+                {
+                    <button class="btn btn-primary" @onclick="ShowTodoModal">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                            <path d="M12 5v14M5 12h14"/>
+                        </svg>
+                        Add Task
+                    </button>
+                }
             </div>
             <div class="action-bar-right">
-                @if (GetProjectTodoCount() > 0)
+                @if (GetProjectTodoCount() > 0 && _perms.HasFlag(ProjectPermission.TodosRemove))
                 {
                     <button class="btn btn-ghost danger" @onclick="HandleClearAll">
                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
@@ -186,29 +191,36 @@ else
                      FilterChanged="StateHasChanged" />
 
         <!-- Todo List -->
-        <TodoListView Items="@GetFilteredTodos()"
-                      OnEdit="HandleEdit"
-                      OnDelete="HandleDelete"
-                      OnSave="HandleSave" />
+        <CascadingValue Name="ContentPermissions" Value="_perms">
+            <TodoListView Items="@GetFilteredTodos()"
+                          OnEdit="HandleEdit"
+                          OnDelete="HandleDelete"
+                          OnSave="HandleSave" />
+        </CascadingValue>
     }
     else
     {
         <!-- Notes Action Bar -->
         <div class="action-bar">
             <div class="action-bar-left">
-                <button class="btn btn-primary" @onclick="ShowNoteModal">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
-                        <path d="M12 5v14M5 12h14"/>
-                    </svg>
-                    Add Note
-                </button>
+                @if (_perms.HasFlag(ProjectPermission.NotesAdd))
+                {
+                    <button class="btn btn-primary" @onclick="ShowNoteModal">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                            <path d="M12 5v14M5 12h14"/>
+                        </svg>
+                        Add Note
+                    </button>
+                }
             </div>
         </div>
 
         <!-- Notes List -->
-        <NotesList Items="@GetProjectNotes()"
-                   OnEdit="HandleNoteEdit"
-                   OnDelete="HandleNoteDelete" />
+        <CascadingValue Name="ContentPermissions" Value="_perms">
+            <NotesList Items="@GetProjectNotes()"
+                       OnEdit="HandleNoteEdit"
+                       OnDelete="HandleNoteDelete" />
+        </CascadingValue>
     }
 }
 
@@ -493,6 +505,14 @@ else
     private bool _isEditingNote;
     private bool _showNoteModal;
 
+    [CascadingParameter]
+    private Task<AuthenticationState>? AuthState { get; set; }
+
+    // The current user's effective permissions in the selected project (drives UI gating), plus a
+    // per-project map for the project tabs. Anonymous/local users always have full control.
+    private ProjectPermission _perms = ProjectPermission.All;
+    private Dictionary<Guid, ProjectPermission> _projectPerms = new();
+
     protected override void OnInitialized()
     {
         TodoService.OnTodosChanged += StateHasChanged;
@@ -515,7 +535,39 @@ else
             PresetService.InitializeAsync()
         );
         ApplyRememberedPreset();
+        await RefreshPermissionsAsync();
         _isLoading = false;
+    }
+
+    // Recompute the acting user's effective permissions for every project (and the selected one).
+    // For anonymous/local users there is a single user with full control.
+    private async Task RefreshPermissionsAsync()
+    {
+        _projectPerms = new Dictionary<Guid, ProjectPermission>();
+
+        Guid userId = Guid.Empty;
+        var authenticated = false;
+        if (AuthState is not null)
+        {
+            var state = await AuthState;
+            authenticated = state.User.Identity?.IsAuthenticated == true;
+            var sub = state.User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+            Guid.TryParse(sub, out userId);
+        }
+
+        if (!authenticated || userId == Guid.Empty)
+        {
+            _perms = ProjectPermission.All;
+            return;
+        }
+
+        foreach (var p in ProjectService.Projects)
+            _projectPerms[p.Id] = await Access.GetEffectivePermissionsAsync(userId, p.Id);
+
+        var selId = ProjectService.SelectedProject?.Id;
+        _perms = selId.HasValue && _projectPerms.TryGetValue(selId.Value, out var pp)
+            ? pp
+            : ProjectPermission.All;
     }
 
     private IEnumerable<TodoItem> GetFilteredTodos() =>
@@ -653,6 +705,7 @@ else
     private void HandleProjectSelected(Project project)
     {
         ProjectService.SelectProject(project);
+        _perms = _projectPerms.TryGetValue(project.Id, out var pp) ? pp : ProjectPermission.All;
         ResetForm();
         _activeTab = "tasks";
     }
@@ -661,6 +714,7 @@ else
     {
         await ProjectService.SaveProjectAsync(project);
         ProjectService.SelectProject(project);
+        await RefreshPermissionsAsync();
         ResetForm();
     }
 
@@ -671,6 +725,7 @@ else
             await TodoService.DeleteTodosByProjectAsync(project.Id);
             await NoteService.DeleteNotesByProjectAsync(project.Id);
             await ProjectService.DeleteProjectAsync(project);
+            await RefreshPermissionsAsync();
         }
     }
 

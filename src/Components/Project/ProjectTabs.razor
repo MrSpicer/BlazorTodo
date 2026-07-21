@@ -1,4 +1,5 @@
 @using TodoList.Models
+@using TodoList.Models.Enums
 
 <div class="project-tabs-wrapper">
     <div class="project-tabs-container">
@@ -10,23 +11,29 @@
                     <span class="tab-color" style="background-color: @project.Color;"></span>
                     <span class="tab-name">@project.Name</span>
                     <span class="tab-count">@GetTodoCount(project.Id)</span>
-                    <button class="tab-edit"
-                            @onclick:stopPropagation="true"
-                            @onclick="() => OnEditProject.InvokeAsync(project)"
-                            aria-label="Edit project">
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
-                            <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
-                        </svg>
-                    </button>
-                    <button class="tab-close"
-                            @onclick:stopPropagation="true"
-                            @onclick="() => OnDeleteProject.InvokeAsync(project)"
-                            aria-label="Delete project">
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <path d="M18 6L6 18M6 6l12 12"/>
-                        </svg>
-                    </button>
+                    @if (CanModify(project.Id))
+                    {
+                        <button class="tab-edit"
+                                @onclick:stopPropagation="true"
+                                @onclick="() => OnEditProject.InvokeAsync(project)"
+                                aria-label="Edit project">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+                                <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+                            </svg>
+                        </button>
+                    }
+                    @if (CanRemove(project.Id))
+                    {
+                        <button class="tab-close"
+                                @onclick:stopPropagation="true"
+                                @onclick="() => OnDeleteProject.InvokeAsync(project)"
+                                aria-label="Delete project">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M18 6L6 18M6 6l12 12"/>
+                            </svg>
+                        </button>
+                    }
                 </button>
             }
         </div>
@@ -216,6 +223,19 @@
 
     [Parameter]
     public EventCallback<Project> OnDeleteProject { get; set; }
+
+    /// <summary>The acting user's effective permissions per project. Absent entries (anonymous/local
+    /// or a freshly created project) default to full control so the owner's own controls show.</summary>
+    [Parameter]
+    public IReadOnlyDictionary<Guid, ProjectPermission>? PermissionsByProject { get; set; }
+
+    private ProjectPermission PermsFor(Guid projectId) =>
+        PermissionsByProject is not null && PermissionsByProject.TryGetValue(projectId, out var p)
+            ? p
+            : ProjectPermission.All;
+
+    private bool CanModify(Guid projectId) => PermsFor(projectId).HasFlag(ProjectPermission.ProjectModify);
+    private bool CanRemove(Guid projectId) => PermsFor(projectId).HasFlag(ProjectPermission.ProjectRemove);
 
     private bool IsSelected(Project project)
     {

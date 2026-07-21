@@ -7,6 +7,7 @@ using TodoList.Data.Repositories;
 using TodoList.Identity;
 using TodoList.Realtime;
 using TodoList.Services;
+using TodoList.Services.Access;
 using TodoList.Services.Admin;
 
 namespace TodoList.Extensions;
@@ -111,6 +112,10 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IStatusRepository, RoutingStatusRepository>();
         services.AddScoped<IPriorityRepository, RoutingPriorityRepository>();
         services.AddScoped<IFilterPresetRepository, RoutingFilterPresetRepository>();
+
+        // Project sharing / access control (authenticated path).
+        services.AddScoped<IProjectAccessResolver, ProjectAccessResolver>();
+        services.AddScoped<IProjectMembershipService, ProjectMembershipService>();
 
         services.AddScoped<ITagService, TagService>();
         services.AddScoped<IStatusService, StatusService>();

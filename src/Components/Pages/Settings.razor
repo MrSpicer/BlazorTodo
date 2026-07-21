@@ -138,6 +138,36 @@
 		</div>
 	</div>
 
+	<!-- Project Members & Access -->
+	@if (UserContext.IsAuthenticated)
+	{
+		<div class="settings-card">
+			<div class="settings-card-header">
+				<div class="settings-card-icon">
+					<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+						<path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
+						<circle cx="9" cy="7" r="4"/>
+						<path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/>
+					</svg>
+				</div>
+				<div>
+					<h2 class="settings-card-title">Project Members &amp; Access</h2>
+					<p class="settings-card-description">Manage who can access your projects, change member roles, remove members, and delegate access management to specific members or roles.</p>
+				</div>
+			</div>
+			<div class="settings-card-actions">
+				<button class="btn btn-outline-secondary" @onclick="ShowMembersModal">
+					<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+						<path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
+						<circle cx="9" cy="7" r="4"/>
+						<path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/>
+					</svg>
+					Manage Members
+				</button>
+			</div>
+		</div>
+	}
+
 	<!-- Upload local data to account -->
 	@if (_canUploadLocalData)
 	{
@@ -210,6 +240,8 @@
 <StatusManagementModal IsVisible="@_showStatusModal" OnClose="HideStatusModal" />
 
 <PriorityManagementModal IsVisible="@_showPriorityModal" OnClose="HidePriorityModal" />
+
+<ProjectMembersModal IsVisible="@_showMembersModal" OnClose="HideMembersModal" />
 
 <style>
 	.settings-sections {
@@ -328,6 +360,7 @@
 	private bool _showTagsModal;
 	private bool _showStatusModal;
 	private bool _showPriorityModal;
+	private bool _showMembersModal;
 	private ImportExportModal? _importExportModal;
 	private bool _canUploadLocalData;
 	private bool _isUploadingLocalData;
@@ -362,6 +395,8 @@
 	private void HideStatusModal() => _showStatusModal = false;
 	private void ShowPriorityModal() => _showPriorityModal = true;
 	private void HidePriorityModal() => _showPriorityModal = false;
+	private void ShowMembersModal() => _showMembersModal = true;
+	private void HideMembersModal() => _showMembersModal = false;
 
 	private async Task HandleExport()
 	{

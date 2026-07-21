@@ -12,6 +12,8 @@ public class TodoItemConfiguration : IEntityTypeConfiguration<TodoItem>
 		b.HasKey(t => t.Id);
 		b.Property(t => t.Id).HasColumnName("id");
 		b.Property(t => t.UserId).HasColumnName("user_id");
+		b.Property(t => t.OwnerId).HasColumnName("owner_id");
+		b.Property(t => t.AssigneeId).HasColumnName("assignee_id");
 		b.Property(t => t.ProjectId).HasColumnName("project_id");
 		b.Property(t => t.ParentId).HasColumnName("parent_id");
 		b.Property(t => t.Title).HasColumnName("title").HasMaxLength(100).IsRequired();
@@ -45,5 +47,6 @@ public class TodoItemConfiguration : IEntityTypeConfiguration<TodoItem>
 
 		b.HasIndex(t => new { t.UserId, t.ProjectId }).HasDatabaseName("ix_todos_user_id_project_id");
 		b.HasIndex(t => t.ParentId).HasDatabaseName("ix_todos_parent_id");
+		b.HasIndex(t => t.AssigneeId).HasDatabaseName("ix_todos_assignee_id");
 	}
 }

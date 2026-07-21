@@ -1,0 +1,75 @@
+@page "/invitations/accept"
+@attribute [Authorize]
+@using System.Security.Claims
+@using Microsoft.AspNetCore.Authorization
+@using TodoList.Services.Access
+@inject IProjectMembershipService Membership
+
+<PageTitle>Accept invitation</PageTitle>
+
+<div class="invite-accept">
+	@if (_processing)
+	{
+		<h1 class="page-title">Accepting invitation…</h1>
+		<p>One moment while we add this project to your account.</p>
+	}
+	else
+	{
+		<h1 class="page-title">@(_result?.Succeeded == true ? "Invitation accepted" : "Invitation")</h1>
+		<p class="@(_result?.Succeeded == true ? "invite-ok" : "invite-error")">@_result?.Message</p>
+		<a class="btn btn-primary" href="">Go to my projects</a>
+	}
+</div>
+
+<style>
+	.invite-accept {
+		max-width: 480px;
+		margin: 4rem auto;
+		text-align: center;
+	}
+	.invite-accept p {
+		margin-bottom: 1.5rem;
+		color: var(--text-secondary);
+	}
+	.invite-error {
+		color: var(--danger);
+	}
+</style>
+
+@code {
+	// Only run against the live circuit (never the static prerender pass), because AcceptAsync
+	// consumes the single-use token — a double invocation would report the second as invalid.
+	[SupplyParameterFromQuery]
+	public string? Token { get; set; }
+
+	[CascadingParameter]
+	private Task<AuthenticationState>? AuthState { get; set; }
+
+	private bool _processing = true;
+	private MembershipResult? _result;
+
+	protected override async Task OnAfterRenderAsync(bool firstRender)
+	{
+		if (!firstRender)
+			return;
+
+		_result = await AcceptAsync();
+		_processing = false;
+		await InvokeAsync(StateHasChanged);
+	}
+
+	private async Task<MembershipResult> AcceptAsync()
+	{
+		if (string.IsNullOrWhiteSpace(Token))
+			return MembershipResult.Fail("This invitation link is missing its token.");
+		if (AuthState is null)
+			return MembershipResult.Fail("You must be signed in to accept an invitation.");
+
+		var state = await AuthState;
+		var sub = state.User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+		if (!Guid.TryParse(sub, out var userId))
+			return MembershipResult.Fail("You must be signed in to accept an invitation.");
+
+		return await Membership.AcceptAsync(userId, Token);
+	}
+}

@@ -13,6 +13,8 @@ public class AppDbContext : IdentityDbContext<ApplicationUser, IdentityRole<Guid
 	}
 
 	public DbSet<Project> Projects => Set<Project>();
+	public DbSet<ProjectMember> ProjectMembers => Set<ProjectMember>();
+	public DbSet<ProjectAccessRole> ProjectAccessRoles => Set<ProjectAccessRole>();
 	public DbSet<TodoItem> Todos => Set<TodoItem>();
 	public DbSet<ProjectNote> Notes => Set<ProjectNote>();
 	public DbSet<Tag> Tags => Set<Tag>();

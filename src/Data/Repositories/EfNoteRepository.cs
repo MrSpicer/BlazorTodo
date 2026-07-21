@@ -1,9 +1,12 @@
 using Microsoft.EntityFrameworkCore;
 using TodoList.Identity;
 using TodoList.Models;
+using TodoList.Models.Enums;
 
 namespace TodoList.Data.Repositories;
 
+// Notes are gated per action: reads require NotesRead, creating NotesAdd, editing NotesModify,
+// deleting NotesRemove. The owner implicitly has all of them.
 public class EfNoteRepository : EfRepositoryBase, INoteRepository, IRepository<ProjectNote>
 {
 	public EfNoteRepository(IDbContextFactory<AppDbContext> dbFactory, ICurrentUserContext user)
@@ -15,9 +18,10 @@ public class EfNoteRepository : EfRepositoryBase, INoteRepository, IRepository<P
 	{
 		var userId = RequireUserId();
 		await using var db = await CreateDbAsync();
+		var readableIds = ProjectAccessQueries.ProjectIdsWith(db, userId, ProjectPermission.NotesRead);
 		return await db.Notes
 			.AsNoTracking()
-			.FirstOrDefaultAsync(n => n.Id == id && n.UserId == userId);
+			.FirstOrDefaultAsync(n => n.Id == id && readableIds.Contains(n.ProjectId));
 	}
 
 	public Task<List<ProjectNote>> GetAll() => GetNotes();
@@ -33,16 +37,24 @@ public class EfNoteRepository : EfRepositoryBase, INoteRepository, IRepository<P
 	{
 		if (note is null || !note.IsValid() || !PassesDataAnnotations(note)) return false;
 		var userId = RequireUserId();
-		note.UserId = userId;
 
 		await using var db = await CreateDbAsync();
 
-		// Ownership guard: the target project must belong to the caller — a note may not be
-		// attached to another user's project GUID.
-		if (!await db.Projects.AnyAsync(p => p.Id == note.ProjectId && p.UserId == userId))
+		var project = await db.Projects.FirstOrDefaultAsync(p => p.Id == note.ProjectId);
+		if (project is null) return false;
+
+		var accessibleIds = ProjectAccessQueries.AccessibleProjectIds(db, userId);
+		var existing = await db.Notes.FirstOrDefaultAsync(n => n.Id == note.Id &&
+			accessibleIds.Contains(n.ProjectId));
+
+		// Object-level authorization: creating needs NotesAdd, editing needs NotesModify.
+		var required = existing is null ? ProjectPermission.NotesAdd : ProjectPermission.NotesModify;
+		if (!await ProjectAccessQueries.HasPermissionAsync(db, userId, note.ProjectId, required))
 			return false;
 
-		var existing = await db.Notes.FirstOrDefaultAsync(n => n.Id == note.Id && n.UserId == userId);
+		// Partition key = the project owner (matches the resolve-by-owner reference-data model).
+		note.UserId = project.UserId;
+
 		if (existing is null)
 		{
 			note.UpdatedAt ??= DateTime.UtcNow;
@@ -62,16 +74,23 @@ public class EfNoteRepository : EfRepositoryBase, INoteRepository, IRepository<P
 		if (note is null) return;
 		var userId = RequireUserId();
 		await using var db = await CreateDbAsync();
-		await db.Notes.Where(n => n.Id == note.Id && n.UserId == userId).ExecuteDeleteAsync();
+		var accessibleIds = ProjectAccessQueries.AccessibleProjectIds(db, userId);
+		var existing = await db.Notes
+			.FirstOrDefaultAsync(n => n.Id == note.Id && accessibleIds.Contains(n.ProjectId));
+		if (existing is null) return;
+		if (!await ProjectAccessQueries.HasPermissionAsync(db, userId, existing.ProjectId, ProjectPermission.NotesRemove))
+			return;
+		await db.Notes.Where(n => n.Id == existing.Id).ExecuteDeleteAsync();
 	}
 
 	public async Task<List<ProjectNote>> GetNotes()
 	{
 		var userId = RequireUserId();
 		await using var db = await CreateDbAsync();
+		var readableIds = ProjectAccessQueries.ProjectIdsWith(db, userId, ProjectPermission.NotesRead);
 		return await db.Notes
 			.AsNoTracking()
-			.Where(n => n.UserId == userId)
+			.Where(n => readableIds.Contains(n.ProjectId))
 			.ToListAsync();
 	}
 
@@ -79,9 +98,10 @@ public class EfNoteRepository : EfRepositoryBase, INoteRepository, IRepository<P
 	{
 		var userId = RequireUserId();
 		await using var db = await CreateDbAsync();
+		var readableIds = ProjectAccessQueries.ProjectIdsWith(db, userId, ProjectPermission.NotesRead);
 		return await db.Notes
 			.AsNoTracking()
-			.Where(n => n.UserId == userId && n.ProjectId == projectId)
+			.Where(n => n.ProjectId == projectId && readableIds.Contains(n.ProjectId))
 			.ToListAsync();
 	}
 
@@ -89,6 +109,7 @@ public class EfNoteRepository : EfRepositoryBase, INoteRepository, IRepository<P
 	{
 		var userId = RequireUserId();
 		await using var db = await CreateDbAsync();
-		await db.Notes.Where(n => n.UserId == userId && n.ProjectId == projectId).ExecuteDeleteAsync();
+		if (!await ProjectAccessQueries.HasPermissionAsync(db, userId, projectId, ProjectPermission.NotesRemove)) return;
+		await db.Notes.Where(n => n.ProjectId == projectId).ExecuteDeleteAsync();
 	}
 }

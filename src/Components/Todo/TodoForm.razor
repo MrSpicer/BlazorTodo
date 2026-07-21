@@ -1,5 +1,7 @@
 @using TodoList.Models
+@using TodoList.Models.Enums
 @using TodoList.Helpers
+@using TodoList.Services.Access
 @using Microsoft.AspNetCore.Components.Forms
 @implements IDisposable
 @inject IPriorityService PriorityService
@@ -38,6 +40,28 @@ else
 
     [Parameter]
     public EventCallback<TodoItem> OnConvertToNote { get; set; }
+
+    /// <summary>Owner + accepted members of the todo's project. Owner/Assignee selectors show only
+    /// when the project is actually shared (more than one assignable member).</summary>
+    [Parameter]
+    public IReadOnlyList<ProjectMemberView> Members { get; set; } = Array.Empty<ProjectMemberView>();
+
+    private IReadOnlyList<ProjectMemberView> AssignableMembers =>
+        Members.Where(m => m.IsOwner || m.Status == ProjectMemberStatus.Accepted).ToList();
+
+    private static string MemberLabel(ProjectMemberView m) =>
+        string.IsNullOrWhiteSpace(m.DisplayName) ? m.Email : m.DisplayName;
+
+    private void OnOwnerChanged(ChangeEventArgs e)
+    {
+        if (Guid.TryParse(e.Value?.ToString(), out var g))
+            Todo.OwnerId = g;
+    }
+
+    private void OnAssigneeChanged(ChangeEventArgs e)
+    {
+        Todo.AssigneeId = Guid.TryParse(e.Value?.ToString(), out var g) ? g : (Guid?)null;
+    }
 
     private RenderFragment FormContent => __builder =>
     {
@@ -107,6 +131,35 @@ else
                     }
                 </div>
             </div>
+
+            @if (AssignableMembers.Count > 1)
+            {
+                <div class="form-row">
+                    <div class="form-group">
+                        <label class="form-label" for="TodoOwner">Owner</label>
+                        <select id="TodoOwner" class="form-input"
+                                value="@Todo.OwnerId"
+                                @onchange="OnOwnerChanged">
+                            @foreach (var m in AssignableMembers)
+                            {
+                                <option value="@m.UserId">@MemberLabel(m)</option>
+                            }
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label" for="TodoAssignee">Assignee</label>
+                        <select id="TodoAssignee" class="form-input"
+                                value="@(Todo.AssigneeId?.ToString() ?? string.Empty)"
+                                @onchange="OnAssigneeChanged">
+                            <option value="">Unassigned</option>
+                            @foreach (var m in AssignableMembers)
+                            {
+                                <option value="@m.UserId">@MemberLabel(m)</option>
+                            }
+                        </select>
+                    </div>
+                </div>
+            }
 
             <div class="form-actions">
                 @if (IsEditing && OnConvertToNote.HasDelegate)

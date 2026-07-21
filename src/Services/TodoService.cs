@@ -3,6 +3,7 @@ using TodoList.Identity;
 using TodoList.Models;
 using TodoList.Models.Enums;
 using TodoList.Realtime;
+using TodoList.Services.Access;
 
 namespace TodoList.Services;
 
@@ -14,6 +15,7 @@ public class TodoService : EntityServiceBase<TodoItem>, ITodoService
 	private readonly IPriorityService _priorityService;
 	private readonly IUserChangeBus _bus;
 	private readonly ICurrentUserContext _user;
+	private readonly IProjectAccessResolver _access;
 
 	public event Action? OnTodosChanged
 	{
@@ -30,6 +32,7 @@ public class TodoService : EntityServiceBase<TodoItem>, ITodoService
 		IPriorityService priorityService,
 		IUserChangeBus bus,
 		ICurrentUserContext user,
+		IProjectAccessResolver access,
 		ILogger<TodoService> logger)
 		: base((IRepository<TodoItem>)repository, logger)
 	{
@@ -39,6 +42,7 @@ public class TodoService : EntityServiceBase<TodoItem>, ITodoService
 		_priorityService = priorityService;
 		_bus = bus;
 		_user = user;
+		_access = access;
 	}
 
 	public async Task RefreshAsync()
@@ -47,10 +51,21 @@ public class TodoService : EntityServiceBase<TodoItem>, ITodoService
 		NotifyChanged();
 	}
 
-	private Task PublishChange()
+	// When the change is scoped to a project, fan out to that project's audience (owner + accepted
+	// members). For cross-project operations (clear-all) there is no single project, so notify the
+	// acting user only.
+	private async Task PublishChange(Guid? projectId)
 	{
-		if (!_user.IsAuthenticated) return Task.CompletedTask;
-		return _bus.PublishAsync(new UserChangeEvent(_user.UserId, ChangeKind.Todos));
+		if (!_user.IsAuthenticated) return;
+		if (projectId is Guid pid)
+		{
+			foreach (var userId in await _access.AudienceUserIdsAsync(pid))
+				await _bus.PublishAsync(new UserChangeEvent(userId, ChangeKind.Todos));
+		}
+		else
+		{
+			await _bus.PublishAsync(new UserChangeEvent(_user.UserId, ChangeKind.Todos));
+		}
 	}
 
 	public override async Task InitializeAsync()
@@ -193,7 +208,7 @@ public class TodoService : EntityServiceBase<TodoItem>, ITodoService
 			else
 				_items.Add(todo);
 			NotifyChanged();
-			await PublishChange();
+			await PublishChange(todo.ProjectId);
 		}
 		return success;
 	}
@@ -208,7 +223,7 @@ public class TodoService : EntityServiceBase<TodoItem>, ITodoService
 		await Repository.Delete(todo);
 		_items.RemoveAll(t => t.Id == todo.Id || t.ParentId == todo.Id);
 		NotifyChanged();
-		await PublishChange();
+		await PublishChange(todo.ProjectId);
 	}
 
 	public async Task UpdateStatusAsync(TodoItem todo, Guid newStatusId)
@@ -237,7 +252,7 @@ public class TodoService : EntityServiceBase<TodoItem>, ITodoService
 
 		await Repository.AddOrUpdate(todo);
 		NotifyChanged();
-		await PublishChange();
+		await PublishChange(todo.ProjectId);
 	}
 
 	private string StatusName(Guid id) => _formatter.StatusName(id);
@@ -247,7 +262,7 @@ public class TodoService : EntityServiceBase<TodoItem>, ITodoService
 		await Repository.ClearAll();
 		_items.Clear();
 		NotifyChanged();
-		await PublishChange();
+		await PublishChange(null);
 	}
 
 	public async Task ClearAllAsync(Guid? projectId = null)
@@ -263,7 +278,7 @@ public class TodoService : EntityServiceBase<TodoItem>, ITodoService
 			_items.RemoveAll(t => t.ProjectId == projectId.Value);
 		}
 		NotifyChanged();
-		await PublishChange();
+		await PublishChange(projectId);
 	}
 
 	public async Task DeleteTodosByProjectAsync(Guid projectId)
@@ -271,7 +286,7 @@ public class TodoService : EntityServiceBase<TodoItem>, ITodoService
 		await _todoRepository.DeleteByProject(projectId);
 		_items.RemoveAll(t => t.ProjectId == projectId);
 		NotifyChanged();
-		await PublishChange();
+		await PublishChange(projectId);
 	}
 
 	public IReadOnlyList<TodoItem> GetSubTasks(Guid parentId) =>

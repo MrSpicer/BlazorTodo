@@ -9,7 +9,18 @@ public class TodoItem : IEntity, IProjectScoped
 {
 	public Guid Id { get; set; } = Guid.NewGuid();
 
+	/// <summary>
+	/// Partition key = the owning <see cref="Project"/>'s owner (<see cref="Project.UserId"/>).
+	/// Stamped from the project at persistence time, NOT the acting user, so a shared project's
+	/// todos all resolve reference data (status/priority/tags) against the project owner.
+	/// </summary>
 	public Guid UserId { get; set; } = Guid.Empty;
+
+	/// <summary>The user who owns this todo (defaults to its creator). Distinct from <see cref="UserId"/>.</summary>
+	public Guid OwnerId { get; set; } = Guid.Empty;
+
+	/// <summary>Optional project member the todo is assigned to.</summary>
+	public Guid? AssigneeId { get; set; }
 
 	[Required(ErrorMessage = "Title is required")]
 	[StringLength(100, MinimumLength = 1, ErrorMessage = "Title must be 1-100 characters")]

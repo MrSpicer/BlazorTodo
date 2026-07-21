@@ -1,5 +1,13 @@
 @using TodoList.Models
+@using TodoList.Models.Enums
+@using TodoList.Services.Access
 @using Microsoft.AspNetCore.Components.Forms
+@using Microsoft.AspNetCore.Components.Authorization
+@using Microsoft.AspNetCore.Identity
+@using System.Security.Claims
+@inject IProjectMembershipService Membership
+@inject RoleManager<IdentityRole<Guid>> RoleManager
+@inject NavigationManager Navigation
 
 <Modal IsVisible="IsVisible" OnClose="Close" Title="@(IsEditing ? "Edit Project" : "New Project")" Size="compact">
 	<HeaderIcon>
@@ -55,6 +63,46 @@
 						}
 					</div>
 				</div>
+
+					@if (IsEditing && _canManageAccess)
+					{
+						<div class="form-group members-section">
+							<label class="form-label">Members</label>
+							<div class="member-list">
+								@foreach (var m in _members)
+								{
+									<div class="member-row">
+										<span class="member-name">@(string.IsNullOrWhiteSpace(m.DisplayName) ? m.Email : m.DisplayName)</span>
+										<span class="member-role">@(m.IsOwner ? "Owner" : m.RoleName)</span>
+										@if (!m.IsOwner)
+										{
+											<span class="member-status @(m.Status == ProjectMemberStatus.Accepted ? "accepted" : "pending")">@m.Status</span>
+										}
+									</div>
+								}
+							</div>
+							<div class="invite-row">
+								<input type="email" class="form-input" placeholder="Invite by email…"
+								       @bind="_inviteEmail" @bind:event="oninput" />
+								<select class="form-input invite-role" @bind="_inviteRoleId">
+									@foreach (var r in _roles)
+									{
+										<option value="@r.Id">@r.Name</option>
+									}
+								</select>
+								<button type="button" class="btn btn-primary invite-btn"
+								        disabled="@(_inviting || _roles.Count == 0)" @onclick="HandleInviteAsync">Invite</button>
+							</div>
+							@if (!string.IsNullOrEmpty(_inviteMessage))
+							{
+								<p class="invite-ok">@_inviteMessage</p>
+							}
+							@if (!string.IsNullOrEmpty(_inviteError))
+							{
+								<p class="validation-error">@_inviteError</p>
+							}
+						</div>
+					}
 			</div>
 			<div class="modal-footer">
 				<button type="button" class="btn btn-ghost" @onclick="Close">Cancel</button>
@@ -158,6 +206,76 @@
 	.modal-body {
 		gap: var(--space-5);
 	}
+
+	.members-section {
+		border-top: 1px solid var(--border-light);
+		padding-top: var(--space-4);
+	}
+
+	.member-list {
+		display: flex;
+		flex-direction: column;
+		gap: var(--space-1);
+	}
+
+	.member-row {
+		display: flex;
+		align-items: center;
+		gap: var(--space-2);
+		font-size: 0.875rem;
+	}
+
+	.member-name {
+		flex: 1;
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+	}
+
+	.member-role {
+		color: var(--text-secondary);
+		font-size: 0.8125rem;
+	}
+
+	.member-status {
+		font-size: 0.6875rem;
+		font-weight: 600;
+		text-transform: uppercase;
+		padding: 0.0625rem 0.375rem;
+		border-radius: var(--radius-full);
+	}
+
+	.member-status.accepted {
+		background: var(--success-light, #d1fae5);
+		color: var(--success, #059669);
+	}
+
+	.member-status.pending {
+		background: var(--gray-200);
+		color: var(--text-secondary);
+	}
+
+	.invite-row {
+		display: flex;
+		gap: var(--space-2);
+		flex-wrap: wrap;
+	}
+
+	.invite-row .form-input {
+		flex: 1;
+		min-width: 140px;
+	}
+
+	.invite-row .invite-role {
+		flex: 0 0 auto;
+		min-width: 120px;
+		width: auto;
+	}
+
+	.invite-ok {
+		font-size: 0.8125rem;
+		color: var(--success, #059669);
+	}
 </style>
 
 @code {
@@ -176,7 +294,22 @@
 	[Parameter]
 	public EventCallback<Project> OnSave { get; set; }
 
+	[CascadingParameter]
+	private Task<AuthenticationState>? AuthState { get; set; }
+
 	private Project _project = new();
+
+	// Membership / invite state (edit mode, authenticated users who can manage access).
+	private bool _canManageAccess;
+	private Guid _currentUserId;
+	private IReadOnlyList<ProjectMemberView> _members = Array.Empty<ProjectMemberView>();
+	private List<IdentityRole<Guid>> _roles = new();
+	private Guid? _membershipLoadedFor;
+	private string _inviteEmail = string.Empty;
+	private Guid _inviteRoleId;
+	private bool _inviting;
+	private string? _inviteMessage;
+	private string? _inviteError;
 
 	private readonly string[] _presetColors = new[]
 	{
@@ -215,6 +348,89 @@
 				};
 			}
 		}
+	}
+
+	// Load membership context once per opened project. Runs after OnParametersSet so _project is
+	// already cloned. Only touches the DB for authenticated edit sessions.
+	protected override async Task OnParametersSetAsync()
+	{
+		if (IsVisible && IsEditing && EditingProject is not null)
+		{
+			if (_membershipLoadedFor != EditingProject.Id)
+			{
+				_membershipLoadedFor = EditingProject.Id;
+				await LoadMembershipAsync(EditingProject.Id);
+			}
+		}
+		else if (!IsVisible)
+		{
+			ResetMembershipState();
+		}
+	}
+
+	private async Task LoadMembershipAsync(Guid projectId)
+	{
+		ResetMembershipState();
+		_currentUserId = await GetCurrentUserIdAsync();
+		if (_currentUserId == Guid.Empty)
+			return;
+
+		_canManageAccess = await Membership.CanManageAccessAsync(projectId, _currentUserId);
+		if (!_canManageAccess)
+			return;
+
+		_roles = RoleManager.Roles.OrderBy(r => r.Name).ToList();
+		if (_inviteRoleId == Guid.Empty && _roles.Count > 0)
+			_inviteRoleId = _roles[0].Id;
+		_members = await Membership.GetMembersAsync(projectId);
+	}
+
+	private void ResetMembershipState()
+	{
+		_canManageAccess = false;
+		_members = Array.Empty<ProjectMemberView>();
+		_inviteEmail = string.Empty;
+		_inviteMessage = null;
+		_inviteError = null;
+		_membershipLoadedFor = IsVisible ? _membershipLoadedFor : null;
+	}
+
+	private async Task HandleInviteAsync()
+	{
+		_inviteMessage = null;
+		_inviteError = null;
+		if (EditingProject is null)
+			return;
+
+		_inviting = true;
+		try
+		{
+			var result = await Membership.InviteAsync(
+				EditingProject.Id, _currentUserId, _inviteEmail, _inviteRoleId, Navigation.BaseUri);
+			if (result.Succeeded)
+			{
+				_inviteMessage = result.Message;
+				_inviteEmail = string.Empty;
+				_members = await Membership.GetMembersAsync(EditingProject.Id);
+			}
+			else
+			{
+				_inviteError = result.Message;
+			}
+		}
+		finally
+		{
+			_inviting = false;
+		}
+	}
+
+	private async Task<Guid> GetCurrentUserIdAsync()
+	{
+		if (AuthState is null)
+			return Guid.Empty;
+		var state = await AuthState;
+		var sub = state.User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+		return Guid.TryParse(sub, out var id) ? id : Guid.Empty;
 	}
 
 	private async Task HandleValidSubmit()
