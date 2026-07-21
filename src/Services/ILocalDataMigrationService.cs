@@ -11,6 +11,9 @@ public interface ILocalDataMigrationService
 	/// <summary>True if this browser holds any local todos, projects, or notes.</summary>
 	Task<bool> HasLocalDataAsync();
 
+	/// <summary>True if this browser holds a local project set (the ProjectSet_* keys).</summary>
+	Task<bool> HasLocalProjectsAsync();
+
 	/// <summary>True when we should show the migration prompt: authenticated, not opted out, and local data exists.</summary>
 	Task<bool> ShouldPromptAsync();
 

@@ -88,6 +88,22 @@ public class LocalDataMigrationService : ILocalDataMigrationService, IDisposable
 		}
 	}
 
+	public async Task<bool> HasLocalProjectsAsync()
+	{
+		await _gate.WaitAsync();
+		try
+		{
+			await _projectRepo.InitializeAsync();
+			return (await _projectRepo.GetAll()).Count > 0;
+		}
+		catch (Exception ex)
+		{
+			_logger.LogError(ex, "Failed to probe local projects");
+			return false;
+		}
+		finally { _gate.Release(); }
+	}
+
 	public async Task<bool> ShouldPromptAsync()
 	{
 		if (!_user.IsAuthenticated)

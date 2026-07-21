@@ -169,29 +169,32 @@
 	}
 
 	<!-- Danger Zone -->
-	<div class="settings-card danger-zone">
-		<div class="settings-card-header">
-			<div class="settings-card-icon danger">
-				<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-					<path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
-					<line x1="12" y1="9" x2="12" y2="13"/>
-					<line x1="12" y1="17" x2="12.01" y2="17"/>
-				</svg>
+	@if (_canClearLocalStorage)
+	{
+		<div class="settings-card danger-zone">
+			<div class="settings-card-header">
+				<div class="settings-card-icon danger">
+					<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+						<path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+						<line x1="12" y1="9" x2="12" y2="13"/>
+						<line x1="12" y1="17" x2="12.01" y2="17"/>
+					</svg>
+				</div>
+				<div>
+					<h2 class="settings-card-title">Danger Zone</h2>
+					<p class="settings-card-description">Permanently delete the todos, projects, and notes stored locally in this browser. This only affects anonymous data on this device — it does not touch data saved to your account. This cannot be undone.</p>
+				</div>
 			</div>
-			<div>
-				<h2 class="settings-card-title">Danger Zone</h2>
-				<p class="settings-card-description">Permanently delete the todos, projects, and notes stored locally in this browser. This only affects anonymous data on this device — it does not touch data saved to your account. This cannot be undone.</p>
+			<div class="settings-card-actions">
+				<button class="btn btn-ghost danger" @onclick="HandleClearLocalStorage">
+					<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+						<path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+					</svg>
+					Clear All Local Storage
+				</button>
 			</div>
 		</div>
-		<div class="settings-card-actions">
-			<button class="btn btn-ghost danger" @onclick="HandleClearLocalStorage">
-				<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-					<path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
-				</svg>
-				Clear All Local Storage
-			</button>
-		</div>
-	</div>
+	}
 
 </div>
 
@@ -328,6 +331,7 @@
 	private ImportExportModal? _importExportModal;
 	private bool _canUploadLocalData;
 	private bool _isUploadingLocalData;
+	private bool _canClearLocalStorage;
 
 	protected override void OnInitialized()
 	{
@@ -339,6 +343,7 @@
 	{
 		await PresetService.InitializeAsync();
 		_canUploadLocalData = UserContext.IsAuthenticated && await MigrationService.HasLocalDataAsync();
+		_canClearLocalStorage = await MigrationService.HasLocalProjectsAsync();
 		StateHasChanged();
 	}
 
@@ -398,6 +403,7 @@
 		if (result.Success)
 		{
 			_canUploadLocalData = false;
+			_canClearLocalStorage = false;
 			var message = $"Uploaded {result.ImportedCount} item(s) to your account.";
 			if (result.RemappedToDefaultCount > 0)
 				message += $" {result.RemappedToDefaultCount} moved to the default project.";
