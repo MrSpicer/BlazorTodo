@@ -13,14 +13,134 @@
             <h5>@(IsEditing ? "Edit Task" : "Add New Task")</h5>
         </div>
         <div class="form-card-body">
-            @FormContent
+            <EditForm Model="@Todo" OnValidSubmit="HandleValidSubmit" class="task-form">
+                @Fields
+                <div class="form-actions">
+                    @Actions
+                </div>
+            </EditForm>
         </div>
     </div>
 }
 else
 {
-    @FormContent
+    @* Modal mode: the form spans the scrolling body and the pinned footer. *@
+    <EditForm Model="@Todo" OnValidSubmit="HandleValidSubmit" class="modal-form">
+        <div class="modal-body">
+            <div class="task-form">
+                @BodyHeader
+                @Fields
+            </div>
+        </div>
+        <div class="modal-footer">
+            @Actions
+        </div>
+    </EditForm>
 }
+
+<style>
+    .task-form {
+        display: flex;
+        flex-direction: column;
+        gap: var(--space-5);
+        flex: 1;
+    }
+
+    .task-form .form-textarea {
+        flex: 1;
+    }
+
+    .due-date-wrap {
+        position: relative;
+    }
+
+    .btn-clear-due {
+        position: absolute;
+        right: 8px;
+        top: 50%;
+        transform: translateY(-50%);
+        width: 22px;
+        height: 22px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        border: none;
+        background: var(--gray-100);
+        color: var(--text-muted);
+        border-radius: var(--radius-full);
+        cursor: pointer;
+    }
+
+    .btn-clear-due:hover {
+        background: var(--gray-200);
+        color: var(--text-primary);
+    }
+
+    .priority-options {
+        display: flex;
+        gap: var(--space-2);
+        flex-wrap: wrap;
+    }
+
+    .priority-option {
+        display: flex;
+        align-items: center;
+        gap: var(--space-2);
+        padding: var(--space-2) var(--space-3);
+        border: 1.5px solid var(--border);
+        border-radius: var(--radius-lg);
+        cursor: pointer;
+        transition: all var(--transition-fast);
+        font-size: 0.875rem;
+        font-weight: 500;
+    }
+
+    .priority-option input {
+        display: none;
+    }
+
+    .priority-option:hover {
+        border-color: var(--gray-300);
+        background: var(--surface-hover);
+    }
+
+    .priority-dot {
+        width: 10px;
+        height: 10px;
+        border-radius: var(--radius-full);
+    }
+
+    /* Card-mode action bar (modal mode uses the pinned .modal-footer instead). */
+    .form-actions {
+        display: flex;
+        justify-content: flex-end;
+        gap: var(--space-3);
+        padding-top: var(--space-4);
+        border-top: 1px solid var(--border-light);
+    }
+
+    .form-card {
+        background: var(--surface);
+        border: 1px solid var(--border-light);
+        border-radius: var(--radius-xl);
+        overflow: hidden;
+        box-shadow: var(--shadow-sm);
+    }
+
+    .form-card-header {
+        padding: var(--space-4) var(--space-5);
+        border-bottom: 1px solid var(--border-light);
+    }
+
+    .form-card-header h5 {
+        margin: 0;
+        font-weight: 600;
+    }
+
+    .form-card-body {
+        padding: var(--space-5);
+    }
+</style>
 
 @code {
     [Parameter, EditorRequired]
@@ -31,6 +151,10 @@ else
 
     [Parameter]
     public bool ShowCard { get; set; } = true;
+
+    /// <summary>Optional content rendered at the top of the modal body (e.g. a parent-task selector).</summary>
+    [Parameter]
+    public RenderFragment? BodyHeader { get; set; }
 
     [Parameter]
     public EventCallback<TodoItem> OnSubmit { get; set; }
@@ -63,290 +187,137 @@ else
         Todo.AssigneeId = Guid.TryParse(e.Value?.ToString(), out var g) ? g : (Guid?)null;
     }
 
-    private RenderFragment FormContent => __builder =>
+    private RenderFragment Fields => __builder =>
     {
-        <EditForm Model="@Todo" OnValidSubmit="HandleValidSubmit" class="task-form">
-            <DataAnnotationsValidator />
+        <DataAnnotationsValidator />
 
-            <div class="form-group">
-                <label for="TodoTitle" class="form-label">Title</label>
-                <InputText id="TodoTitle" class="form-input" @bind-Value="Todo.Title"
-                           placeholder="What needs to be done?" />
-                <ValidationMessage For="@(() => Todo.Title)" class="validation-error" />
-            </div>
+        <div class="form-group">
+            <label for="TodoTitle" class="form-label">Title</label>
+            <InputText id="TodoTitle" class="form-input" @bind-Value="Todo.Title"
+                       placeholder="What needs to be done?" />
+            <ValidationMessage For="@(() => Todo.Title)" class="validation-error" />
+        </div>
 
-            <div class="form-group" style="flex: 1; display: flex; flex-direction: column">
-                <label for="TodoDescription" class="form-label">Description</label>
-                <InputTextArea id="TodoDescription" class="form-input form-textarea" rows="3"
-                               @bind-Value="Todo.Description" placeholder="Add some details..." />
-            </div>
+        <div class="form-group" style="flex: 1; display: flex; flex-direction: column">
+            <label for="TodoDescription" class="form-label">Description</label>
+            <InputTextArea id="TodoDescription" class="form-input form-textarea" rows="3"
+                           @bind-Value="Todo.Description" placeholder="Add some details..." />
+        </div>
 
-            <div class="form-row">
-                <div class="form-group form-group-due">
-                    <label for="TodoDueDate" class="form-label">Due date</label>
-                    <div class="due-date-wrap">
-                        <InputDate Type="InputDateType.DateTimeLocal"
-                                   id="TodoDueDate"
-                                   class="form-input"
-                                   @bind-Value="Todo.DueDate" />
-                        @if (Todo.DueDate.HasValue)
-                        {
-                            <button type="button" class="btn-clear-due"
-                                    @onclick="() => Todo.DueDate = null"
-                                    aria-label="Clear due date"
-                                    data-testid="clear-due-date">
-                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
-                                    <path d="M18 6L6 18M6 6l12 12" />
-                                </svg>
-                            </button>
-                        }
-                    </div>
-                </div>
-                <div class="form-group form-group-estimate">
-                    <label for="TodoEstimate" class="form-label">Estimate (minutes)</label>
-                    <InputNumber id="TodoEstimate" class="form-input" @bind-Value="Todo.EstimatedMinutes" placeholder="e.g. 30" />
-                </div>
-            </div>
-
-            <div class="form-group">
-                <label class="form-label">Tags</label>
-                <TagSelector @bind-SelectedTagIds="Todo.TagIds" />
-            </div>
-
-            <div class="form-group">
-                <label class="form-label">Priority</label>
-                <div class="priority-options">
-                    @foreach (var priority in PriorityService.Priorities.OrderBy(p => p.Rank))
+        <div class="form-row">
+            <div class="form-group form-group-due">
+                <label for="TodoDueDate" class="form-label">Due date</label>
+                <div class="due-date-wrap">
+                    <InputDate Type="InputDateType.DateTimeLocal"
+                               id="TodoDueDate"
+                               class="form-input"
+                               @bind-Value="Todo.DueDate" />
+                    @if (Todo.DueDate.HasValue)
                     {
-                        var isSelected = Todo.PriorityId == priority.Id;
-                        var (bg, fg) = StatusColor.Resolve(priority.Color);
-                        <label class="priority-option @(isSelected ? "selected" : "")"
-                               style="@(isSelected ? $"background:{bg};border-color:{priority.Color};color:{fg};" : "")">
-                            <input type="radio" name="priority" value="@priority.Id"
-                                   checked="@isSelected"
-                                   @onchange="() => Todo.PriorityId = priority.Id" />
-                            <span class="priority-dot" style="background-color:@priority.Color"></span>
-                            <span class="priority-label">@priority.Name</span>
-                        </label>
+                        <button type="button" class="btn-clear-due"
+                                @onclick="() => Todo.DueDate = null"
+                                aria-label="Clear due date"
+                                data-testid="clear-due-date">
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                                <path d="M18 6L6 18M6 6l12 12" />
+                            </svg>
+                        </button>
                     }
                 </div>
             </div>
+            <div class="form-group form-group-estimate">
+                <label for="TodoEstimate" class="form-label">Estimate (minutes)</label>
+                <InputNumber id="TodoEstimate" class="form-input" @bind-Value="Todo.EstimatedMinutes" placeholder="e.g. 30" />
+            </div>
+        </div>
 
-            @if (AssignableMembers.Count > 1)
-            {
-                <div class="form-row">
-                    <div class="form-group">
-                        <label class="form-label" for="TodoOwner">Owner</label>
-                        <select id="TodoOwner" class="form-input"
-                                value="@Todo.OwnerId"
-                                @onchange="OnOwnerChanged">
-                            @foreach (var m in AssignableMembers)
-                            {
-                                <option value="@m.UserId">@MemberLabel(m)</option>
-                            }
-                        </select>
-                    </div>
-                    <div class="form-group">
-                        <label class="form-label" for="TodoAssignee">Assignee</label>
-                        <select id="TodoAssignee" class="form-input"
-                                value="@(Todo.AssigneeId?.ToString() ?? string.Empty)"
-                                @onchange="OnAssigneeChanged">
-                            <option value="">Unassigned</option>
-                            @foreach (var m in AssignableMembers)
-                            {
-                                <option value="@m.UserId">@MemberLabel(m)</option>
-                            }
-                        </select>
-                    </div>
-                </div>
-            }
+        <div class="form-group">
+            <label class="form-label">Tags</label>
+            <TagSelector @bind-SelectedTagIds="Todo.TagIds" />
+        </div>
 
-            <div class="form-actions">
-                @if (IsEditing && OnConvertToNote.HasDelegate)
+        <div class="form-group">
+            <label class="form-label">Priority</label>
+            <div class="priority-options">
+                @foreach (var priority in PriorityService.Priorities.OrderBy(p => p.Rank))
                 {
-                    <button type="button" class="btn btn-ghost" style="margin-right: auto" @onclick="() => OnConvertToNote.InvokeAsync(Todo)">
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
-                            <polyline points="14 2 14 8 20 8"/>
-                        </svg>
-                        Convert to Note
-                    </button>
+                    var isSelected = Todo.PriorityId == priority.Id;
+                    var (bg, fg) = StatusColor.Resolve(priority.Color);
+                    <label class="priority-option @(isSelected ? "selected" : "")"
+                           style="@(isSelected ? $"background:{bg};border-color:{priority.Color};color:{fg};" : "")">
+                        <input type="radio" name="priority" value="@priority.Id"
+                               checked="@isSelected"
+                               @onchange="() => Todo.PriorityId = priority.Id" />
+                        <span class="priority-dot" style="background-color:@priority.Color"></span>
+                        <span class="priority-label">@priority.Name</span>
+                    </label>
                 }
-                <button type="button" class="btn btn-ghost" @onclick="HandleCancel">
-                    Cancel
-                </button>
-                <button type="submit" class="btn btn-primary">
-                    @if (IsEditing)
-                    {
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/>
-                            <polyline points="17 21 17 13 7 13 7 21"/>
-                            <polyline points="7 3 7 8 15 8"/>
-                        </svg>
-                        <span>Save Changes</span>
-                    }
-                    else
-                    {
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <path d="M12 5v14M5 12h14"/>
-                        </svg>
-                        <span>Add Task</span>
-                    }
-                </button>
             </div>
-        </EditForm>
+        </div>
 
-        <style>
-            .task-form {
-                display: flex;
-                flex-direction: column;
-                gap: var(--space-5);
-                flex: 1;
-            }
-            
-            .form-group {
-                display: flex;
-                flex-direction: column;
-                gap: var(--space-2);
-            }
-            
-            .form-label {
-                font-size: 0.875rem;
-                font-weight: 600;
-                color: var(--text-primary);
-            }
-            
-            .form-input {
-                padding: var(--space-3) var(--space-4);
-                border: 1.5px solid var(--border);
-                border-radius: var(--radius-lg);
-                font-size: 0.9375rem;
-                transition: all var(--transition-fast);
-                background: var(--surface);
-                width: 100%;
-            }
-            
-            .form-input:focus {
-                outline: none;
-                border-color: var(--primary);
-                box-shadow: 0 0 0 3px var(--primary-light);
-            }
-            
-            .form-input::placeholder {
-                color: var(--text-muted);
-            }
-            
-            .form-textarea {
-                resize: vertical;
-                flex: 1;
-            }
-            
-            .validation-error {
-                font-size: 0.8125rem;
-                color: var(--danger);
-            }
-            
-            .form-row {
-                display: flex;
-                gap: var(--space-3);
-                flex-wrap: wrap;
-            }
+        @if (AssignableMembers.Count > 1)
+        {
+            <div class="form-row">
+                <div class="form-group">
+                    <label class="form-label" for="TodoOwner">Owner</label>
+                    <select id="TodoOwner" class="form-input"
+                            value="@Todo.OwnerId"
+                            @onchange="OnOwnerChanged">
+                        @foreach (var m in AssignableMembers)
+                        {
+                            <option value="@m.UserId">@MemberLabel(m)</option>
+                        }
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label class="form-label" for="TodoAssignee">Assignee</label>
+                    <select id="TodoAssignee" class="form-input"
+                            value="@(Todo.AssigneeId?.ToString() ?? string.Empty)"
+                            @onchange="OnAssigneeChanged">
+                        <option value="">Unassigned</option>
+                        @foreach (var m in AssignableMembers)
+                        {
+                            <option value="@m.UserId">@MemberLabel(m)</option>
+                        }
+                    </select>
+                </div>
+            </div>
+        }
+    };
 
-            .form-row .form-group {
-                flex: 1;
-                min-width: 180px;
+    private RenderFragment Actions => __builder =>
+    {
+        @if (IsEditing && OnConvertToNote.HasDelegate)
+        {
+            <button type="button" class="btn btn-ghost" style="margin-right: auto" @onclick="() => OnConvertToNote.InvokeAsync(Todo)">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                    <polyline points="14 2 14 8 20 8"/>
+                </svg>
+                Convert to Note
+            </button>
+        }
+        <button type="button" class="btn btn-ghost" @onclick="HandleCancel">
+            Cancel
+        </button>
+        <button type="submit" class="btn btn-primary">
+            @if (IsEditing)
+            {
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/>
+                    <polyline points="17 21 17 13 7 13 7 21"/>
+                    <polyline points="7 3 7 8 15 8"/>
+                </svg>
+                <span>Save Changes</span>
             }
-
-            .due-date-wrap {
-                position: relative;
+            else
+            {
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M12 5v14M5 12h14"/>
+                </svg>
+                <span>Add Task</span>
             }
-
-            .btn-clear-due {
-                position: absolute;
-                right: 8px;
-                top: 50%;
-                transform: translateY(-50%);
-                width: 22px;
-                height: 22px;
-                display: inline-flex;
-                align-items: center;
-                justify-content: center;
-                border: none;
-                background: var(--gray-100);
-                color: var(--text-muted);
-                border-radius: var(--radius-full);
-                cursor: pointer;
-            }
-
-            .btn-clear-due:hover {
-                background: var(--gray-200);
-                color: var(--text-primary);
-            }
-
-            .priority-options {
-                display: flex;
-                gap: var(--space-2);
-                flex-wrap: wrap;
-            }
-            
-            .priority-option {
-                display: flex;
-                align-items: center;
-                gap: var(--space-2);
-                padding: var(--space-2) var(--space-3);
-                border: 1.5px solid var(--border);
-                border-radius: var(--radius-lg);
-                cursor: pointer;
-                transition: all var(--transition-fast);
-                font-size: 0.875rem;
-                font-weight: 500;
-            }
-            
-            .priority-option input {
-                display: none;
-            }
-            
-            .priority-option:hover {
-                border-color: var(--gray-300);
-                background: var(--surface-hover);
-            }
-            
-            .priority-dot {
-                width: 10px;
-                height: 10px;
-                border-radius: var(--radius-full);
-            }
-            
-            .form-actions {
-                display: flex;
-                justify-content: flex-end;
-                gap: var(--space-3);
-                padding-top: var(--space-4);
-                border-top: 1px solid var(--border-light);
-            }
-            
-            .form-card {
-                background: var(--surface);
-                border: 1px solid var(--border-light);
-                border-radius: var(--radius-xl);
-                overflow: hidden;
-                box-shadow: var(--shadow-sm);
-            }
-            
-            .form-card-header {
-                padding: var(--space-4) var(--space-5);
-                border-bottom: 1px solid var(--border-light);
-            }
-            
-            .form-card-header h5 {
-                margin: 0;
-                font-weight: 600;
-            }
-            
-            .form-card-body {
-                padding: var(--space-5);
-            }
-        </style>
+        </button>
     };
 
     protected override void OnInitialized()

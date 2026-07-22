@@ -4,31 +4,16 @@
 @inject ITagService TagService
 @inject IDialogService DialogService
 
-@if (IsVisible)
-{
-	<div class="modal-overlay" @onclick="Close">
-		<div class="modal-container tags-modal-container"
-		     role="dialog"
-		     aria-modal="true"
-		     aria-labelledby="tags-modal-title"
-		     @onclick:stopPropagation="true">
-			<div class="modal-header">
-				<h2 class="modal-title" id="tags-modal-title">
-					<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-						<path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/>
-						<line x1="7" y1="7" x2="7.01" y2="7"/>
-					</svg>
-					<span>Tags</span>
-				</h2>
-				<button class="modal-close" @onclick="Close" aria-label="Close">
-					<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-						<path d="M18 6L6 18M6 6l12 12"/>
-					</svg>
-				</button>
-			</div>
-
-			<div class="modal-body">
-				<EditForm Model="@_createForm" OnValidSubmit="HandleCreate">
+<Modal IsVisible="IsVisible" OnClose="Close" Title="Tags" Size="medium">
+	<HeaderIcon>
+		<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+			<path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/>
+			<line x1="7" y1="7" x2="7.01" y2="7"/>
+		</svg>
+	</HeaderIcon>
+	<BodyContent>
+		<div class="tag-content">
+			<EditForm Model="@_createForm" OnValidSubmit="HandleCreate">
 					<DataAnnotationsValidator />
 					<div class="tag-create-row">
 						<InputText class="form-input tag-create-input"
@@ -145,133 +130,18 @@
 						}
 					</ul>
 				}
-			</div>
-
-			<div class="modal-footer">
-				<button type="button" class="btn btn-ghost" @onclick="Close">Close</button>
-			</div>
 		</div>
-	</div>
-}
+	</BodyContent>
+	<FooterContent>
+		<button type="button" class="btn btn-ghost" @onclick="Close">Close</button>
+	</FooterContent>
+</Modal>
 
 <style>
-	.modal-overlay {
-		position: fixed;
-		inset: 0;
-		background: rgba(15, 23, 42, 0.6);
-		backdrop-filter: blur(4px);
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		z-index: 1000;
-		padding: var(--space-4);
-		animation: fadeIn var(--transition-fast) ease-out;
-	}
-
-	.modal-container.tags-modal-container {
-		background: var(--surface);
-		border-radius: var(--radius-xl);
-		box-shadow: var(--shadow-xl);
-		width: 100%;
-		max-width: 520px;
-		max-height: 85vh;
-		display: flex;
-		flex-direction: column;
-		animation: scaleIn var(--transition-base) ease-out;
-	}
-
-	@@keyframes fadeIn {
-		from { opacity: 0; }
-		to { opacity: 1; }
-	}
-
-	@@keyframes scaleIn {
-		from { opacity: 0; transform: scale(0.95) translateY(10px); }
-		to { opacity: 1; transform: scale(1) translateY(0); }
-	}
-
-	.modal-header {
-		display: flex;
-		align-items: center;
-		justify-content: space-between;
-		padding: var(--space-5) var(--space-6);
-		border-bottom: 1px solid var(--border-light);
-	}
-
-	.modal-title {
-		display: flex;
-		align-items: center;
-		gap: var(--space-3);
-		font-size: 1.125rem;
-		font-weight: 600;
-		color: var(--text-primary);
-		margin: 0;
-	}
-
-	.modal-title svg {
-		color: var(--primary);
-	}
-
-	.modal-close {
-		width: 36px;
-		height: 36px;
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		background: transparent;
-		border: none;
-		border-radius: var(--radius-md);
-		color: var(--text-muted);
-		cursor: pointer;
-		transition: all var(--transition-fast);
-	}
-
-	.modal-close:hover {
-		background: var(--gray-100);
-		color: var(--text-primary);
-	}
-
-	.modal-body {
-		padding: var(--space-5) var(--space-6);
+	.tag-content {
 		display: flex;
 		flex-direction: column;
 		gap: var(--space-4);
-		overflow-y: auto;
-	}
-
-	.modal-footer {
-		display: flex;
-		justify-content: flex-end;
-		gap: var(--space-3);
-		padding: var(--space-4) var(--space-6);
-		border-top: 1px solid var(--border-light);
-		background: var(--gray-50);
-	}
-
-	.form-input {
-		padding: var(--space-3) var(--space-4);
-		border: 1.5px solid var(--border);
-		border-radius: var(--radius-lg);
-		font-size: 0.9375rem;
-		transition: all var(--transition-fast);
-		background: var(--surface);
-		width: 100%;
-	}
-
-	.form-input:focus {
-		outline: none;
-		border-color: var(--primary);
-		box-shadow: 0 0 0 3px var(--primary-light);
-	}
-
-	.form-input::placeholder {
-		color: var(--text-muted);
-	}
-
-	.validation-error {
-		font-size: 0.8125rem;
-		color: var(--danger);
-		margin-top: var(--space-1);
 	}
 
 	.tag-create-row {

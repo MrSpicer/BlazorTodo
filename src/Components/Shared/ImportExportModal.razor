@@ -210,6 +210,10 @@
 		box-shadow: var(--shadow-xl), 0 0 0 1px rgba(0,0,0,0.05);
 		width: 100%;
 		max-width: 480px;
+		/* Fit content, cap height, then scroll the body — the header stays pinned. */
+		max-height: min(85vh, 900px);
+		display: flex;
+		flex-direction: column;
 		overflow: hidden;
 		animation: ieModalIn 220ms cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
 	}
@@ -226,6 +230,7 @@
 		display: flex;
 		align-items: center;
 		gap: var(--space-3);
+		flex-shrink: 0;
 	}
 
 	.ie-header-icon {
@@ -283,6 +288,9 @@
 		display: flex;
 		flex-direction: column;
 		gap: var(--space-4);
+		overflow-y: auto;
+		flex: 1 1 auto;
+		min-height: 0;
 	}
 
 	/* Banner */
@@ -633,6 +641,17 @@
 	}
 
 	@@media (max-width: 640px) {
+		/* Full-screen on phones, matching the shared modal shell. */
+		.ie-backdrop {
+			padding: 0;
+		}
+		.ie-modal {
+			width: 100vw;
+			max-width: none;
+			height: 100dvh;
+			max-height: 100dvh;
+			border-radius: 0;
+		}
 		.ie-export-section {
 			flex-direction: column;
 			align-items: stretch;

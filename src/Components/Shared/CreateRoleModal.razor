@@ -9,7 +9,7 @@
 		</svg>
 	</HeaderIcon>
 	<ChildContent>
-		<EditForm Model="@this" OnValidSubmit="Submit">
+		<EditForm Model="@this" OnValidSubmit="Submit" class="modal-form">
 			<div class="modal-body">
 				<div class="form-group">
 					<label for="roleName" class="form-label">Role name</label>
@@ -29,45 +29,6 @@
 		</EditForm>
 	</ChildContent>
 </Modal>
-
-<style>
-	.form-group {
-		display: flex;
-		flex-direction: column;
-		gap: var(--space-2);
-	}
-
-	.form-label {
-		font-size: 0.875rem;
-		font-weight: 600;
-		color: var(--text-primary);
-	}
-
-	.form-input {
-		padding: var(--space-3) var(--space-4);
-		border: 1.5px solid var(--border);
-		border-radius: var(--radius-lg);
-		font-size: 0.9375rem;
-		transition: all var(--transition-fast);
-		background: var(--surface);
-		width: 100%;
-	}
-
-	.form-input:focus {
-		outline: none;
-		border-color: var(--primary);
-		box-shadow: 0 0 0 3px var(--primary-light);
-	}
-
-	.form-input::placeholder {
-		color: var(--text-muted);
-	}
-
-	.validation-error {
-		font-size: 0.8125rem;
-		color: var(--danger);
-	}
-</style>
 
 @code {
 	[Parameter] public bool IsVisible { get; set; }

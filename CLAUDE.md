@@ -48,7 +48,7 @@ All source lives under `src/`. Non-source files (sln, Dockerfile, docs, scripts)
   - `Todo/` - TodoForm, TodoFilters, TodoListView, TodoItemRow, TodoFormModal
   - `Project/` - ProjectTabs, ProjectModal
   - `Notes/` - NoteCard, NotesList, NoteFormModal
-  - `Shared/` - ImportExportModal, PriorityBadge, StatusBadge, RedirectToLogin, MultiDeviceSyncListener
+  - `Shared/` - Modal (shared modal shell), ImportExportModal, TagsModal, StatusManagementModal, PriorityManagementModal, CreateRoleModal, RoleManagementModal, LocalDataMigrationPrompt, TagSelector, PriorityBadge, StatusBadge, RedirectToLogin, MultiDeviceSyncListener
   - `Layout/` - MainLayout (auth header + sync listener), NavMenu (Admin link gated by `<AuthorizeView Roles="Admin">`)
 - **src/Services/** - Business logic layer with interfaces (ITodoService, IProjectService, IDialogService, IImportExportService, INoteService, IFileService, ITagService, IStatusService, IPriorityService, IFilterPresetService, UserOnboardingService)
   - `Admin/` - Admin layer (IAdminService, IConnectionTracker, ILoginActivityTracker, AdminCircuitHandler)
@@ -66,6 +66,7 @@ All source lives under `src/`. Non-source files (sln, Dockerfile, docs, scripts)
 5. **Component communication**: Parent components pass callbacks (`OnEdit`, `OnDelete`, `OnStatusChange`) to child components
 6. **Multi-device sync**: For authenticated users, `IUserChangeBus` (`src/Realtime/`, in-process pub/sub keyed by UserId) notifies the `MultiDeviceSyncListener` in `MainLayout` so changes made on one device refresh others in real time
 7. **Admin & Identity**: `DatabaseInitializer` (invoked from `Program.cs`) applies migrations and seeds the `Admin` role + admin user from the `AdminUser` config section (or `/run/secrets/admin_password`). `TrackingSignInManager` records failed logins for the admin dashboard; `AdminCircuitHandler`/`IConnectionTracker` track live connections; `ILoginActivityTracker` holds recent failures. `src/Program.cs` adds production hardening (HSTS, ForwardedHeaders for Cloudflare, secure auth cookies, CSP, per-IP rate limiting)
+8. **Modals**: Every modal renders through the single shared shell `Components/Shared/Modal.razor`. It owns the overlay, header (`Title` + optional `HeaderIcon`), and close button, and marks its container/overlay with `app-modal`/`app-modal-overlay`. Content goes in either the `BodyContent` (scrolling `.modal-body`) + `FooterContent` (pinned `.modal-footer`) slots for non-form modals, or — for **form** modals — via `ChildContent` holding a `<form class="modal-form">` that wraps a `.modal-body` and a sibling `.modal-footer` (so a `type=submit` button in the footer stays pinned yet still submits). `Size` = `compact` (440px) / `medium` (600px) / `wide` (760px) / `large` (90vw) / `default` (75vw); all are content-height capped at `min(85vh, 900px)` on desktop and full-screen (`100dvh`) at ≤640px. The shell + form primitives + shared management-list styles live in `wwwroot/css/site.css`, **not** in component `<style>` blocks (see Code Style)
 
 ### Domain Model
 
@@ -87,3 +88,4 @@ Root namespace is `TodoList` (despite repo name BlazorTodo).
 - **Collections**: Expose as `IReadOnlyList<T>`, use `Task<bool>` for fallible operations
 - **Error handling**: Try-catch at service/repository boundaries, log with `ILogger<T>`, return `false`/empty rather than throwing
 - **Components**: `[Parameter, EditorRequired]` for required inputs, `EventCallback<T>` for callbacks, implement `IDisposable` to unsubscribe from service events
+- **CSS / `<style>` blocks are global**: there are no scoped `.razor.css` files — a `<style>` block inside a `.razor` renders into the DOM and leaks app-wide. Keep only genuinely component-specific rules in component `<style>`; put anything shared (the modal shell, `.form-input/.form-group/.form-label/.form-row/.form-stack`, the `.status-*`/`.color-input*` management-list styles) in `wwwroot/css/site.css`. **Never redefine `.modal-*` or `.form-input` in a component `<style>`** — doing so silently overrides the shared shell for every other modal by render order

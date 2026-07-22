@@ -5,30 +5,15 @@
 @inject IPriorityService PriorityService
 @inject IDialogService DialogService
 
-@if (IsVisible)
-{
-	<div class="modal-overlay" @onclick="Close">
-		<div class="modal-container statuses-modal-container"
-		     role="dialog"
-		     aria-modal="true"
-		     aria-labelledby="priorities-modal-title"
-		     @onclick:stopPropagation="true">
-			<div class="modal-header">
-				<h2 class="modal-title" id="priorities-modal-title">
-					<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-						<path d="M4 22V4M4 4l8 4-8 4M4 14l12 4-12 4"/>
-					</svg>
-					<span>Priorities</span>
-				</h2>
-				<button class="modal-close" @onclick="Close" aria-label="Close">
-					<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-						<path d="M18 6L6 18M6 6l12 12"/>
-					</svg>
-				</button>
-			</div>
-
-			<div class="modal-body">
-				<EditForm Model="@_createForm" OnValidSubmit="HandleCreate">
+<Modal IsVisible="IsVisible" OnClose="Close" Title="Priorities" Size="medium">
+	<HeaderIcon>
+		<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+			<path d="M4 22V4M4 4l8 4-8 4M4 14l12 4-12 4"/>
+		</svg>
+	</HeaderIcon>
+	<BodyContent>
+		<div class="status-content">
+			<EditForm Model="@_createForm" OnValidSubmit="HandleCreate">
 					<DataAnnotationsValidator />
 					<div class="status-create-block">
 						<div class="status-create-row">
@@ -171,14 +156,12 @@
 						</li>
 					}
 				</ul>
-			</div>
-
-			<div class="modal-footer">
-				<button type="button" class="btn btn-ghost" @onclick="Close">Close</button>
-			</div>
 		</div>
-	</div>
-}
+	</BodyContent>
+	<FooterContent>
+		<button type="button" class="btn btn-ghost" @onclick="Close">Close</button>
+	</FooterContent>
+</Modal>
 
 <style>
 	.rank-input-label {

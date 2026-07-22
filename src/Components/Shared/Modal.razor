@@ -1,13 +1,17 @@
 @*
-	Shared modal shell. Owns overlay, container, header, close button.
-	Consumers provide `Title`, optional `HeaderIcon`, and the modal body via `ChildContent`.
-	The body content is responsible for its own scrolling/layout (use .modal-body / .modal-footer
-	classes from site.css to match the standard look).
+	Shared modal shell. Owns overlay, container, header, close button, and (optionally) the pinned
+	body/footer structure. Two ways to supply content:
+	  1. Structured (preferred): provide `BodyContent` (the only scrolling region) and `FooterContent`
+	     (pinned action bar). The shell wraps them in `.modal-body` / `.modal-footer` so the footer
+	     is always visible.
+	  2. Free-form (`ChildContent`): for form modals whose <form> must wrap both the scroll region and
+	     the pinned footer, render a `<form class="modal-form">` containing your own `.modal-body` and
+	     `.modal-footer` siblings.
 *@
 @if (IsVisible)
 {
-	<div class="modal-overlay" @onclick="HandleOverlayClick">
-		<div class="modal-container @SizeClass"
+	<div class="modal-overlay app-modal-overlay" @onclick="HandleOverlayClick">
+		<div class="modal-container app-modal @SizeClass"
 		     role="dialog"
 		     aria-modal="true"
 		     aria-labelledby="@_titleId"
@@ -23,6 +27,18 @@
 					</svg>
 				</button>
 			</div>
+			@if (BodyContent is not null)
+			{
+				<div class="modal-body">
+					@BodyContent
+				</div>
+			}
+			@if (FooterContent is not null)
+			{
+				<div class="modal-footer">
+					@FooterContent
+				</div>
+			}
 			@ChildContent
 		</div>
 	</div>
@@ -33,9 +49,14 @@
 	[Parameter, EditorRequired] public string Title { get; set; } = string.Empty;
 	[Parameter] public RenderFragment? HeaderIcon { get; set; }
 	[Parameter] public RenderFragment? ChildContent { get; set; }
+	/// <summary>Scrolling body region; wrapped in `.modal-body` by the shell.</summary>
+	[Parameter] public RenderFragment? BodyContent { get; set; }
+	/// <summary>Pinned action bar; wrapped in `.modal-footer` by the shell. Always visible.</summary>
+	[Parameter] public RenderFragment? FooterContent { get; set; }
 	[Parameter] public EventCallback OnClose { get; set; }
 
-	/// <summary>"default" (75vw × 75vh), "compact" (440px), or "large" (90vw × 90vh).</summary>
+	/// <summary>"compact" (440px), "medium" (600px), "wide" (760px), "large" (90vw), or "default" (75vw).
+	/// All sizes are content-height (capped) on desktop and full-screen on phones.</summary>
 	[Parameter] public string Size { get; set; } = "default";
 
 	[Parameter] public bool CloseOnOverlayClick { get; set; } = true;
@@ -45,6 +66,8 @@
 	private string SizeClass => Size switch
 	{
 		"compact" => "modal-compact",
+		"medium" => "modal-medium",
+		"wide" => "modal-wide",
 		"large" => "modal-large",
 		_ => string.Empty
 	};

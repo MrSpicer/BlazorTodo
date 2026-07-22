@@ -600,12 +600,6 @@ a:hover, .btn-link:hover {
 /* ========================================
    Modals
    ======================================== */
-.modal-content {
-    border: none;
-    border-radius: var(--radius-xl);
-    box-shadow: var(--shadow-xl);
-}
-
 .modal-overlay {
     position: fixed;
     inset: 0;
@@ -625,7 +619,9 @@ a:hover, .btn-link:hover {
     box-shadow: var(--shadow-xl);
     width: 100%;
     max-width: 75vw;
-    height: 75vh;
+    /* Auto-height: fit the content, but never grow past the cap (then the body scrolls). */
+    height: auto;
+    max-height: min(85vh, 900px);
     display: flex;
     flex-direction: column;
     overflow: hidden;
@@ -634,12 +630,56 @@ a:hover, .btn-link:hover {
 
 .modal-container.modal-compact {
     max-width: 440px;
-    height: auto;
 }
 
 .modal-container.modal-large {
     max-width: 90vw;
+    /* Large modals lean toward filling the viewport for content-heavy views. */
     height: 90vh;
+    max-height: 90vh;
+}
+
+/*
+   Authoritative sizing for the shared shell (Modal.razor). The `.app-modal` marker gives these a
+   higher specificity than any stray global `.modal-container { ... }` override still shipped inline
+   by not-yet-migrated modals, so the shell's adaptive height and full-screen-on-mobile always win.
+   Once every modal is migrated and those inline overrides are gone, these can fold back into the
+   plain `.modal-container` rules above.
+*/
+.modal-container.app-modal {
+    max-width: 75vw;
+    height: auto;
+    max-height: min(85vh, 900px);
+}
+
+.modal-container.app-modal.modal-compact {
+    max-width: 440px;
+}
+
+.modal-container.app-modal.modal-medium {
+    max-width: 600px;
+}
+
+.modal-container.app-modal.modal-wide {
+    max-width: 760px;
+}
+
+.modal-container.app-modal.modal-large {
+    max-width: 90vw;
+    height: 90vh;
+    max-height: 90vh;
+}
+
+/*
+   Form modals: the <form> must wrap both the scroll region and the pinned footer so a submit
+   button in the footer still submits. `.modal-form` fills the space under the header and splits
+   into `.modal-body` (scrolls) + `.modal-footer` (pinned).
+*/
+.modal-form {
+    display: flex;
+    flex-direction: column;
+    flex: 1 1 auto;
+    min-height: 0;
 }
 
 .modal-header {
@@ -686,7 +726,8 @@ a:hover, .btn-link:hover {
 .modal-body {
     padding: var(--space-6);
     overflow-y: auto;
-    flex: 1;
+    flex: 1 1 auto;
+    min-height: 0;
     display: flex;
     flex-direction: column;
 }
@@ -694,7 +735,9 @@ a:hover, .btn-link:hover {
 .modal-footer {
     display: flex;
     justify-content: flex-end;
+    align-items: center;
     gap: var(--space-3);
+    flex-shrink: 0;
     border-top: 1px solid var(--border-light);
     padding: var(--space-4) var(--space-6);
     background: var(--gray-50);
@@ -710,14 +753,305 @@ a:hover, .btn-link:hover {
     to { opacity: 1; transform: scale(1) translateY(0); }
 }
 
+/* Phones: modals go full-screen so long forms are usable and controls stay pinned.
+   Scoped to the shared shell markers so these win over stray inline `.modal-*` overrides. */
 @media (max-width: 640px) {
-    .modal-container {
-        max-width: 95vw;
-        height: 90vh;
+    .app-modal-overlay.modal-overlay {
+        padding: 0;
     }
-    .modal-container.modal-compact {
-        max-width: 95vw;
-        height: auto;
+    .modal-container.app-modal,
+    .modal-container.app-modal.modal-compact,
+    .modal-container.app-modal.modal-medium,
+    .modal-container.app-modal.modal-wide,
+    .modal-container.app-modal.modal-large {
+        width: 100vw;
+        max-width: none;
+        height: 100dvh;
+        max-height: 100dvh;
+        border-radius: 0;
+    }
+}
+
+/* ========================================
+   Form primitives (canonical — used by all modal forms)
+   ======================================== */
+/* Vertical stack of form groups with consistent spacing (use inside .modal-body). */
+.form-stack {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-5);
+    flex: 1;
+}
+
+.form-group {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-2);
+}
+
+.form-label {
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.form-input {
+    padding: var(--space-3) var(--space-4);
+    border: 1.5px solid var(--border);
+    border-radius: var(--radius-lg);
+    font-size: 0.9375rem;
+    transition: all var(--transition-fast);
+    background: var(--surface);
+    color: var(--text-primary);
+    width: 100%;
+}
+
+.form-input:focus {
+    outline: none;
+    border-color: var(--primary);
+    box-shadow: 0 0 0 3px var(--primary-light);
+}
+
+.form-input::placeholder {
+    color: var(--text-muted);
+}
+
+.form-textarea {
+    resize: vertical;
+}
+
+.form-row {
+    display: flex;
+    gap: var(--space-3);
+    flex-wrap: wrap;
+}
+
+.form-row .form-group {
+    flex: 1;
+    min-width: 180px;
+}
+
+.validation-error {
+    font-size: 0.8125rem;
+    color: var(--danger);
+}
+
+/* ========================================
+   Management-list modals (statuses / priorities share this UI)
+   ======================================== */
+.status-content {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-4);
+}
+
+.status-create-block,
+.status-edit-block {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-2);
+    width: 100%;
+}
+
+.status-create-row,
+.status-edit-row {
+    display: flex;
+    gap: var(--space-2);
+    align-items: stretch;
+    flex-wrap: wrap;
+}
+
+.status-create-input,
+.status-name-input {
+    flex: 1;
+    min-width: 160px;
+}
+
+.color-input-label {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-2);
+    font-size: 0.8125rem;
+    color: var(--text-secondary);
+    cursor: pointer;
+}
+
+.color-input-text {
+    font-weight: 500;
+}
+
+.color-input {
+    width: 36px;
+    height: 28px;
+    padding: 0;
+    border: 1.5px solid var(--border);
+    border-radius: var(--radius-md);
+    background: var(--surface);
+    cursor: pointer;
+}
+
+.color-input::-webkit-color-swatch-wrapper { padding: 2px; }
+.color-input::-webkit-color-swatch { border: none; border-radius: var(--radius-sm); }
+.color-input::-moz-color-swatch    { border: none; border-radius: var(--radius-sm); }
+
+.color-input-preview {
+    display: inline-block;
+    width: 22px;
+    height: 22px;
+    border-radius: var(--radius-full);
+    border: 1px solid var(--border-light);
+}
+
+.status-banner {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-3);
+    padding: var(--space-2) var(--space-3);
+    border-radius: var(--radius-md);
+    font-size: 0.8125rem;
+}
+
+.status-banner-info {
+    background: var(--primary-50);
+    color: #4338ca;
+    border: 1px solid var(--primary-light);
+}
+
+.status-banner-error {
+    background: var(--danger-light);
+    color: #991b1b;
+    border: 1px solid #fca5a5;
+}
+
+.status-banner-dismiss {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 22px;
+    height: 22px;
+    border: none;
+    background: transparent;
+    color: inherit;
+    border-radius: var(--radius-full);
+    cursor: pointer;
+    opacity: 0.7;
+}
+
+.status-banner-dismiss:hover {
+    opacity: 1;
+}
+
+.status-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-1);
+}
+
+.status-row {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    padding: var(--space-2) var(--space-3);
+    border-radius: var(--radius-md);
+    border: 1px solid transparent;
+    transition: all var(--transition-fast);
+}
+
+.status-row:hover {
+    background: var(--gray-50);
+    border-color: var(--border-light);
+}
+
+.status-row:hover .status-actions {
+    opacity: 1;
+}
+
+.status-preview {
+    flex: 1;
+    font-size: 0.8125rem;
+    font-weight: 600;
+    padding: 0.25rem 0.625rem;
+    border-radius: var(--radius-full);
+    max-width: max-content;
+}
+
+.status-built-in {
+    font-size: 0.6875rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.025em;
+    color: var(--text-muted);
+    background: var(--gray-100);
+    padding: 0.125rem 0.5rem;
+    border-radius: var(--radius-full);
+}
+
+.status-count {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    background: var(--gray-100);
+    padding: 0.125rem 0.5rem;
+    border-radius: var(--radius-full);
+    flex-shrink: 0;
+}
+
+.status-actions,
+.status-edit-actions {
+    display: flex;
+    gap: var(--space-1);
+    flex-shrink: 0;
+}
+
+.status-actions {
+    opacity: 0;
+    transition: opacity var(--transition-fast);
+}
+
+.status-action-btn {
+    width: 30px;
+    height: 30px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: transparent;
+    border: none;
+    border-radius: var(--radius-md);
+    color: var(--text-muted);
+    cursor: pointer;
+    transition: all var(--transition-fast);
+}
+
+.status-action-btn:hover:not(:disabled) {
+    background: var(--gray-100);
+    color: var(--text-primary);
+}
+
+.status-action-btn:disabled {
+    opacity: 0.3;
+    cursor: not-allowed;
+}
+
+.status-action-btn.primary {
+    color: var(--primary);
+}
+
+.status-action-btn.primary:hover {
+    background: var(--primary-50);
+}
+
+.status-action-btn.danger:hover:not(:disabled) {
+    background: var(--danger-light);
+    color: var(--danger);
+}
+
+/* Touch screens can't hover, so keep row actions visible. */
+@media (max-width: 640px) {
+    .status-actions {
+        opacity: 1;
     }
 }
 

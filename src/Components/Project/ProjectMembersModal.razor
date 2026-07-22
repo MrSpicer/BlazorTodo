@@ -93,6 +93,7 @@
 							{
 								<div class="perm-card">
 									<div class="perm-role-name">@(string.IsNullOrWhiteSpace(role.RoleName) ? "(unnamed role)" : role.RoleName)</div>
+									<div class="perm-matrix-scroll">
 									<table class="perm-matrix">
 										<thead>
 											<tr>
@@ -131,6 +132,7 @@
 											}
 										</tbody>
 									</table>
+									</div>
 								</div>
 							}
 						</div>
@@ -233,14 +235,14 @@
 		margin-bottom: var(--space-2);
 	}
 	.perm-role-name { font-weight: 600; font-size: 0.9375rem; margin-bottom: var(--space-2); }
-	.perm-matrix { width: 100%; border-collapse: collapse; font-size: 0.8125rem; }
+	.perm-matrix-scroll { overflow-x: auto; }
+	.perm-matrix { width: 100%; min-width: 320px; border-collapse: collapse; font-size: 0.8125rem; }
 	.perm-matrix th, .perm-matrix td { padding: 0.25rem 0.375rem; text-align: center; }
 	.perm-matrix thead th { color: var(--text-secondary); font-weight: 600; }
 	.perm-matrix th[scope="row"] { text-align: left; color: var(--text-secondary); font-weight: 500; }
 	.perm-na { color: var(--text-muted); }
 
 	.invite-ok { font-size: 0.8125rem; color: var(--success, #059669); }
-	.validation-error { font-size: 0.8125rem; color: var(--danger); }
 </style>
 
 @code {

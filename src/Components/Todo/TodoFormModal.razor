@@ -23,30 +23,31 @@
 		}
 	</HeaderIcon>
 	<ChildContent>
-		<div class="modal-body">
-			@if (ShowParentSelector)
-			{
-				<div class="form-group" style="margin-bottom: var(--space-5);">
-					<label for="parentTaskSelect" class="form-label">Parent</label>
-					<select id="parentTaskSelect" class="form-input"
-					        value="@(_selectedParentId?.ToString() ?? string.Empty)"
-					        @onchange="e => _selectedParentId = string.IsNullOrEmpty(e.Value?.ToString()) ? (Guid?)null : Guid.Parse(e.Value!.ToString()!)">
-						<option value="">None</option>
-						@foreach (var p in GetAvailableParents())
-						{
-							<option value="@p.Id">@p.Title</option>
-						}
-					</select>
-				</div>
-			}
-			<TodoForm Todo="@_todo"
-			          IsEditing="@IsEditing"
-			          ShowCard="false"
-			          Members="@_members"
-			          OnSubmit="HandleSubmit"
-			          OnCancel="Close"
-			          OnConvertToNote="HandleConvertToNote" />
-		</div>
+		<TodoForm Todo="@_todo"
+		          IsEditing="@IsEditing"
+		          ShowCard="false"
+		          Members="@_members"
+		          OnSubmit="HandleSubmit"
+		          OnCancel="Close"
+		          OnConvertToNote="HandleConvertToNote">
+			<BodyHeader>
+				@if (ShowParentSelector)
+				{
+					<div class="form-group">
+						<label for="parentTaskSelect" class="form-label">Parent</label>
+						<select id="parentTaskSelect" class="form-input"
+						        value="@(_selectedParentId?.ToString() ?? string.Empty)"
+						        @onchange="e => _selectedParentId = string.IsNullOrEmpty(e.Value?.ToString()) ? (Guid?)null : Guid.Parse(e.Value!.ToString()!)">
+							<option value="">None</option>
+							@foreach (var p in GetAvailableParents())
+							{
+								<option value="@p.Id">@p.Title</option>
+							}
+						</select>
+					</div>
+				}
+			</BodyHeader>
+		</TodoForm>
 	</ChildContent>
 </Modal>
 
