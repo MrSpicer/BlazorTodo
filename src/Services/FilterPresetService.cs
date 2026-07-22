@@ -18,7 +18,7 @@ public class FilterPresetService : IFilterPresetService
 	}
 
 	public IReadOnlyList<FilterPreset> Presets =>
-		new[] { FilterPreset.SystemDefault }
+		new[] { FilterPreset.SystemDefault, FilterPreset.KanbanDefault }
 			.Concat(_userPresets.OrderBy(p => p.Name, StringComparer.OrdinalIgnoreCase))
 			.ToList();
 
@@ -36,9 +36,14 @@ public class FilterPresetService : IFilterPresetService
 
 	public FilterPreset? GetByName(string name)
 	{
+		if (IsKanban(name)) return FilterPreset.KanbanDefault;
 		if (IsProtected(name)) return FilterPreset.SystemDefault;
 		return _userPresets.FirstOrDefault(p => p.Name.Equals(name, StringComparison.OrdinalIgnoreCase));
 	}
+
+	private static bool IsKanban(string name) =>
+		!string.IsNullOrWhiteSpace(name) &&
+		name.Trim().Equals(FilterPreset.KanbanName, StringComparison.OrdinalIgnoreCase);
 
 	public bool Exists(string name)
 	{
@@ -48,7 +53,7 @@ public class FilterPresetService : IFilterPresetService
 
 	public bool IsProtected(string name) =>
 		!string.IsNullOrWhiteSpace(name) &&
-		name.Trim().Equals(FilterPreset.DefaultName, StringComparison.OrdinalIgnoreCase);
+		(name.Trim().Equals(FilterPreset.DefaultName, StringComparison.OrdinalIgnoreCase) || IsKanban(name));
 
 	public async Task<bool> SaveAsync(FilterPreset preset)
 	{

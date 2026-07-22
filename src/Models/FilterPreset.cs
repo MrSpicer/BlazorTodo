@@ -13,6 +13,7 @@ public record FilterPreset(
 	List<SortCriterion> SortCriteria)
 {
 	public const string DefaultName = "Default";
+	public const string KanbanName = "Kanban";
 
 	public Guid Id { get; init; } = Guid.NewGuid();
 	public Guid UserId { get; init; } = Guid.Empty;
@@ -22,6 +23,18 @@ public record FilterPreset(
 		string.Empty,
 		new List<Guid>(),
 		BuiltInStatusIds.DefaultFilterIds.ToList(),
+		new List<SortCriterion>
+		{
+			new(SortOption.Status, true),
+			new(SortOption.Priority, true),
+		});
+
+	/// <summary>Default board layout for the Kanban page: every built-in status lane except Archived.</summary>
+	public static FilterPreset KanbanDefault => new(
+		KanbanName,
+		string.Empty,
+		new List<Guid>(),
+		BuiltInStatusIds.AllIds.Where(id => id != BuiltInStatusIds.Archived).ToList(),
 		new List<SortCriterion>
 		{
 			new(SortOption.Status, true),
