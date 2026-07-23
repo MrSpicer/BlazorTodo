@@ -11,7 +11,9 @@
                     <span class="tab-color" style="background-color: @project.Color;"></span>
                     <span class="tab-name">@project.Name</span>
                     <span class="tab-count">@GetTodoCount(project.Id)</span>
-                    @if (CanModify(project.Id))
+                    @* Only offer the action when the host page actually handles it — the Board page
+                       reuses these tabs for navigation but does not manage projects. *@
+                    @if (CanModify(project.Id) && OnEditProject.HasDelegate)
                     {
                         <button class="tab-edit"
                                 @onclick:stopPropagation="true"
@@ -23,7 +25,7 @@
                             </svg>
                         </button>
                     }
-                    @if (CanRemove(project.Id))
+                    @if (CanRemove(project.Id) && OnDeleteProject.HasDelegate)
                     {
                         <button class="tab-close"
                                 @onclick:stopPropagation="true"

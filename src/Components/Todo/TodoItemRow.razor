@@ -388,14 +388,7 @@
 		flex-shrink: 0;
 	}
 
-	.priority-badge {
-		font-size: 0.6875rem;
-		font-weight: 600;
-		padding: 0.125rem 0.5rem;
-		border-radius: var(--radius-full);
-		text-transform: uppercase;
-		letter-spacing: 0.025em;
-	}
+	/* .priority-badge lives in site.css (shared with the kanban cards). */
 
 	.todo-description {
 		font-size: 0.875rem;
@@ -448,23 +441,7 @@
 		opacity: 0.7;
 	}
 
-	/* Subtask progress bar */
-	.subtask-progress-bar-track {
-		display: inline-block;
-		width: 60px;
-		height: 4px;
-		background: var(--gray-200);
-		border-radius: var(--radius-full);
-		overflow: hidden;
-		vertical-align: middle;
-	}
-
-	.subtask-progress-bar {
-		height: 100%;
-		background: linear-gradient(90deg, var(--primary) 0%, var(--success) 100%);
-		border-radius: var(--radius-full);
-		transition: width 0.3s ease;
-	}
+	/* .subtask-progress-bar-track / .subtask-progress-bar live in site.css (shared with the kanban cards). */
 
 	/* Actions */
 	.todo-card-actions {

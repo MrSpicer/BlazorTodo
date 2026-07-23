@@ -14,7 +14,7 @@
 }
 else if (!ProjectService.Projects.Any())
 {
-    <div class="empty-state">
+    <div class="empty-state-page">
         <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
             <path d="M18 20V10M12 20V4M6 20v-6"/>
         </svg>
@@ -103,93 +103,11 @@ else
         margin: 0 0 var(--space-5);
     }
 
-    .empty-state {
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        justify-content: center;
-        min-height: 50vh;
-        text-align: center;
-        color: var(--text-secondary);
-        gap: var(--space-3);
-    }
-
-    .empty-state h2 {
-        font-size: 1.25rem;
-        font-weight: 600;
-        color: var(--text-primary);
-        margin: 0;
-    }
-
-    .empty-state p {
-        margin: 0;
-        max-width: 360px;
-    }
-
+    /* .empty-state-page and the .stat-* dashboard family live in site.css.
+       This page only widens the grid tracks and adds a little more breathing room. */
     .stats-dashboard {
-        display: grid;
         grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-        gap: var(--space-4);
         margin-bottom: var(--space-6);
-    }
-
-    .stat-card {
-        background: var(--surface);
-        border: 1px solid var(--border-light);
-        border-radius: var(--radius-lg);
-        padding: var(--space-4);
-        display: flex;
-        align-items: center;
-        gap: var(--space-3);
-        transition: all var(--transition-fast);
-    }
-
-    .stat-card:hover {
-        border-color: var(--border);
-        box-shadow: var(--shadow-sm);
-    }
-
-    .stat-icon {
-        width: 44px;
-        height: 44px;
-        border-radius: var(--radius-lg);
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        flex-shrink: 0;
-    }
-
-    .stat-icon.total {
-        background: var(--primary-50);
-        color: var(--primary);
-    }
-
-    .stat-icon.pending {
-        background: var(--warning-light);
-        color: #d97706;
-    }
-
-    .stat-icon.completed {
-        background: var(--success-light);
-        color: var(--success);
-    }
-
-    .stat-info {
-        display: flex;
-        flex-direction: column;
-    }
-
-    .stat-value {
-        font-size: 1.5rem;
-        font-weight: 700;
-        color: var(--text-primary);
-        line-height: 1;
-    }
-
-    .stat-label {
-        font-size: 0.75rem;
-        color: var(--text-secondary);
-        margin-top: var(--space-1);
     }
 
     .section-title {

@@ -4,8 +4,17 @@
 @implements IDisposable
 @inject ITagService TagService
 @inject IPriorityService PriorityService
+@inject IStatusService StatusService
+@inject ITodoService TodoService
 
+@{
+	var subs = TodoService.GetSubTasks(Item.Id);
+	var doneSubs = subs.Count(s => s.StatusId == BuiltInStatusIds.Done);
+	var visibleTags = Item.TagIds.Take(MaxVisibleTags).ToList();
+	var hiddenTagCount = Item.TagIds.Count - visibleTags.Count;
+}
 <div class="kanban-card @(IsDone ? "completed" : "")"
+     style="--card-accent:@AccentColor"
      draggable="@(CanDrag ? "true" : "false")"
      @ondragstart="HandleDragStart"
      @onclick="() => OnEdit.InvokeAsync(Item)"
@@ -21,30 +30,48 @@
 		<p class="kanban-card-desc">@Item.Description</p>
 	}
 
-	@if (Item.DueDate.HasValue || Item.TagIds.Count > 0)
+	<div class="kanban-card-meta">
+		<span class="meta-item">
+			<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+				<circle cx="12" cy="12" r="10" />
+				<path d="M12 6v6l4 2" />
+			</svg>
+			@Item.CreatedAt.ToLocalTime().ToString("MMM d")
+		</span>
+		@if (Item.DueDate.HasValue)
+		{
+			<span class="meta-item kanban-due @(IsOverdue ? "overdue" : "")" data-testid="kanban-due">
+				<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+					<rect x="3" y="4" width="18" height="18" rx="2" />
+					<line x1="16" y1="2" x2="16" y2="6" />
+					<line x1="8" y1="2" x2="8" y2="6" />
+					<line x1="3" y1="10" x2="21" y2="10" />
+				</svg>
+				@Item.DueDate.Value.ToLocalTime().ToString("MMM d")
+			</span>
+		}
+		@if (subs.Count > 0)
+		{
+			<span class="meta-item" data-testid="kanban-subtask-progress">
+				<span class="subtask-progress-bar-track">
+					<span class="subtask-progress-bar" style="width:@(doneSubs * 100 / subs.Count)%"></span>
+				</span>
+				@doneSubs/@subs.Count
+			</span>
+		}
+	</div>
+
+	@if (Item.TagIds.Count > 0)
 	{
-		<div class="kanban-card-meta">
-			@if (Item.DueDate.HasValue)
+		<div class="kanban-tags" data-testid="kanban-tags">
+			@foreach (var id in visibleTags)
 			{
-				<span class="kanban-due @(IsOverdue ? "overdue" : "")" data-testid="kanban-due">
-					<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-						<rect x="3" y="4" width="18" height="18" rx="2" />
-						<line x1="16" y1="2" x2="16" y2="6" />
-						<line x1="8" y1="2" x2="8" y2="6" />
-						<line x1="3" y1="10" x2="21" y2="10" />
-					</svg>
-					@Item.DueDate.Value.ToLocalTime().ToString("MMM d")
-				</span>
+				var tag = TagService.GetById(id);
+				<span class="kanban-tag" @key="id">@(tag?.Name ?? "?")</span>
 			}
-			@if (Item.TagIds.Count > 0)
+			@if (hiddenTagCount > 0)
 			{
-				<span class="kanban-tags" data-testid="kanban-tags">
-					@foreach (var id in Item.TagIds)
-					{
-						var tag = TagService.GetById(id);
-						<span class="kanban-tag" @key="id">@(tag?.Name ?? "?")</span>
-					}
-				</span>
+				<span class="kanban-tag kanban-tag-more">+@hiddenTagCount</span>
 			}
 		</div>
 	}
@@ -54,14 +81,22 @@
 	.kanban-card {
 		background: var(--surface);
 		border: 1px solid var(--border-light);
+		/* --card-accent is the lane status's colour, set inline by the component. */
+		border-left: 3px solid var(--card-accent, var(--border-light));
 		border-radius: var(--radius-lg);
 		padding: var(--space-3);
 		box-shadow: var(--shadow-xs);
 		cursor: pointer;
-		transition: all var(--transition-fast);
+		transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
 		display: flex;
 		flex-direction: column;
 		gap: var(--space-2);
+		flex-shrink: 0;
+	}
+
+	.kanban-card:focus-visible {
+		outline: 2px solid var(--primary);
+		outline-offset: 2px;
 	}
 
 	.kanban-card[draggable="true"] {
@@ -72,10 +107,11 @@
 		cursor: grabbing;
 	}
 
+	/* No translate on hover — the card lives inside a scrolling lane, where it jitters. */
 	.kanban-card:hover {
 		border-color: var(--border);
+		border-left-color: var(--card-accent, var(--border));
 		box-shadow: var(--shadow-md);
-		transform: translateY(-1px);
 	}
 
 	.kanban-card.completed {
@@ -85,11 +121,12 @@
 	.kanban-card-header {
 		display: flex;
 		align-items: flex-start;
-		justify-content: space-between;
 		gap: var(--space-2);
 	}
 
 	.kanban-card-title {
+		flex: 1;
+		min-width: 0;
 		font-size: 0.875rem;
 		font-weight: 600;
 		color: var(--text-primary);
@@ -117,10 +154,11 @@
 		display: flex;
 		flex-wrap: wrap;
 		align-items: center;
-		gap: var(--space-2);
+		gap: var(--space-3);
 	}
 
-	.kanban-due {
+	/* Mirrors .meta-item on the todo rows so both surfaces read the same. */
+	.kanban-card-meta .meta-item {
 		display: inline-flex;
 		align-items: center;
 		gap: var(--space-1);
@@ -128,9 +166,17 @@
 		color: var(--text-secondary);
 	}
 
+	.kanban-card-meta .meta-item svg {
+		opacity: 0.7;
+	}
+
 	.kanban-due.overdue {
 		color: var(--danger);
 		font-weight: 600;
+	}
+
+	.kanban-due.overdue svg {
+		opacity: 1;
 	}
 
 	.kanban-tags {
@@ -140,12 +186,18 @@
 	}
 
 	.kanban-tag {
+		display: inline-flex;
 		font-size: 0.6875rem;
 		font-weight: 500;
 		padding: 0.0625rem var(--space-2);
+		background: var(--primary-50);
+		color: #4338ca;
+		border-radius: var(--radius-full);
+	}
+
+	.kanban-tag-more {
 		background: var(--gray-100);
 		color: var(--text-secondary);
-		border-radius: var(--radius-full);
 	}
 </style>
 
@@ -162,22 +214,32 @@
 	[Parameter]
 	public EventCallback<TodoItem> OnDragStart { get; set; }
 
+	// Beyond this the tag row is collapsed to a "+N" chip so a heavily tagged card can't
+	// blow out the lane's width.
+	private const int MaxVisibleTags = 3;
+
 	private bool IsDone => Item.StatusId == BuiltInStatusIds.Done;
 
 	private bool IsOverdue => Item.DueDate.HasValue
 		&& Item.DueDate.Value < DateTime.UtcNow
 		&& !BuiltInStatusIds.IsCompletedLike(Item.StatusId);
 
+	// Left edge accent, matching the lane header's colour.
+	private string AccentColor =>
+		StatusColor.Resolve(StatusService.GetById(Item.StatusId)?.Color).Background;
+
 	protected override void OnInitialized()
 	{
 		PriorityService.OnPrioritiesChanged += StateHasChanged;
 		TagService.OnTagsChanged += StateHasChanged;
+		StatusService.OnStatusesChanged += StateHasChanged;
 	}
 
 	public void Dispose()
 	{
 		PriorityService.OnPrioritiesChanged -= StateHasChanged;
 		TagService.OnTagsChanged -= StateHasChanged;
+		StatusService.OnStatusesChanged -= StateHasChanged;
 	}
 
 	private async Task HandleDragStart()

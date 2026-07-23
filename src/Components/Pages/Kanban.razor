@@ -14,24 +14,36 @@
 
 @if (_isLoading)
 {
-    <div class="kanban-loading" aria-busy="true" aria-live="polite">
-        <div class="kanban-skeleton-lane"></div>
-        <div class="kanban-skeleton-lane"></div>
-        <div class="kanban-skeleton-lane"></div>
+    <div class="skeleton-shell" aria-busy="true" aria-live="polite">
+        <div class="skeleton-tabs">
+            <div class="skeleton-tab"></div>
+            <div class="skeleton-tab"></div>
+            <div class="skeleton-tab"></div>
+        </div>
+        <div class="skeleton-stats">
+            <div class="skeleton-card"></div>
+            <div class="skeleton-card"></div>
+            <div class="skeleton-card"></div>
+            <div class="skeleton-card"></div>
+        </div>
+        <div class="skeleton-board">
+            <div class="skeleton-lane"></div>
+            <div class="skeleton-lane"></div>
+            <div class="skeleton-lane"></div>
+            <div class="skeleton-lane"></div>
+        </div>
     </div>
 }
 else if (!ProjectService.Projects.Any())
 {
-    <div class="kanban-empty">
-        <div class="kanban-empty-icon">
-            <svg width="72" height="72" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-                <rect x="3" y="3" width="6" height="18" rx="1"/>
-                <rect x="10" y="3" width="6" height="12" rx="1"/>
-                <rect x="17" y="3" width="4" height="8" rx="1"/>
-            </svg>
-        </div>
-        <h1 class="kanban-empty-title">No projects yet</h1>
-        <p class="kanban-empty-desc">Create a project on the Todos page to start using the board.</p>
+    <div class="empty-state-page">
+        <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+            <rect x="3" y="3" width="6" height="18" rx="1"/>
+            <rect x="10" y="3" width="6" height="12" rx="1"/>
+            <rect x="17" y="3" width="4" height="8" rx="1"/>
+        </svg>
+        <h2>No Projects Yet</h2>
+        <p>Create a project on the Todos page to start using the board.</p>
         <button class="btn btn-primary" @onclick='() => NavigationManager.NavigateTo("/")'>Go to Todos</button>
     </div>
 }
@@ -43,6 +55,54 @@ else
                  PermissionsByProject="@_projectPerms"
                  OnProjectSelected="HandleProjectSelected"
                  OnNewProjectClick='() => NavigationManager.NavigateTo("/")' />
+
+    <div class="stats-dashboard" aria-live="polite" aria-label="Task statistics">
+        <div class="stat-card">
+            <div class="stat-icon total">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                    <rect x="3" y="3" width="18" height="18" rx="2"/>
+                    <path d="M3 9h18"/>
+                </svg>
+            </div>
+            <div class="stat-info">
+                <span class="stat-value">@GetProjectTodoCount()</span>
+                <span class="stat-label">Total Tasks</span>
+            </div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-icon pending">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                    <circle cx="12" cy="12" r="10"/>
+                    <path d="M12 6v6l4 2"/>
+                </svg>
+            </div>
+            <div class="stat-info">
+                <span class="stat-value">@TodoService.GetActiveCount(ProjectService.SelectedProject?.Id)</span>
+                <span class="stat-label">Remaining</span>
+            </div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-icon completed">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                    <path d="M22 11.08V12a10 10 0 11-5.93-9.14"/>
+                    <path d="M22 4L12 14.01l-3-3"/>
+                </svg>
+            </div>
+            <div class="stat-info">
+                <span class="stat-value">@TodoService.GetCompletedCount(ProjectService.SelectedProject?.Id)</span>
+                <span class="stat-label">Completed</span>
+            </div>
+        </div>
+        <div class="stat-card progress-card">
+            <div class="progress-info">
+                <span class="progress-label">Progress</span>
+                <span class="progress-value">@GetProgressPercentage()%</span>
+            </div>
+            <div class="progress-bar-container">
+                <div class="progress-bar" style="width: @GetProgressPercentage()%"></div>
+            </div>
+        </div>
+    </div>
 
     <div class="action-bar">
         <div class="action-bar-left">
@@ -60,16 +120,14 @@ else
 
     <TodoFilters FilterCriteria="@_filterCriteria"
                  TotalCount="@GetProjectTodoCount()"
-                 FilteredCount="@_filteredCount"
+                 FilteredCount="@GetFilteredTodos().Count()"
                  SelectedPresetName="@_selectedPresetName"
                  SelectedPresetChanged="HandleSelectedPresetChanged"
                  FilterChanged="StateHasChanged" />
 
     <div class="kanban-area">
         @{
-            var projectId = ProjectService.SelectedProject?.Id;
-            var filtered = TodoService.GetFilteredAndSorted(_filterCriteria, projectId).ToList();
-            _filteredCount = filtered.Count;
+            var filtered = GetFilteredTodos().ToList();
             var lanes = StatusService.Statuses
                 .Where(s => _filterCriteria.SelectedStatuses.Contains(s.Id))
                 .OrderBy(s => BuiltInStatusIds.NaturalOrder(s.Id))
@@ -79,8 +137,9 @@ else
 
         @if (lanes.Count == 0)
         {
-            <div class="kanban-no-lanes">
-                No status lanes selected. Enable statuses in the <strong>Filters</strong> panel to show lanes.
+            <div class="empty-state kanban-no-lanes">
+                <h3 class="empty-title">No status lanes selected</h3>
+                <p class="empty-description">Enable one or more statuses in the <strong>Filters</strong> panel to show lanes.</p>
             </div>
         }
         else
@@ -132,23 +191,30 @@ else
                OnSubmit="HandleFormSubmit" />
 
 <style>
+    /* Lanes are grid columns rather than flex children so they share one height (align-items:
+       stretch) and divide the available width evenly until they hit their 260px floor, at which
+       point the board starts scrolling horizontally instead of clipping the last lane. */
     .kanban-board {
-        display: flex;
+        display: grid;
+        grid-auto-flow: column;
+        grid-auto-columns: minmax(260px, 1fr);
+        align-items: stretch;
         gap: var(--space-4);
         overflow-x: auto;
-        padding-bottom: var(--space-4);
-        align-items: flex-start;
+        overscroll-behavior-x: contain;
+        height: clamp(360px, calc(100dvh - 460px), 860px);
+        padding-bottom: var(--space-2);
+        scrollbar-width: thin;
     }
 
     .kanban-lane {
-        flex: 0 0 300px;
-        max-width: 300px;
+        height: 100%;
+        min-height: 0; /* lets .kanban-lane-body scroll instead of stretching the lane */
         background: var(--gray-50);
         border: 1px solid var(--border-light);
         border-radius: var(--radius-lg);
         display: flex;
         flex-direction: column;
-        max-height: calc(100vh - 320px);
         transition: box-shadow var(--transition-fast), border-color var(--transition-fast);
     }
 
@@ -161,17 +227,22 @@ else
         display: flex;
         align-items: center;
         justify-content: space-between;
+        gap: var(--space-2);
         padding: var(--space-3);
         border-radius: var(--radius-lg) var(--radius-lg) 0 0;
         font-weight: 600;
         font-size: 0.875rem;
+        flex-shrink: 0;
     }
 
     .kanban-lane-name {
-        text-transform: uppercase;
-        letter-spacing: 0.03em;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
     }
 
+    /* currentColor is the header's contrast-checked foreground (StatusColor.Resolve), so the pill
+       stays legible on both pale and dark lane colours. */
     .kanban-lane-count {
         display: inline-flex;
         align-items: center;
@@ -179,10 +250,11 @@ else
         min-width: 22px;
         height: 22px;
         padding: 0 var(--space-2);
-        background: rgba(255, 255, 255, 0.55);
+        background: color-mix(in srgb, currentColor 15%, transparent);
         border-radius: var(--radius-full);
         font-size: 0.75rem;
         font-weight: 700;
+        flex-shrink: 0;
     }
 
     .kanban-lane-body {
@@ -190,103 +262,80 @@ else
         flex-direction: column;
         gap: var(--space-2);
         padding: var(--space-3);
+        padding-bottom: var(--space-4);
         overflow-y: auto;
         flex: 1;
-        min-height: 80px;
+        min-height: 0;
+        scrollbar-width: thin;
+        /* Fades the last visible card so a partially scrolled lane reads as "more below"
+           rather than as content sliced in half. */
+        mask-image: linear-gradient(to bottom, #000 calc(100% - 24px), transparent 100%);
     }
 
     .kanban-lane-empty {
+        flex: 1;
+        display: grid;
+        place-items: center;
         text-align: center;
         color: var(--text-muted);
         font-size: 0.8125rem;
-        padding: var(--space-5) var(--space-3);
+        padding: var(--space-4) var(--space-3);
         border: 2px dashed var(--border);
         border-radius: var(--radius-md);
     }
 
     .kanban-no-lanes {
-        padding: var(--space-6);
-        text-align: center;
-        color: var(--text-secondary);
-        background: var(--surface);
-        border: 2px dashed var(--border);
-        border-radius: var(--radius-xl);
+        min-height: 220px;
+        display: grid;
+        place-content: center;
     }
 
-    .action-bar {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        margin-bottom: var(--space-5);
-        flex-wrap: wrap;
-        gap: var(--space-3);
-    }
-
-    .action-bar-left {
-        display: flex;
-        align-items: center;
-        gap: var(--space-2);
-    }
-
-    /* Loading */
-    .kanban-loading {
-        display: flex;
+    /* Board-shaped loading skeleton, built on the shared .skeleton-* shimmer primitives. */
+    .skeleton-board {
+        display: grid;
+        grid-auto-flow: column;
+        grid-auto-columns: minmax(260px, 1fr);
         gap: var(--space-4);
     }
 
-    .kanban-skeleton-lane {
-        flex: 0 0 300px;
-        height: 400px;
-        background: var(--gray-100);
+    .skeleton-lane {
+        height: 360px;
         border-radius: var(--radius-lg);
-        animation: kanbanPulse 1.4s ease-in-out infinite;
+        background: var(--gray-100);
+        position: relative;
+        overflow: hidden;
     }
 
-    @@keyframes kanbanPulse {
-        0%, 100% { opacity: 1; }
-        50% { opacity: 0.5; }
+    .skeleton-lane::after {
+        content: "";
+        position: absolute;
+        inset: 0;
+        background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.6), transparent);
+        transform: translateX(-100%);
+        animation: skeleton-shimmer 1.4s ease-in-out infinite;
     }
 
-    /* Empty state */
-    .kanban-empty {
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        justify-content: center;
-        text-align: center;
-        min-height: 60vh;
-        gap: var(--space-4);
-    }
-
-    .kanban-empty-icon {
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        width: 120px;
-        height: 120px;
-        background: var(--primary-50);
-        border-radius: var(--radius-full);
-        color: var(--primary);
-    }
-
-    .kanban-empty-title {
-        font-size: 1.75rem;
-        font-weight: 700;
-        color: var(--text-primary);
-        margin: 0;
-    }
-
-    .kanban-empty-desc {
-        font-size: 1rem;
-        color: var(--text-secondary);
-        margin: 0;
-        max-width: 420px;
-    }
-
+    /* Phones get a single natural page scroll: lanes size to their content and the board
+       scrolls sideways one lane at a time. */
     @@media (max-width: 640px) {
+        .kanban-board {
+            grid-auto-columns: 85vw;
+            height: auto;
+            scroll-snap-type: x mandatory;
+        }
+
         .kanban-lane {
-            flex-basis: 85vw;
-            max-width: 85vw;
+            height: auto;
+            scroll-snap-align: start;
+        }
+
+        .kanban-lane-body {
+            overflow-y: visible;
+            mask-image: none;
+        }
+
+        .skeleton-board {
+            grid-auto-columns: 85vw;
         }
     }
 </style>
@@ -295,7 +344,6 @@ else
     private TodoFilterCriteria _filterCriteria = new();
     private string _selectedPresetName = FilterPreset.KanbanName;
     private bool _isLoading = true;
-    private int _filteredCount;
 
     private TodoItem _currentTodo = new();
     private bool _isEditing;
@@ -373,12 +421,22 @@ else
             : ProjectPermission.All;
     }
 
+    private IEnumerable<TodoItem> GetFilteredTodos() =>
+        TodoService.GetFilteredAndSorted(_filterCriteria, ProjectService.SelectedProject?.Id);
+
     private int GetProjectTodoCount()
     {
         var projectId = ProjectService.SelectedProject?.Id;
         return projectId.HasValue
             ? TodoService.Todos.Count(t => t.ParentId is null && t.ProjectId == projectId.Value)
             : TodoService.Todos.Count(t => t.ParentId is null);
+    }
+
+    private int GetProgressPercentage()
+    {
+        var total = GetProjectTodoCount();
+        if (total == 0) return 0;
+        return (int)((TodoService.GetCompletedCount(ProjectService.SelectedProject?.Id) / (double)total) * 100);
     }
 
     private void HandleProjectSelected(Project project)

@@ -289,112 +289,9 @@ else
         margin: 0 0 var(--space-6);
     }
     
-    /* Stats Dashboard */
-    .stats-dashboard {
-        display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
-        gap: var(--space-4);
-        margin-bottom: var(--space-5);
-    }
-    
-    .stat-card {
-        background: var(--surface);
-        border: 1px solid var(--border-light);
-        border-radius: var(--radius-lg);
-        padding: var(--space-4);
-        display: flex;
-        align-items: center;
-        gap: var(--space-3);
-        transition: all var(--transition-fast);
-    }
-    
-    .stat-card:hover {
-        border-color: var(--border);
-        box-shadow: var(--shadow-sm);
-    }
-    
-    .stat-icon {
-        width: 44px;
-        height: 44px;
-        border-radius: var(--radius-lg);
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        flex-shrink: 0;
-    }
-    
-    .stat-icon.total {
-        background: var(--primary-50);
-        color: var(--primary);
-    }
-    
-    .stat-icon.pending {
-        background: var(--warning-light);
-        color: #d97706;
-    }
-    
-    .stat-icon.completed {
-        background: var(--success-light);
-        color: var(--success);
-    }
-    
-    .stat-info {
-        display: flex;
-        flex-direction: column;
-    }
-    
-    .stat-value {
-        font-size: 1.5rem;
-        font-weight: 700;
-        color: var(--text-primary);
-        line-height: 1;
-    }
-    
-    .stat-label {
-        font-size: 0.75rem;
-        color: var(--text-secondary);
-        margin-top: var(--space-1);
-    }
-    
-    .progress-card {
-        flex-direction: column;
-        align-items: stretch;
-        gap: var(--space-2);
-    }
-    
-    .progress-info {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-    }
-    
-    .progress-label {
-        font-size: 0.875rem;
-        font-weight: 500;
-        color: var(--text-secondary);
-    }
-    
-    .progress-value {
-        font-size: 0.875rem;
-        font-weight: 600;
-        color: #4338ca;
-    }
-    
-    .progress-bar-container {
-        height: 8px;
-        background: var(--gray-200);
-        border-radius: var(--radius-full);
-        overflow: hidden;
-    }
-    
-    .progress-bar {
-        height: 100%;
-        background: linear-gradient(90deg, var(--primary) 0%, var(--success) 100%);
-        border-radius: var(--radius-full);
-        transition: width 0.5s ease;
-        min-width: 4px;
-    }
-    
+    /* The .stats-dashboard / .stat-* / .progress-* family lives in site.css (shared with
+       Statistics and the Board). */
+
     /* Content Tabs */
     .content-tabs {
         display: flex;
@@ -449,43 +346,14 @@ else
         color: #4338ca;
     }
 
-    /* Action Bar */
-    .action-bar {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        margin-bottom: var(--space-5);
-        flex-wrap: wrap;
-        gap: var(--space-3);
-    }
-    
-    .action-bar-left, .action-bar-right {
-        display: flex;
-        align-items: center;
-        gap: var(--space-2);
-    }
-    
+    /* .action-bar / .action-bar-left / .action-bar-right live in site.css. */
+
     .btn-ghost.danger {
         color: #b91c1c;
     }
-    
+
     .btn-ghost.danger:hover {
         background: var(--danger-light);
-    }
-    
-    @@media (max-width: 640px) {
-        .stats-dashboard {
-            grid-template-columns: repeat(2, 1fr);
-        }
-        
-        .action-bar {
-            flex-direction: column;
-            align-items: stretch;
-        }
-        
-        .action-bar-left, .action-bar-right {
-            justify-content: center;
-        }
     }
 </style>
 
