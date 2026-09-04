@@ -1,0 +1,217 @@
+@page "/notes/new"
+@page "/notes/{Id:guid}/edit"
+@inherits PageComponentBase
+@using TodoList.Services.Access
+@inject IProjectService ProjectService
+@inject INoteService NoteService
+@inject ITodoService TodoService
+@inject IProjectAccessResolver Access
+@inject IDialogService DialogService
+@inject NavigationManager NavigationManager
+
+<PageTitle>BlazorTodo - @(IsEditing ? "Edit Note" : "New Note")</PageTitle>
+
+@if (_isLoading)
+{
+    <div class="editor-page" aria-busy="true" aria-live="polite">
+        <div class="skeleton-shell">
+            <div class="skeleton-tab"></div>
+            <div class="skeleton-row" style="margin-top: var(--space-5);"></div>
+            <div class="editor-grid single" style="margin-top: var(--space-6);">
+                <div class="skeleton-list">
+                    <div class="skeleton-row"></div>
+                    <div class="skeleton-row" style="height: 320px;"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+else if (_notFound)
+{
+    <div class="editor-page">
+        <h1 class="editor-title">Note not found</h1>
+        <p class="editor-empty-text">This note doesn't exist anymore — it may have been deleted on another device.</p>
+        <a class="btn btn-primary" href="@_backHref">Go back</a>
+    </div>
+}
+else if (_noProject)
+{
+    <div class="editor-page">
+        <h1 class="editor-title">No project selected</h1>
+        <p class="editor-empty-text">Notes live inside a project. Pick or create one first, then add the note.</p>
+        <a class="btn btn-primary" href="@_backHref">Go back</a>
+    </div>
+}
+else if (_noPermission)
+{
+    <div class="editor-page">
+        <h1 class="editor-title">No permission</h1>
+        <p class="editor-empty-text">You don't have permission to @(IsEditing ? "edit" : "add") notes in this project.</p>
+        <a class="btn btn-primary" href="@_backHref">Go back</a>
+    </div>
+}
+else
+{
+    <EditForm Model="@_note" OnValidSubmit="HandleValidSubmit">
+        <DataAnnotationsValidator />
+        <EditorPageShell Heading="@(IsEditing ? "Edit Note" : "New Note")"
+                         BackHref="@_backHref"
+                         BackLabel="@_backLabel"
+                         SubmitLabel="@(IsEditing ? "Save Changes" : "Add Note")"
+                         ErrorMessage="@_error"
+                         OnCancel="GoBack">
+            <LeadingActions>
+                @if (IsEditing)
+                {
+                    <button type="button" class="btn btn-ghost" @onclick="HandleConvertToTodo" data-testid="convert-note-to-task">
+                        Convert to Task
+                    </button>
+                }
+            </LeadingActions>
+            <MainContent>
+                <div class="form-group">
+                    <label class="form-label" for="note-title">Title</label>
+                    <InputText id="note-title" class="form-input editor-title-input"
+                               @bind-Value="_note.Title" placeholder="Note title..." />
+                    <ValidationMessage For="@(() => _note.Title)" class="validation-error" />
+                </div>
+                <div class="form-group">
+                    <label class="form-label" for="note-content">Content</label>
+                    <InputTextArea id="note-content" class="form-input form-textarea editor-body-textarea"
+                                   @bind-Value="_note.Content" placeholder="Write your note here..." />
+                    <ValidationMessage For="@(() => _note.Content)" class="validation-error" />
+                </div>
+            </MainContent>
+        </EditorPageShell>
+    </EditForm>
+}
+
+@code {
+    // Route value on the /notes/{Id:guid}/edit route; stays null on /notes/new.
+    [Parameter]
+    public Guid? Id { get; set; }
+
+    [SupplyParameterFromQuery]
+    public Guid? ProjectId { get; set; }
+
+    [SupplyParameterFromQuery]
+    public string? ReturnUrl { get; set; }
+
+    [CascadingParameter]
+    private Task<AuthenticationState>? AuthState { get; set; }
+
+    private bool _isLoading = true;
+    private bool _loaded;
+    private bool _notFound;
+    private bool _noProject;
+    private bool _noPermission;
+    private string? _error;
+    // Non-nullable so ValidationMessage/For and @bind codegen can infer member types. The
+    // not-found / no-permission flags gate the form, not the field.
+    private ProjectNote _note = new();
+    private string _backHref = "/";
+    private string _backLabel = "Back to Notes";
+
+    private bool IsEditing => Id is not null;
+
+    protected override async Task OnFirstRenderAsync()
+    {
+        if (_loaded) return;
+        _loaded = true;
+
+        _backHref = EditorRoutes.SafeReturn(ReturnUrl);
+
+        await Task.WhenAll(
+            ProjectService.InitializeAsync(),
+            NoteService.InitializeAsync());
+
+        if (IsEditing)
+        {
+            // Deep-copy the cached item so a mid-edit sync refresh can't reach in and clobber
+            // fields the user is typing into.
+            var original = NoteService.GetById(Id!.Value);
+            if (original is null)
+            {
+                _notFound = true;
+                _isLoading = false;
+                return;
+            }
+            _note = new ProjectNote
+            {
+                Id = original.Id,
+                UserId = original.UserId,
+                ProjectId = original.ProjectId,
+                Title = original.Title,
+                Content = original.Content,
+                CreatedAt = original.CreatedAt,
+                UpdatedAt = original.UpdatedAt
+            };
+        }
+        else
+        {
+            var projectId = ProjectId ?? ProjectService.SelectedProject?.Id ?? Guid.Empty;
+            if (projectId == Guid.Empty)
+            {
+                _noProject = true;
+                _isLoading = false;
+                return;
+            }
+            _note = new ProjectNote
+            {
+                ProjectId = projectId
+            };
+        }
+
+        var requiredPerm = IsEditing ? ProjectPermission.NotesModify : ProjectPermission.NotesAdd;
+        var perms = await PermissionResolver.ForProjectAsync(AuthState, Access, _note.ProjectId);
+        if (!perms.HasFlag(requiredPerm))
+        {
+            _noPermission = true;
+            _isLoading = false;
+            return;
+        }
+
+        var project = ProjectService.Projects.FirstOrDefault(p => p.Id == _note.ProjectId);
+        if (project is not null)
+            _backLabel = $"Back to {project.Name}";
+        _isLoading = false;
+    }
+
+    private async Task HandleValidSubmit()
+    {
+        var saved = await NoteService.SaveNoteAsync(_note);
+        if (!saved)
+        {
+            _error = "Couldn't save this note. Check that you still have access to the project.";
+            return;
+        }
+        GoBack();
+    }
+
+    private async Task HandleConvertToTodo()
+    {
+        if (!await DialogService.ConfirmAsync(
+            "Convert this note to a task? Note content will become the task description.",
+            "Convert to Task"))
+            return;
+
+        await TodoService.InitializeAsync();
+        var todo = new TodoItem
+        {
+            ProjectId = _note.ProjectId,
+            Title = _note.Title,
+            Description = _note.Content
+        };
+        if (!await TodoService.SaveTodoAsync(todo))
+        {
+            // A long note can exceed the task description limit — surface that instead of
+            // silently deleting the note.
+            _error = "Couldn't create the task (the note is longer than a task description allows), so the note was kept.";
+            return;
+        }
+        await NoteService.DeleteNoteAsync(_note);
+        NavigationManager.NavigateTo("/?tab=tasks");
+    }
+
+    private void GoBack() => NavigationManager.NavigateTo(_backHref);
+}

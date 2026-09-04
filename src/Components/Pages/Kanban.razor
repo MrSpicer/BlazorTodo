@@ -1,5 +1,6 @@
 @page "/kanban"
 @inherits PageComponentBase
+@using TodoList.Helpers
 @inject ITodoService TodoService
 @inject IProjectService ProjectService
 @inject IStatusService StatusService
@@ -108,7 +109,7 @@ else
         <div class="action-bar-left">
             @if (_perms.HasFlag(ProjectPermission.TodosAdd))
             {
-                <button class="btn btn-primary" @onclick="ShowTodoModal">
+                <button class="btn btn-primary" @onclick="GoToNewTodo">
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
                         <path d="M12 5v14M5 12h14"/>
                     </svg>
@@ -181,14 +182,6 @@ else
         }
     </div>
 }
-
-<TodoFormModal IsVisible="@_showTodoModal"
-               IsEditing="@_isEditing"
-               EditingTodo="@_currentTodo"
-               DefaultProjectId="@ProjectService.SelectedProject?.Id"
-               ShowParentSelector="true"
-               OnClose="HideTodoModal"
-               OnSubmit="HandleFormSubmit" />
 
 <style>
     /* Lanes are grid columns rather than flex children so they share one height (align-items:
@@ -345,10 +338,6 @@ else
     private string _selectedPresetName = FilterPreset.KanbanName;
     private bool _isLoading = true;
 
-    private TodoItem _currentTodo = new();
-    private bool _isEditing;
-    private bool _showTodoModal;
-
     private TodoItem? _draggedTodo;
     private Guid? _dragOverStatusId;
 
@@ -469,33 +458,11 @@ else
         await TodoService.UpdateStatusAsync(todo, statusId);
     }
 
-    private void ShowTodoModal()
-    {
-        _currentTodo = new TodoItem();
-        if (ProjectService.SelectedProject != null)
-            _currentTodo.ProjectId = ProjectService.SelectedProject.Id;
-        _isEditing = false;
-        _showTodoModal = true;
-    }
+    private string Here() => EditorRoutes.Here(NavigationManager);
 
-    private void HandleEdit(TodoItem todo)
-    {
-        _currentTodo = todo;
-        _isEditing = true;
-        _showTodoModal = true;
-    }
+    private void GoToNewTodo() =>
+        NavigationManager.NavigateTo(EditorRoutes.NewTodo(Here(), ProjectService.SelectedProject?.Id));
 
-    private void HideTodoModal()
-    {
-        _showTodoModal = false;
-        _isEditing = false;
-    }
-
-    private async Task HandleFormSubmit(TodoItem todo)
-    {
-        if (todo.ProjectId == Guid.Empty && ProjectService.SelectedProject != null)
-            todo.ProjectId = ProjectService.SelectedProject.Id;
-        await TodoService.SaveTodoAsync(todo);
-        HideTodoModal();
-    }
+    private void HandleEdit(TodoItem todo) =>
+        NavigationManager.NavigateTo(EditorRoutes.EditTodo(todo.Id, Here()));
 }

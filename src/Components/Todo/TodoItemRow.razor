@@ -6,6 +6,7 @@
 @inject IStatusService StatusService
 @inject IPriorityService PriorityService
 @inject ITodoService TodoService
+@inject NavigationManager NavigationManager
 
 <div class="todo-card @GetStatusClass() @(IsDone ? "completed" : "") @(Depth > 0 ? "subtask-card" : "")"
      data-testid="@(Depth > 0 ? "subtask-card" : "todo-card")">
@@ -144,7 +145,7 @@
 			}
 			@if (Depth == 0 && subs.Count == 0 && CanAdd)
 			{
-				<button class="action-btn add-subtask-btn" @onclick="ShowAddSubTaskModal"
+				<button class="action-btn add-subtask-btn" @onclick="ShowAddSubTask"
 				        title="Add subtask"
 				        aria-label="Add subtask">
 					<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
@@ -196,7 +197,7 @@
 		@if (CanAdd)
 		{
 			<button class="add-subtask-trigger"
-			        @onclick="ShowAddSubTaskModal"
+			        @onclick="ShowAddSubTask"
 			        data-testid="add-subtask-trigger"
 			        aria-label="Add subtask">
 				<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
@@ -207,16 +208,6 @@
 		}
 	</div>
 }
-
-<TodoFormModal
-    IsVisible="_showSubTaskModal"
-    IsEditing="_isEditingSubTask"
-    EditingTodo="_editingSubTask"
-    DefaultProjectId="Item.ProjectId"
-	DefaultParentId="Item.Id"
-    ShowParentSelector="true"
-	OnClose="HandleSubTaskModalClose"
-    OnSubmit="HandleSubTaskModalSubmit" />
 
 <ChangeHistoryModal IsVisible="_showHistoryModal"
                     Item="Item"
@@ -616,9 +607,6 @@
 	private bool CanRemove => Permissions.HasFlag(ProjectPermission.TodosRemove);
 
 	private bool _isExpanded = false;
-	private bool _showSubTaskModal;
-	private bool _isEditingSubTask;
-	private TodoItem? _editingSubTask;
 	private bool _showHistoryModal;
 
 	private bool IsDone => Item.StatusId == BuiltInStatusIds.Done;
@@ -680,36 +668,14 @@
 
 	private async Task HandleSubTaskDelete(TodoItem sub) => await TodoService.DeleteTodoAsync(sub);
 
-	private void ShowAddSubTaskModal()
-	{
-		_editingSubTask = null;
-		_isEditingSubTask = false;
-		_showSubTaskModal = true;
-	}
+	private string Here() => EditorRoutes.Here(NavigationManager);
 
-	private void HandleEditSubTask(TodoItem sub)
-	{
-		_editingSubTask = sub;
-		_isEditingSubTask = true;
-		_showSubTaskModal = true;
-	}
+	// Opens the dedicated editor for a new subtask of this item.
+	private void ShowAddSubTask() =>
+		NavigationManager.NavigateTo(EditorRoutes.NewTodo(Here(), Item.ProjectId, Item.Id));
 
-	private async Task HandleSubTaskModalSubmit(TodoItem submitted)
-	{
-		// ParentId / ProjectId already populated by TodoFormModal.HandleSubmit
-		// from DefaultParentId / parent-selector state.
-		_showSubTaskModal = false;
-		_isEditingSubTask = false;
-		_editingSubTask = null;
-		await TodoService.SaveTodoAsync(submitted);
-	}
-
-	private void HandleSubTaskModalClose()
-	{
-		_showSubTaskModal = false;
-		_isEditingSubTask = false;
-		_editingSubTask = null;
-	}
+	private void HandleEditSubTask(TodoItem sub) =>
+		NavigationManager.NavigateTo(EditorRoutes.EditTodo(sub.Id, Here()));
 
 	private string GetStatusClass()
 	{

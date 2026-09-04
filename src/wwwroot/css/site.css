@@ -837,6 +837,159 @@ a:hover, .btn-link:hover {
 }
 
 /* ========================================
+   Editor pages (EditorPageShell: dedicated todo/note edit routes)
+   ======================================== */
+.editor-page {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-5);
+}
+
+/* The sticky bar below needs .app-main to be a real scrollport. .app-main already has
+   overflow-y: auto, but .app-container uses min-height: 100vh, so the shell grows with the
+   content and .app-main never actually scrolls -- which silently makes `position: sticky` a
+   no-op. Capping the shell to the viewport height on editor routes only (via :has) hands
+   scrolling back to .app-main without changing how any other page scrolls. */
+.app-container:has(.editor-page) {
+    height: 100vh;
+    height: 100dvh;
+}
+
+/* Sticky action bar: pins to the top of .app-main's scrollport while the form scrolls under
+   it, so Save stays reachable down a long description. */
+.editor-bar {
+    position: sticky;
+    /* A sticky element is clamped to the scrollport *minus* the scroll container's padding, so
+       with .app-main's 1.5rem padding-top a `top: 0` bar pins 1.5rem down and content scrolls
+       visibly through the gap above it. Pulling both the offset and the flow position up by
+       that padding closes the gap; the padding-top puts the controls back where they look right. */
+    top: -1.5rem;
+    z-index: 20;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-3);
+    margin-top: -1.5rem;
+    padding: calc(1.5rem + var(--space-2)) 0 var(--space-2);
+    background: var(--background);
+}
+
+.editor-back {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-2);
+    color: var(--text-secondary);
+    font-size: 0.875rem;
+    font-weight: 500;
+    padding: var(--space-2) var(--space-3);
+    border-radius: var(--radius-md);
+    transition: all var(--transition-fast);
+}
+
+.editor-back:hover {
+    color: var(--text-primary);
+    background: var(--surface);
+    text-decoration: none;
+}
+
+/* flex: 1 gives the auto margin below some free space to absorb; without it the group is
+   content-sized and the leading action can't be pushed away from Cancel/Submit. */
+.editor-bar-actions {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    flex: 1;
+    gap: var(--space-2);
+}
+
+/* Cancel always sits just before Submit, so pushing it right strands any leading action
+   (e.g. "Convert to Note") on the left. Harmless when there is no leading action. */
+.editor-bar-actions > .editor-cancel {
+    margin-left: auto;
+}
+
+.editor-title {
+    font-size: 1.5rem;
+    margin: 0;
+}
+
+.editor-error {
+    padding: var(--space-3) var(--space-4);
+    background: var(--danger-light);
+    color: var(--danger);
+    border-radius: var(--radius-md);
+    font-size: 0.875rem;
+    font-weight: 500;
+}
+
+.editor-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 300px;
+    gap: var(--space-6);
+    align-items: start;
+}
+
+.editor-grid.single {
+    grid-template-columns: minmax(0, 1fr);
+}
+
+.editor-main {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-5);
+    min-width: 0;
+}
+
+.editor-rail {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-5);
+    padding: var(--space-5);
+    background: var(--surface);
+    border: 1px solid var(--border-light);
+    border-radius: var(--radius-lg);
+}
+
+.editor-title-input {
+    font-size: 1.25rem;
+    font-weight: 600;
+}
+
+.editor-body-textarea {
+    min-height: clamp(240px, 45vh, 560px);
+}
+
+.editor-empty-text {
+    color: var(--text-secondary);
+    margin: 0 0 var(--space-4);
+}
+
+@media (max-width: 900px) {
+    /* The metadata rail stacks under the main form on narrow screens. */
+    .editor-grid {
+        grid-template-columns: minmax(0, 1fr);
+    }
+
+    .editor-rail {
+        order: 2;
+    }
+}
+
+@media (max-width: 640px) {
+    .editor-bar {
+        flex-wrap: wrap;
+    }
+
+    .editor-bar-actions {
+        flex-wrap: wrap;
+    }
+
+    .editor-bar-actions > .editor-cancel {
+        margin-left: 0;
+    }
+}
+
+/* ========================================
    Management-list modals (statuses / priorities share this UI)
    ======================================== */
 .status-content {

@@ -1,5 +1,6 @@
 @page "/"
 @inherits PageComponentBase
+@using TodoList.Helpers
 @inject ITodoService TodoService
 @inject IProjectService ProjectService
 @inject INoteService NoteService
@@ -135,7 +136,7 @@ else
     <!-- Content Tabs -->
     <div class="content-tabs">
         <button class="content-tab @(_activeTab == "tasks" ? "active" : "")"
-                @onclick='() => _activeTab = "tasks"'>
+                @onclick='() => SelectTab("tasks")'>
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
                 <rect x="3" y="3" width="18" height="18" rx="2"/>
                 <path d="M9 12l2 2 4-4"/>
@@ -144,7 +145,7 @@ else
             <span class="tab-count">@GetProjectTodoCount()</span>
         </button>
         <button class="content-tab @(_activeTab == "notes" ? "active" : "")"
-                @onclick='() => _activeTab = "notes"'>
+                @onclick='() => SelectTab("notes")'>
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
                 <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
                 <polyline points="14 2 14 8 20 8"/>
@@ -161,7 +162,7 @@ else
             <div class="action-bar-left">
                 @if (_perms.HasFlag(ProjectPermission.TodosAdd))
                 {
-                    <button class="btn btn-primary" @onclick="ShowTodoModal">
+                    <button class="btn btn-primary" @onclick="GoToNewTodo">
                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
                             <path d="M12 5v14M5 12h14"/>
                         </svg>
@@ -205,7 +206,7 @@ else
             <div class="action-bar-left">
                 @if (_perms.HasFlag(ProjectPermission.NotesAdd))
                 {
-                    <button class="btn btn-primary" @onclick="ShowNoteModal">
+                    <button class="btn btn-primary" @onclick="GoToNewNote">
                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
                             <path d="M12 5v14M5 12h14"/>
                         </svg>
@@ -230,23 +231,6 @@ else
               EditingProject="@_editingProject"
               OnClose="HideProjectModal"
               OnSave="HandleSaveProject" />
-
-<TodoFormModal IsVisible="@_showTodoModal"
-               IsEditing="@_isEditing"
-               EditingTodo="@_currentTodo"
-               DefaultProjectId="@ProjectService.SelectedProject?.Id"
-               ShowParentSelector="true"
-               OnClose="HideTodoModal"
-               OnSubmit="HandleFormSubmit"
-               OnConvertToNote="HandleConvertTodoToNote" />
-
-<NoteFormModal IsVisible="@_showNoteModal"
-               IsEditing="@_isEditingNote"
-               EditingNote="@_currentNote"
-               DefaultProjectId="@ProjectService.SelectedProject?.Id"
-               OnClose="HideNoteModal"
-               OnSubmit="HandleNoteFormSubmit"
-               OnConvertToTodo="HandleConvertNoteToTodo" />
 
 <style>
     /* Welcome Screen */
@@ -358,20 +342,18 @@ else
 </style>
 
 @code {
-    private TodoItem _currentTodo = new();
-    private bool _isEditing;
     private TodoFilterCriteria _filterCriteria = new();
     private string _selectedPresetName = FilterPreset.DefaultName;
     private bool _isLoading = true;
     private bool _showProjectModal;
     private bool _isEditingProject;
     private Project? _editingProject;
-    private bool _showTodoModal;
 
+    // The Tasks/Notes switch is URL-driven (/?tab=notes) so a saved link or refresh keeps the tab.
     private string _activeTab = "tasks";
-    private ProjectNote _currentNote = new();
-    private bool _isEditingNote;
-    private bool _showNoteModal;
+
+    [SupplyParameterFromQuery(Name = "tab")]
+    public string? Tab { get; set; }
 
     [CascadingParameter]
     private Task<AuthenticationState>? AuthState { get; set; }
@@ -380,6 +362,10 @@ else
     // per-project map for the project tabs. Anonymous/local users always have full control.
     private ProjectPermission _perms = ProjectPermission.All;
     private Dictionary<Guid, ProjectPermission> _projectPerms = new();
+
+    // `/` and `/?tab=notes` are the same routed component, so this must run on every parameter
+    // set (not just OnInitialized) or browser back/forward leaves the tab out of step with the URL.
+    protected override void OnParametersSet() => SelectTabFromQuery();
 
     protected override void OnInitialized()
     {
@@ -488,29 +474,24 @@ else
         return (int)((GetCompletedCount() / (double)total) * 100);
     }
 
-    private async Task HandleFormSubmit(TodoItem todo)
+    private void SelectTabFromQuery() => _activeTab = Tab == "notes" ? "notes" : "tasks";
+
+    private void SelectTab(string tab)
     {
-        if (todo.ProjectId == Guid.Empty && ProjectService.SelectedProject != null)
-        {
-            todo.ProjectId = ProjectService.SelectedProject.Id;
-        }
-        await TodoService.SaveTodoAsync(todo);
-        HideTodoModal();
-        ResetForm();
+        _activeTab = tab;
+        NavigationManager.NavigateTo(tab == "notes" ? "/?tab=notes" : "/", replace: true);
     }
 
-    private void HandleFormCancel()
-    {
-        HideTodoModal();
-        ResetForm();
-    }
+    private string Here() => EditorRoutes.Here(NavigationManager);
 
-    private void HandleEdit(TodoItem todo)
-    {
-        _currentTodo = todo;
-        _isEditing = true;
-        ShowTodoModal();
-    }
+    private void GoToNewTodo() =>
+        NavigationManager.NavigateTo(EditorRoutes.NewTodo(Here(), ProjectService.SelectedProject?.Id));
+
+    private void GoToNewNote() =>
+        NavigationManager.NavigateTo(EditorRoutes.NewNote(Here(), ProjectService.SelectedProject?.Id));
+
+    private void HandleEdit(TodoItem todo) =>
+        NavigationManager.NavigateTo(EditorRoutes.EditTodo(todo.Id, Here()));
 
     private async Task HandleDelete(TodoItem todo)
     {
@@ -529,18 +510,7 @@ else
         if (await DialogService.ConfirmAsync($"Delete ALL todos in '{projectName}'? This cannot be undone."))
         {
             await TodoService.ClearAllAsync(ProjectService.SelectedProject?.Id);
-            ResetForm();
         }
-    }
-
-    private void ResetForm()
-    {
-        _currentTodo = new TodoItem();
-        if (ProjectService.SelectedProject != null)
-        {
-            _currentTodo.ProjectId = ProjectService.SelectedProject.Id;
-        }
-        _isEditing = false;
     }
 
     private void ShowProjectModal()
@@ -563,19 +533,12 @@ else
         _isEditingProject = false;
         _editingProject = null;
     }
-    private void ShowTodoModal() => _showTodoModal = true;
-    private void HideTodoModal()
-    {
-        _showTodoModal = false;
-        _isEditing = false;
-    }
 
     private void HandleProjectSelected(Project project)
     {
         ProjectService.SelectProject(project);
         _perms = _projectPerms.TryGetValue(project.Id, out var pp) ? pp : ProjectPermission.All;
-        ResetForm();
-        _activeTab = "tasks";
+        SelectTab("tasks");
     }
 
     private async Task HandleSaveProject(Project project)
@@ -583,7 +546,6 @@ else
         await ProjectService.SaveProjectAsync(project);
         ProjectService.SelectProject(project);
         await RefreshPermissionsAsync();
-        ResetForm();
     }
 
     private async Task HandleDeleteProject(Project project)
@@ -597,82 +559,12 @@ else
         }
     }
 
-    private void HandleNoteEdit(ProjectNote note)
-    {
-        _currentNote = note;
-        _isEditingNote = true;
-        ShowNoteModal();
-    }
+    private void HandleNoteEdit(ProjectNote note) =>
+        NavigationManager.NavigateTo(EditorRoutes.EditNote(note.Id, Here()));
 
     private async Task HandleNoteDelete(ProjectNote note)
     {
         if (await DialogService.ConfirmAsync($"Delete note '{note.Title}'?"))
             await NoteService.DeleteNoteAsync(note);
-    }
-
-    private async Task HandleNoteFormSubmit(ProjectNote note)
-    {
-        if (note.ProjectId == Guid.Empty && ProjectService.SelectedProject != null)
-        {
-            note.ProjectId = ProjectService.SelectedProject.Id;
-        }
-        await NoteService.SaveNoteAsync(note);
-        HideNoteModal();
-        ResetNoteForm();
-    }
-
-    private void ResetNoteForm()
-    {
-        _currentNote = new ProjectNote();
-        if (ProjectService.SelectedProject != null)
-        {
-            _currentNote.ProjectId = ProjectService.SelectedProject.Id;
-        }
-        _isEditingNote = false;
-    }
-
-    private async Task HandleConvertTodoToNote(TodoItem todo)
-    {
-        if (!await DialogService.ConfirmAsync(
-            "Convert this task to a note? Task status, priority, and subtasks will not be carried over.",
-            "Convert to Note"))
-            return;
-        var note = new ProjectNote
-        {
-            ProjectId = todo.ProjectId,
-            Title = todo.Title,
-            Content = todo.Description,
-        };
-        await NoteService.SaveNoteAsync(note);
-        await TodoService.DeleteTodoAsync(todo);
-        HideTodoModal();
-        ResetForm();
-        _activeTab = "notes";
-    }
-
-    private async Task HandleConvertNoteToTodo(ProjectNote note)
-    {
-        if (!await DialogService.ConfirmAsync(
-            "Convert this note to a task? Note content will become the task description.",
-            "Convert to Task"))
-            return;
-        var todo = new TodoItem
-        {
-            ProjectId = note.ProjectId,
-            Title = note.Title,
-            Description = note.Content,
-        };
-        await TodoService.SaveTodoAsync(todo);
-        await NoteService.DeleteNoteAsync(note);
-        HideNoteModal();
-        ResetNoteForm();
-        _activeTab = "tasks";
-    }
-
-    private void ShowNoteModal() => _showNoteModal = true;
-    private void HideNoteModal()
-    {
-        _showNoteModal = false;
-        _isEditingNote = false;
     }
 }

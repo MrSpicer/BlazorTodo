@@ -24,6 +24,12 @@ public interface ITodoService
     Task InitializeAsync();
 
     /// <summary>
+    /// Gets a single todo by id from the in-memory list, or null if not found.
+    /// </summary>
+    /// <param name="id">The todo id.</param>
+    TodoItem? GetById(Guid id);
+
+    /// <summary>
     /// Re-hydrates the in-memory list from the repository and raises OnTodosChanged.
     /// Used by the multi-device sync listener when another circuit signals a change.
     /// </summary>

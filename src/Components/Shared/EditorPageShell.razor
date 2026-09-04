@@ -1,0 +1,66 @@
+<div class="editor-page">
+	<div class="editor-bar">
+		<a class="editor-back" href="@BackHref">
+			<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+				<path d="M19 12H5M12 19l-7-7 7-7"/>
+			</svg>
+			<span>@BackLabel</span>
+		</a>
+		<div class="editor-bar-actions">
+			@LeadingActions
+			<button type="button" class="btn btn-ghost editor-cancel" @onclick="OnCancel">Cancel</button>
+			<button type="submit" class="btn btn-primary" data-testid="editor-submit">@SubmitLabel</button>
+		</div>
+	</div>
+
+	<h1 class="editor-title">@Heading</h1>
+
+	@if (!string.IsNullOrWhiteSpace(ErrorMessage))
+	{
+		<div class="editor-error" role="alert" data-testid="editor-error">@ErrorMessage</div>
+	}
+
+	<div class="editor-grid @(SideRail is null ? "single" : "")">
+		<div class="editor-main">
+			@MainContent
+		</div>
+		@if (SideRail is not null)
+		{
+			<aside class="editor-rail">
+				@SideRail
+			</aside>
+		}
+	</div>
+</div>
+
+@code {
+	[Parameter, EditorRequired]
+	public string Heading { get; set; } = string.Empty;
+
+	[Parameter, EditorRequired]
+	public string BackHref { get; set; } = "/";
+
+	[Parameter]
+	public string BackLabel { get; set; } = "Back";
+
+	[Parameter]
+	public string SubmitLabel { get; set; } = "Save";
+
+	/// <summary>Error surfaced above the form when a save is rejected by the repository.</summary>
+	[Parameter]
+	public string? ErrorMessage { get; set; }
+
+	/// <summary>Left-aligned extra actions in the bar (e.g. "Convert to Note").</summary>
+	[Parameter]
+	public RenderFragment? LeadingActions { get; set; }
+
+	[Parameter, EditorRequired]
+	public RenderFragment MainContent { get; set; } = default!;
+
+	/// <summary>Metadata rail. When null the grid collapses to a single column.</summary>
+	[Parameter]
+	public RenderFragment? SideRail { get; set; }
+
+	[Parameter]
+	public EventCallback OnCancel { get; set; }
+}

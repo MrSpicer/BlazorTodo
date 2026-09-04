@@ -1,0 +1,241 @@
+@page "/todos/new"
+@page "/todos/{Id:guid}/edit"
+@inherits PageComponentBase
+@using TodoList.Services.Access
+@inject IProjectService ProjectService
+@inject ITagService TagService
+@inject IStatusService StatusService
+@inject IPriorityService PriorityService
+@inject ITodoService TodoService
+@inject INoteService NoteService
+@inject IProjectAccessResolver Access
+@inject IProjectMembershipService Membership
+@inject IDialogService DialogService
+@inject NavigationManager NavigationManager
+
+<PageTitle>BlazorTodo - @(IsEditing ? "Edit Task" : "New Task")</PageTitle>
+
+@if (_isLoading)
+{
+    <div class="editor-page" aria-busy="true" aria-live="polite">
+        <div class="skeleton-shell">
+            <div class="skeleton-tab"></div>
+            <div class="skeleton-row" style="margin-top: var(--space-5);"></div>
+            <div class="editor-grid" style="margin-top: var(--space-6);">
+                <div class="skeleton-list">
+                    <div class="skeleton-row"></div>
+                    <div class="skeleton-row" style="height: 220px;"></div>
+                </div>
+                <div class="skeleton-list">
+                    <div class="skeleton-row"></div>
+                    <div class="skeleton-row"></div>
+                    <div class="skeleton-row"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+else if (_notFound)
+{
+    <div class="editor-page">
+        <h1 class="editor-title">Task not found</h1>
+        <p class="editor-empty-text">This task doesn't exist anymore — it may have been deleted on another device.</p>
+        <a class="btn btn-primary" href="@_backHref">Go back</a>
+    </div>
+}
+else if (_noProject)
+{
+    <div class="editor-page">
+        <h1 class="editor-title">No project selected</h1>
+        <p class="editor-empty-text">Tasks live inside a project. Pick or create one first, then add the task.</p>
+        <a class="btn btn-primary" href="@_backHref">Go back</a>
+    </div>
+}
+else if (_noPermission)
+{
+    <div class="editor-page">
+        <h1 class="editor-title">No permission</h1>
+        <p class="editor-empty-text">You don't have permission to @(IsEditing ? "edit" : "add") tasks in this project.</p>
+        <a class="btn btn-primary" href="@_backHref">Go back</a>
+    </div>
+}
+else if (_todo is not null)
+{
+    <TodoForm @key="_todo.Id"
+              Todo="@_todo"
+              IsEditing="@IsEditing"
+              BackHref="@_backHref"
+              BackLabel="@_backLabel"
+              ErrorMessage="@_error"
+              Members="@_members"
+              OnSubmit="HandleSubmit"
+              OnCancel="GoBack"
+              OnConvertToNote="HandleConvertToNote" />
+}
+
+@code {
+    // Route value on the /todos/{Id:guid}/edit route; stays null on /todos/new.
+    [Parameter]
+    public Guid? Id { get; set; }
+
+    [SupplyParameterFromQuery]
+    public Guid? ProjectId { get; set; }
+
+    [SupplyParameterFromQuery]
+    public Guid? ParentId { get; set; }
+
+    [SupplyParameterFromQuery]
+    public string? ReturnUrl { get; set; }
+
+    [CascadingParameter]
+    private Task<AuthenticationState>? AuthState { get; set; }
+
+    private bool _isLoading = true;
+    private bool _loaded;
+    private bool _notFound;
+    private bool _noProject;
+    private bool _noPermission;
+    private string? _error;
+    private TodoItem? _todo;
+    private string _backHref = "/";
+    private string _backLabel = "Back to Tasks";
+    private IReadOnlyList<ProjectMemberView> _members = Array.Empty<ProjectMemberView>();
+
+    private bool IsEditing => Id is not null;
+
+    protected override void OnInitialized()
+    {
+        // Re-render on cross-device sync so the parent options stay current. The form edits a
+        // deep copy of the item, so a refresh can't clobber in-progress input.
+        TodoService.OnTodosChanged += StateHasChanged;
+        Track(() => TodoService.OnTodosChanged -= StateHasChanged);
+    }
+
+    protected override async Task OnFirstRenderAsync()
+    {
+        if (_loaded) return;
+        _loaded = true;
+
+        _backHref = EditorRoutes.SafeReturn(ReturnUrl);
+
+        await Task.WhenAll(
+            ProjectService.InitializeAsync(),
+            TagService.InitializeAsync(),
+            StatusService.InitializeAsync(),
+            PriorityService.InitializeAsync(),
+            TodoService.InitializeAsync());
+
+        if (IsEditing)
+        {
+            // Deep-copy the cached item so a mid-edit sync refresh can't reach in and clobber
+            // fields the user is typing into.
+            var original = TodoService.GetById(Id!.Value);
+            if (original is null)
+            {
+                _notFound = true;
+                _isLoading = false;
+                return;
+            }
+            _todo = DeepCopy(original);
+        }
+        else
+        {
+            var projectId = ProjectId ?? ProjectService.SelectedProject?.Id ?? Guid.Empty;
+            if (projectId == Guid.Empty)
+            {
+                _noProject = true;
+                _isLoading = false;
+                return;
+            }
+            // Subtask creation: the child follows the parent's project.
+            if (ParentId is not null)
+            {
+                var parent = TodoService.GetById(ParentId.Value);
+                if (parent is not null)
+                    projectId = parent.ProjectId;
+            }
+            _todo = new TodoItem
+            {
+                ProjectId = projectId,
+                ParentId = ParentId
+            };
+        }
+
+        var requiredPerm = IsEditing ? ProjectPermission.TodosModify : ProjectPermission.TodosAdd;
+        var perms = await PermissionResolver.ForProjectAsync(AuthState, Access, _todo.ProjectId);
+        if (!perms.HasFlag(requiredPerm))
+        {
+            _noPermission = true;
+            _isLoading = false;
+            return;
+        }
+
+        // Empty for anonymous/local projects — TodoForm hides the Owner/Assignee selectors then.
+        _members = await Membership.GetMembersAsync(_todo.ProjectId);
+
+        var project = ProjectService.Projects.FirstOrDefault(p => p.Id == _todo.ProjectId);
+        if (project is not null)
+            _backLabel = $"Back to {project.Name}";
+        _isLoading = false;
+    }
+
+    private static TodoItem DeepCopy(TodoItem t) => new()
+    {
+        Id = t.Id,
+        UserId = t.UserId,
+        OwnerId = t.OwnerId,
+        AssigneeId = t.AssigneeId,
+        Title = t.Title,
+        Description = t.Description,
+        Priority = t.Priority,
+        PriorityId = t.PriorityId,
+        Status = t.Status,
+        StatusId = t.StatusId,
+        CreatedAt = t.CreatedAt,
+        StartedAt = t.StartedAt,
+        CompletedAt = t.CompletedAt,
+        UpdatedAt = t.UpdatedAt,
+        DueDate = t.DueDate,
+        EstimatedMinutes = t.EstimatedMinutes,
+        ProjectId = t.ProjectId,
+        ParentId = t.ParentId,
+        TagIds = new List<Guid>(t.TagIds),
+        ChangeLog = new List<TodoChangeLogEntry>(t.ChangeLog)
+    };
+
+    private async Task HandleSubmit(TodoItem todo)
+    {
+        var saved = await TodoService.SaveTodoAsync(todo);
+        if (!saved)
+        {
+            _error = "Couldn't save this task. Check that you still have access to the project.";
+            return;
+        }
+        GoBack();
+    }
+
+    private async Task HandleConvertToNote(TodoItem todo)
+    {
+        if (!await DialogService.ConfirmAsync(
+            "Convert this task to a note? Task status, priority, and subtasks will not be carried over.",
+            "Convert to Note"))
+            return;
+
+        await NoteService.InitializeAsync();
+        var note = new ProjectNote
+        {
+            ProjectId = todo.ProjectId,
+            Title = todo.Title,
+            Content = todo.Description
+        };
+        if (!await NoteService.SaveNoteAsync(note))
+        {
+            _error = "Couldn't create the note, so the task was kept.";
+            return;
+        }
+        await TodoService.DeleteTodoAsync(todo);
+        NavigationManager.NavigateTo("/?tab=notes");
+    }
+
+    private void GoBack() => NavigationManager.NavigateTo(_backHref);
+}
