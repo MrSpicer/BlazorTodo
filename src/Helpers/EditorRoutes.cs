@@ -35,14 +35,18 @@ public static class EditorRoutes
 	/// <summary>
 	/// Accepts a returnUrl only if it is an app-relative path. Rejects absolute URLs,
 	/// protocol-relative (<c>//host</c>) and scheme-bearing (<c>javascript:</c>) values so a
-	/// hand-crafted link can't turn an editor into an open redirect.
+	/// hand-crafted link can't turn an editor into an open redirect. Control characters and
+	/// backslashes are rejected anywhere in the value, not just at the ends: browsers strip
+	/// tab/CR/LF while parsing a URL, so <c>/&lt;LF&gt;/evil.com</c> would otherwise survive
+	/// the prefix checks and then resolve to <c>//evil.com</c>.
 	/// </summary>
 	public static string SafeReturn(string? returnUrl, string fallback = "/")
 	{
 		if (string.IsNullOrWhiteSpace(returnUrl)) return fallback;
 		var v = returnUrl.Trim();
 		if (!v.StartsWith('/')) return fallback;
-		if (v.StartsWith("//") || v.StartsWith("/\\")) return fallback;
+		if (v.Any(c => c < ' ' || c == '\u007f' || c == '\\')) return fallback;
+		if (v.StartsWith("//")) return fallback;
 		if (v.Contains(':')) return fallback;
 		return v;
 	}

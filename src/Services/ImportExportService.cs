@@ -1,5 +1,5 @@
-using System.ComponentModel.DataAnnotations;
 using System.Text.Json;
+using TodoList.Helpers;
 using TodoList.Models;
 using TodoList.Data;
 
@@ -399,10 +399,7 @@ public class ImportExportService : IImportExportService
 	}
 
 	private static bool IsValid<T>(T entity) where T : class
-	{
-		var context = new ValidationContext(entity);
-		return Validator.TryValidateObject(entity, context, null, validateAllProperties: true);
-	}
+		=> EntityValidation.Passes(entity);
 
 	private static void RemapTagIds(TodoItem todo, Dictionary<Guid, Guid> remap)
 	{

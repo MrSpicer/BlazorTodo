@@ -1,3 +1,4 @@
+using System.Net;
 using TodoList.Services.Admin;
 
 namespace TodoList.Middleware;
@@ -44,9 +45,11 @@ public sealed class AnonymousSessionMiddleware
 		}
 
 		// Skip framework/asset traffic (the /_blazor negotiate, /_framework, /_content, etc.) so we
-		// count real page requests rather than the websocket handshake and static files.
+		// count real page requests rather than the websocket handshake and static files. Also skip
+		// health-check pings (see IsHealthCheck) so they don't pollute the admin report.
 		var path = context.Request.Path.Value;
-		if (path is null || !path.StartsWith("/_", StringComparison.Ordinal))
+		if ((path is null || !path.StartsWith("/_", StringComparison.Ordinal))
+			&& !IsHealthCheck(context))
 		{
 			tracker.RecordRequest(
 				sessionId,
@@ -55,5 +58,27 @@ public sealed class AnonymousSessionMiddleware
 		}
 
 		await _next(context);
+	}
+
+	/// <summary>
+	/// True for infrastructure health-check pings that should not show up in the admin dashboard.
+	/// Both signals are required: the request comes from localhost (::1/127.0.0.1) <em>and</em>
+	/// carries a probe user agent (the container health check uses curl; Wget is the other common
+	/// probe) or none at all. Loopback alone is far too broad — under local <c>dotnet run</c> every
+	/// browser request arrives from ::1, which would leave anonymous tracking permanently dead in
+	/// development.
+	/// </summary>
+	private static bool IsHealthCheck(HttpContext context)
+	{
+		var ip = context.Connection.RemoteIpAddress;
+		if (ip is null || !IPAddress.IsLoopback(ip))
+		{
+			return false;
+		}
+
+		var userAgent = context.Request.Headers.UserAgent.ToString();
+		return userAgent.Length == 0
+			|| userAgent.StartsWith("curl", StringComparison.OrdinalIgnoreCase)
+			|| userAgent.StartsWith("Wget", StringComparison.OrdinalIgnoreCase);
 	}
 }

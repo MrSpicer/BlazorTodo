@@ -92,6 +92,7 @@ else if (_todo is not null)
 
     private bool _isLoading = true;
     private bool _loaded;
+    private Guid? _loadedId;
     private bool _notFound;
     private bool _noProject;
     private bool _noPermission;
@@ -115,7 +116,34 @@ else if (_todo is not null)
     {
         if (_loaded) return;
         _loaded = true;
+        await LoadAsync();
+    }
 
+    // RouteView reuses this instance when the route changes to another task, so OnFirstRenderAsync
+    // won't run again — reload explicitly or the form stays bound to the previously loaded task
+    // while the URL (and a subsequent save) points at a different one.
+    protected override async Task OnParametersSetAsync()
+    {
+        if (!_loaded || Id == _loadedId) return;
+        ResetState();
+        await LoadAsync();
+        StateHasChanged();
+    }
+
+    private void ResetState()
+    {
+        _isLoading = true;
+        _notFound = false;
+        _noProject = false;
+        _noPermission = false;
+        _error = null;
+        _todo = null;
+        _members = Array.Empty<ProjectMemberView>();
+    }
+
+    private async Task LoadAsync()
+    {
+        _loadedId = Id;
         _backHref = EditorRoutes.SafeReturn(ReturnUrl);
 
         await Task.WhenAll(
@@ -228,13 +256,28 @@ else if (_todo is not null)
             Title = todo.Title,
             Content = todo.Description
         };
+        // Note limits are the wider of the two, so this rarely trips — but check before deleting
+        // the task so a rejected note can never cost the user their data.
+        if (!EntityValidation.TryValidate(note, out var problem))
+        {
+            _error = $"Couldn't convert this task to a note — {problem}. The task was kept.";
+            return;
+        }
         if (!await NoteService.SaveNoteAsync(note))
         {
             _error = "Couldn't create the note, so the task was kept.";
             return;
         }
         await TodoService.DeleteTodoAsync(todo);
-        NavigationManager.NavigateTo("/?tab=notes");
+        NavigateAfterConvert("/?tab=notes");
+    }
+
+    // Returning to a different page (say /kanban) keeps the user where they were. Returning to the
+    // list page itself should land on the tab the converted item now lives in, not the one it left.
+    private void NavigateAfterConvert(string tabUrl)
+    {
+        var isListPage = _backHref == "/" || _backHref.StartsWith("/?", StringComparison.Ordinal);
+        NavigationManager.NavigateTo(isListPage ? tabUrl : _backHref);
     }
 
     private void GoBack() => NavigationManager.NavigateTo(_backHref);

@@ -1,5 +1,5 @@
-using System.ComponentModel.DataAnnotations;
 using Microsoft.EntityFrameworkCore;
+using TodoList.Helpers;
 using TodoList.Identity;
 
 namespace TodoList.Data.Repositories;
@@ -22,10 +22,7 @@ public abstract class EfRepositoryBase
 	/// can persist a malformed row to the shared database, regardless of upstream validation.
 	/// </summary>
 	protected static bool PassesDataAnnotations<T>(T entity) where T : class
-	{
-		var context = new ValidationContext(entity);
-		return Validator.TryValidateObject(entity, context, null, validateAllProperties: true);
-	}
+		=> EntityValidation.Passes(entity);
 
 	protected Guid RequireUserId()
 	{

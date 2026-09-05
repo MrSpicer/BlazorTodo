@@ -1,4 +1,5 @@
 using Blazored.LocalStorage;
+using TodoList.Helpers;
 using TodoList.Models;
 
 namespace TodoList.Data;
@@ -45,6 +46,15 @@ public abstract class LocalStorageRepository<T> : IRepository<T> where T : class
 		if (entity is null || !entity.IsValid())
 		{
 			_logger.LogWarning("Malformed {Type}", typeof(T).Name);
+			return false;
+		}
+
+		// Same defense-in-depth check the EF path applies. Without it a programmatic caller
+		// (e.g. note -> todo conversion) can persist an over-length entity that the entity's
+		// own EditForm will then never let the user save again.
+		if (!EntityValidation.TryValidate(entity, out var problem))
+		{
+			_logger.LogWarning("Invalid {Type}: {Problem}", typeof(T).Name, problem);
 			return false;
 		}
 

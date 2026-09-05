@@ -102,6 +102,7 @@ else
 
     private bool _isLoading = true;
     private bool _loaded;
+    private Guid? _loadedId;
     private bool _notFound;
     private bool _noProject;
     private bool _noPermission;
@@ -118,7 +119,33 @@ else
     {
         if (_loaded) return;
         _loaded = true;
+        await LoadAsync();
+    }
 
+    // RouteView reuses this instance when the route changes to another note, so OnFirstRenderAsync
+    // won't run again — reload explicitly or the form stays bound to the previously loaded note
+    // while the URL (and a subsequent save) points at a different one.
+    protected override async Task OnParametersSetAsync()
+    {
+        if (!_loaded || Id == _loadedId) return;
+        ResetState();
+        await LoadAsync();
+        StateHasChanged();
+    }
+
+    private void ResetState()
+    {
+        _isLoading = true;
+        _notFound = false;
+        _noProject = false;
+        _noPermission = false;
+        _error = null;
+        _note = new ProjectNote();
+    }
+
+    private async Task LoadAsync()
+    {
+        _loadedId = Id;
         _backHref = EditorRoutes.SafeReturn(ReturnUrl);
 
         await Task.WhenAll(
@@ -202,15 +229,29 @@ else
             Title = _note.Title,
             Description = _note.Content
         };
+        // Notes allow a longer title (200 vs 100) and body (5000 vs 500) than tasks do, so check
+        // up front and name the field that actually overflowed — the note is only deleted once
+        // the task is safely saved.
+        if (!EntityValidation.TryValidate(todo, out var problem))
+        {
+            _error = $"Couldn't convert this note to a task — {problem}. The note was kept.";
+            return;
+        }
         if (!await TodoService.SaveTodoAsync(todo))
         {
-            // A long note can exceed the task description limit — surface that instead of
-            // silently deleting the note.
-            _error = "Couldn't create the task (the note is longer than a task description allows), so the note was kept.";
+            _error = "Couldn't create the task, so the note was kept.";
             return;
         }
         await NoteService.DeleteNoteAsync(_note);
-        NavigationManager.NavigateTo("/?tab=tasks");
+        NavigateAfterConvert("/?tab=tasks");
+    }
+
+    // Returning to a different page (say /kanban) keeps the user where they were. Returning to the
+    // list page itself should land on the tab the converted item now lives in, not the one it left.
+    private void NavigateAfterConvert(string tabUrl)
+    {
+        var isListPage = _backHref == "/" || _backHref.StartsWith("/?", StringComparison.Ordinal);
+        NavigationManager.NavigateTo(isListPage ? tabUrl : _backHref);
     }
 
     private void GoBack() => NavigationManager.NavigateTo(_backHref);
