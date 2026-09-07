@@ -17,7 +17,7 @@ public class TodoItemConfiguration : IEntityTypeConfiguration<TodoItem>
 		b.Property(t => t.ProjectId).HasColumnName("project_id");
 		b.Property(t => t.ParentId).HasColumnName("parent_id");
 		b.Property(t => t.Title).HasColumnName("title").HasMaxLength(100).IsRequired();
-		b.Property(t => t.Description).HasColumnName("description").HasMaxLength(500);
+		b.Property(t => t.Description).HasColumnName("description").HasMaxLength(2000);
 		b.Property(t => t.PriorityId).HasColumnName("priority_id");
 		b.Property(t => t.StatusId).HasColumnName("status_id");
 		b.Property(t => t.CreatedAt).HasColumnName("created_at");

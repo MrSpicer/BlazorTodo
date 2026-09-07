@@ -88,7 +88,7 @@
 							<circle cx="12" cy="12" r="10" />
 							<polyline points="12 6 12 12 16 14" />
 						</svg>
-						@FormatMinutes(Item.EstimatedMinutes.Value)
+						@Duration.FormatMinutes(Item.EstimatedMinutes.Value)
 					</span>
 				}
 			}
@@ -625,14 +625,6 @@
 	{
 		StatusService.OnStatusesChanged -= StateHasChanged;
 		PriorityService.OnPrioritiesChanged -= StateHasChanged;
-	}
-
-	private static string FormatMinutes(int minutes)
-	{
-		if (minutes < 60) return $"{minutes}m";
-		var h = minutes / 60;
-		var m = minutes % 60;
-		return m == 0 ? $"{h}h" : $"{h}h {m}m";
 	}
 
 	private void ShowHistory() => _showHistoryModal = true;

@@ -15,11 +15,10 @@
 {
     <div class="editor-page" aria-busy="true" aria-live="polite">
         <div class="skeleton-shell">
-            <div class="skeleton-tab"></div>
-            <div class="skeleton-row" style="margin-top: var(--space-5);"></div>
+            <div class="skeleton-row" style="height: 32px; max-width: 420px;"></div>
             <div class="editor-grid single" style="margin-top: var(--space-6);">
                 <div class="skeleton-list">
-                    <div class="skeleton-row"></div>
+                    <div class="skeleton-row" style="height: 36px;"></div>
                     <div class="skeleton-row" style="height: 320px;"></div>
                 </div>
             </div>
@@ -57,6 +56,7 @@ else
         <EditorPageShell Heading="@(IsEditing ? "Edit Note" : "New Note")"
                          BackHref="@_backHref"
                          BackLabel="@_backLabel"
+                         Crumb="@_crumb"
                          SubmitLabel="@(IsEditing ? "Save Changes" : "Add Note")"
                          ErrorMessage="@_error"
                          OnCancel="GoBack">
@@ -76,7 +76,10 @@ else
                     <ValidationMessage For="@(() => _note.Title)" class="validation-error" />
                 </div>
                 <div class="form-group">
-                    <label class="form-label" for="note-content">Content</label>
+                    <div class="editor-label-row">
+                        <label class="form-label" for="note-content">Content</label>
+                        <span class="editor-count" data-testid="note-content-count">@_note.Content.Length/5000</span>
+                    </div>
                     <InputTextArea id="note-content" class="form-input form-textarea editor-body-textarea"
                                    @bind-Value="_note.Content" placeholder="Write your note here..." />
                     <ValidationMessage For="@(() => _note.Content)" class="validation-error" />
@@ -112,6 +115,7 @@ else
     private ProjectNote _note = new();
     private string _backHref = "/";
     private string _backLabel = "Back to Notes";
+    private string _crumb = string.Empty;
 
     private bool IsEditing => Id is not null;
 
@@ -141,6 +145,7 @@ else
         _noPermission = false;
         _error = null;
         _note = new ProjectNote();
+        _crumb = string.Empty;
     }
 
     private async Task LoadAsync()
@@ -200,7 +205,10 @@ else
 
         var project = ProjectService.Projects.FirstOrDefault(p => p.Id == _note.ProjectId);
         if (project is not null)
+        {
             _backLabel = $"Back to {project.Name}";
+            _crumb = project.Name;
+        }
         _isLoading = false;
     }
 

@@ -856,7 +856,8 @@ a:hover, .btn-link:hover {
 }
 
 /* Sticky action bar: pins to the top of .app-main's scrollport while the form scrolls under
-   it, so Save stays reachable down a long description. */
+   it, so Save stays reachable down a long description. Compact single row: breadcrumb on the
+   left, 32px actions on the right — no standalone heading in the flow. */
 .editor-bar {
     position: sticky;
     /* A sticky element is clamped to the scrollport *minus* the scroll container's padding, so
@@ -874,6 +875,15 @@ a:hover, .btn-link:hover {
     background: var(--background);
 }
 
+/* Breadcrumb: back link (project) / current segment. The current segment is the page's <h1>,
+   so the heading level survives the compact bar. */
+.editor-crumb {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-2);
+    min-width: 0;
+}
+
 .editor-back {
     display: inline-flex;
     align-items: center;
@@ -884,12 +894,32 @@ a:hover, .btn-link:hover {
     padding: var(--space-2) var(--space-3);
     border-radius: var(--radius-md);
     transition: all var(--transition-fast);
+    min-width: 0;
 }
 
 .editor-back:hover {
     color: var(--text-primary);
     background: var(--surface);
     text-decoration: none;
+}
+
+.editor-back-label {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.editor-crumb-sep {
+    color: var(--text-muted);
+}
+
+.editor-crumb-current {
+    font-size: 0.8125rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin: 0;
+    line-height: 1.4;
+    white-space: nowrap;
 }
 
 /* flex: 1 gives the auto margin below some free space to absorb; without it the group is
@@ -908,6 +938,25 @@ a:hover, .btn-link:hover {
     margin-left: auto;
 }
 
+/* 32px controls in the bar — sized here so components keep plain .btn classes. The fixed
+   height means a label that wraps would spill out of its own pill, so labels never wrap and
+   the buttons never shrink below their content; the row wraps instead (see the 640px block). */
+.editor-bar .btn {
+    height: 32px;
+    padding: 0 var(--space-3);
+    font-size: 0.8125rem;
+    white-space: nowrap;
+    flex-shrink: 0;
+}
+
+/* The non-form states (not-found / no-project / no-permission) put a link-button straight into
+   the page column, which stretch-aligns it to the full width unless it opts out. */
+.editor-page > .btn {
+    align-self: flex-start;
+}
+
+/* Standalone heading for the non-form states (not-found / no-project / no-permission),
+   which are real <h1>s outside the bar. */
 .editor-title {
     font-size: 1.5rem;
     margin: 0;
@@ -924,8 +973,8 @@ a:hover, .btn-link:hover {
 
 .editor-grid {
     display: grid;
-    grid-template-columns: minmax(0, 1fr) 300px;
-    gap: var(--space-6);
+    grid-template-columns: minmax(0, 1fr) 280px;
+    gap: var(--space-4);
     align-items: start;
 }
 
@@ -940,17 +989,89 @@ a:hover, .btn-link:hover {
     min-width: 0;
 }
 
+/* Rail is a stack of cards; each card owns its own surface. */
 .editor-rail {
     display: flex;
     flex-direction: column;
-    gap: var(--space-5);
-    padding: var(--space-5);
+    gap: var(--space-4);
+    min-width: 0;
+}
+
+.editor-rail-card {
+    padding: var(--space-4);
     background: var(--surface);
     border: 1px solid var(--border-light);
     border-radius: var(--radius-lg);
 }
 
+/* Hairline section head: label, then a rule filling the rest of the row. */
+.editor-section {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-4);
+    padding-top: var(--space-4);
+    border-top: 1px solid var(--border-light);
+}
+
+.editor-section-head {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    font-size: 0.6875rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    margin: 0;
+}
+
+.editor-section-head::after {
+    content: "";
+    flex: 1;
+    height: 1px;
+    background: var(--border-light);
+}
+
+/* Two fields side by side; collapses to one column on phones. */
+.editor-field-pair {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--space-4);
+}
+
+/* Dense 36px control for the section fields (overrides .form-input padding/height). */
+.editor-control {
+    height: 36px;
+    padding: 0 var(--space-3);
+    border: 1.5px solid var(--border);
+    border-radius: var(--radius-md);
+    font-size: 0.8125rem;
+}
+
+/* Character counter, right-aligned against the field label. */
+.editor-label-row {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: var(--space-3);
+}
+
+.editor-label-row .form-label {
+    margin-bottom: 0;
+}
+
+.editor-count {
+    color: var(--text-muted);
+    font-size: 0.75rem;
+    font-variant-numeric: tabular-nums;
+}
+
+/* The title is the one field the dense treatment doesn't apply to: it keeps a comfortable
+   42px so the primary input never ends up shorter than the metadata controls under it. */
 .editor-title-input {
+    height: 42px;
+    padding: 0 var(--space-3);
+    border-radius: var(--radius-md);
     font-size: 1.25rem;
     font-weight: 600;
 }
@@ -976,16 +1097,20 @@ a:hover, .btn-link:hover {
 }
 
 @media (max-width: 640px) {
+    /* Breadcrumb on its own row, actions below it — wrapping to a second row rather than
+       squeezing the buttons when three actions don't fit a phone's width. */
     .editor-bar {
-        flex-wrap: wrap;
+        flex-direction: column;
+        align-items: stretch;
+        gap: var(--space-2);
     }
 
     .editor-bar-actions {
         flex-wrap: wrap;
     }
 
-    .editor-bar-actions > .editor-cancel {
-        margin-left: 0;
+    .editor-field-pair {
+        grid-template-columns: minmax(0, 1fr);
     }
 }
 

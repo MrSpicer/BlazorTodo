@@ -1,11 +1,18 @@
 <div class="editor-page">
 	<div class="editor-bar">
-		<a class="editor-back" href="@BackHref">
-			<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
-				<path d="M19 12H5M12 19l-7-7 7-7"/>
-			</svg>
-			<span>@BackLabel</span>
-		</a>
+		<nav class="editor-crumb" aria-label="Breadcrumb">
+			<a class="editor-back" href="@BackHref">
+				<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+					<path d="M19 12H5M12 19l-7-7 7-7"/>
+				</svg>
+				<span class="editor-back-label">@(string.IsNullOrWhiteSpace(Crumb) ? BackLabel : Crumb)</span>
+			</a>
+			@if (!string.IsNullOrWhiteSpace(Crumb))
+			{
+				<span class="editor-crumb-sep" aria-hidden="true">/</span>
+			}
+			<h1 class="editor-crumb-current">@Heading</h1>
+		</nav>
 		<div class="editor-bar-actions">
 			@LeadingActions
 			<button type="button" class="btn btn-ghost editor-cancel" @onclick="OnCancel">Cancel</button>
@@ -13,18 +20,21 @@
 		</div>
 	</div>
 
-	<h1 class="editor-title">@Heading</h1>
-
 	@if (!string.IsNullOrWhiteSpace(ErrorMessage))
 	{
 		<div class="editor-error" role="alert" data-testid="editor-error">@ErrorMessage</div>
 	}
 
-	<div class="editor-grid @(SideRail is null ? "single" : "")">
+	@{
+		// The rail is dropped entirely -- not just left empty -- when there is nothing to put in
+		// it, so the form column gets the full width instead of sitting beside a blank 280px.
+		var showRail = SideRail is not null && ShowSideRail;
+	}
+	<div class="editor-grid @(showRail ? "" : "single")">
 		<div class="editor-main">
 			@MainContent
 		</div>
-		@if (SideRail is not null)
+		@if (showRail)
 		{
 			<aside class="editor-rail">
 				@SideRail
@@ -43,6 +53,11 @@
 	[Parameter]
 	public string BackLabel { get; set; } = "Back";
 
+	/// <summary>Parent crumb segment (usually the project name). When empty the back link
+	/// falls back to <see cref="BackLabel"/> and no separator is rendered.</summary>
+	[Parameter]
+	public string Crumb { get; set; } = string.Empty;
+
 	[Parameter]
 	public string SubmitLabel { get; set; } = "Save";
 
@@ -60,6 +75,12 @@
 	/// <summary>Metadata rail. When null the grid collapses to a single column.</summary>
 	[Parameter]
 	public RenderFragment? SideRail { get; set; }
+
+	/// <summary>Lets a caller that always supplies <see cref="SideRail"/> markup drop the rail
+	/// for a given render (e.g. a new task with no history yet), collapsing the grid as if it
+	/// had passed none.</summary>
+	[Parameter]
+	public bool ShowSideRail { get; set; } = true;
 
 	[Parameter]
 	public EventCallback OnCancel { get; set; }

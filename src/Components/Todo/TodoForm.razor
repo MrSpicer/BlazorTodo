@@ -12,8 +12,10 @@
     <EditorPageShell Heading="@(IsEditing ? "Edit Task" : "New Task")"
                      BackHref="@BackHref"
                      BackLabel="@BackLabel"
+                     Crumb="@Crumb"
                      SubmitLabel="@(IsEditing ? "Save Changes" : "Add Task")"
                      ErrorMessage="@ErrorMessage"
+                     ShowSideRail="@HasHistory"
                      OnCancel="OnCancel">
         <LeadingActions>
             @if (IsEditing && OnConvertToNote.HasDelegate)
@@ -31,100 +33,146 @@
         <MainContent>
             <div class="form-group">
                 <label for="TodoTitle" class="form-label">Title</label>
-                <InputText id="TodoTitle" class="form-input editor-title-input" @bind-Value="Todo.Title"
+                <InputText id="TodoTitle" class="form-input editor-title-input"
+                           @bind-Value="Todo.Title"
                            placeholder="What needs to be done?" />
                 <ValidationMessage For="@(() => Todo.Title)" class="validation-error" />
             </div>
 
             <div class="form-group">
-                <label for="TodoDescription" class="form-label">Description</label>
+                <div class="editor-label-row">
+                    <label for="TodoDescription" class="form-label">Description</label>
+                    <span class="editor-count" data-testid="description-count">@Todo.Description.Length/2000</span>
+                </div>
                 <InputTextArea id="TodoDescription" class="form-input form-textarea editor-body-textarea"
                                @bind-Value="Todo.Description" placeholder="Add some details..." />
                 <ValidationMessage For="@(() => Todo.Description)" class="validation-error" />
             </div>
-        </MainContent>
 
-        <SideRail>
-            <div class="form-group">
-                <label for="parentTaskSelect" class="form-label">Parent</label>
-                <select id="parentTaskSelect" class="form-input"
-                        value="@(_selectedParentId?.ToString() ?? string.Empty)"
-                        @onchange="OnParentChanged">
-                    <option value="">None</option>
-                    @foreach (var p in GetAvailableParents())
-                    {
-                        <option value="@p.Id">@p.Title</option>
-                    }
-                </select>
-            </div>
-
-            <div class="form-group">
-                <label for="TodoDueDate" class="form-label">Due date</label>
-                <div class="due-date-wrap">
-                    <InputDate Type="InputDateType.DateTimeLocal" id="TodoDueDate" class="form-input"
-                               @bind-Value="Todo.DueDate" />
-                    @if (Todo.DueDate.HasValue)
-                    {
-                        <button type="button" class="btn-clear-due" @onclick="() => Todo.DueDate = null"
-                                aria-label="Clear due date" data-testid="clear-due-date">
-                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
-                                <path d="M18 6L6 18M6 6l12 12" />
-                            </svg>
-                        </button>
-                    }
+            <div class="editor-section">
+                <h2 class="editor-section-head">Scheduling</h2>
+                <div class="editor-field-pair">
+                    <div class="form-group">
+                        <label for="TodoDueDate" class="form-label">Due date</label>
+                        <div class="due-date-wrap">
+                            <InputDate Type="InputDateType.DateTimeLocal" id="TodoDueDate" class="form-input editor-control"
+                                       @bind-Value="Todo.DueDate" />
+                            @if (Todo.DueDate.HasValue)
+                            {
+                                <button type="button" class="btn-clear-due" @onclick="() => Todo.DueDate = null"
+                                        aria-label="Clear due date" data-testid="clear-due-date">
+                                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                                        <path d="M18 6L6 18M6 6l12 12" />
+                                    </svg>
+                                </button>
+                            }
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label for="TodoEstimate" class="form-label">Estimate (minutes)</label>
+                        <InputNumber id="TodoEstimate" class="form-input editor-control" @bind-Value="Todo.EstimatedMinutes" placeholder="e.g. 30" />
+                    </div>
                 </div>
             </div>
 
-            <div class="form-group">
-                <label for="TodoEstimate" class="form-label">Estimate (minutes)</label>
-                <InputNumber id="TodoEstimate" class="form-input" @bind-Value="Todo.EstimatedMinutes" placeholder="e.g. 30" />
-            </div>
-
-            <div class="form-group">
-                <label class="form-label">Priority</label>
-                <div class="priority-options">
-                    @foreach (var priority in PriorityService.Priorities.OrderBy(p => p.Rank))
-                    {
-                        var isSelected = Todo.PriorityId == priority.Id;
-                        var (bg, fg) = StatusColor.Resolve(priority.Color);
-                        <label class="priority-option @(isSelected ? "selected" : "")"
-                               style="@(isSelected ? $"background:{bg};border-color:{priority.Color};color:{fg};" : "")">
-                            <input type="radio" name="priority" value="@priority.Id" checked="@isSelected"
-                                   @onchange="() => Todo.PriorityId = priority.Id" />
-                            <span class="priority-dot" style="background-color:@priority.Color"></span>
-                            <span class="priority-label">@priority.Name</span>
-                        </label>
-                    }
+            <div class="editor-section">
+                <h2 class="editor-section-head">Classification</h2>
+                <div class="form-group">
+                    <span class="form-label" id="priorityLabel">Priority</span>
+                    <div class="priority-segments" role="radiogroup" aria-labelledby="priorityLabel">
+                        @foreach (var priority in PriorityService.Priorities.OrderBy(p => p.Rank))
+                        {
+                            var isSelected = Todo.PriorityId == priority.Id;
+                            var (bg, fg) = StatusColor.Resolve(priority.Color);
+                            <label class="priority-segment @(isSelected ? "selected" : "")"
+                                   style="@(isSelected ? $"background:{bg};border-color:{priority.Color};color:{fg};" : "")">
+                                <input type="radio" name="priority" value="@priority.Id" checked="@isSelected"
+                                       @onchange="() => Todo.PriorityId = priority.Id" />
+                                <span class="priority-dot" style="background-color:@priority.Color"></span>
+                                <span class="priority-label">@priority.Name</span>
+                            </label>
+                        }
+                    </div>
                 </div>
-            </div>
-
-            <div class="form-group">
-                <label class="form-label">Tags</label>
-                <TagSelector @bind-SelectedTagIds="Todo.TagIds" />
+                <div class="form-group">
+                    <label class="form-label">Tags</label>
+                    <TagSelector @bind-SelectedTagIds="Todo.TagIds" />
+                </div>
+                <div class="form-group">
+                    <label for="parentTaskSelect" class="form-label">Parent</label>
+                    <select id="parentTaskSelect" class="form-input editor-control"
+                            value="@(_selectedParentId?.ToString() ?? string.Empty)"
+                            @onchange="OnParentChanged">
+                        <option value="">None</option>
+                        @foreach (var p in GetAvailableParents())
+                        {
+                            <option value="@p.Id">@p.Title</option>
+                        }
+                    </select>
+                </div>
             </div>
 
             @if (AssignableMembers.Count > 1)
             {
-                <div class="form-group">
-                    <label class="form-label" for="TodoOwner">Owner</label>
-                    <select id="TodoOwner" class="form-input" value="@Todo.OwnerId" @onchange="OnOwnerChanged">
-                        @foreach (var m in AssignableMembers)
-                        {
-                            <option value="@m.UserId">@MemberLabel(m)</option>
-                        }
-                    </select>
+                <div class="editor-section">
+                    <h2 class="editor-section-head">People</h2>
+                    <div class="editor-field-pair">
+                        <div class="form-group">
+                            <label class="form-label" for="TodoOwner">Owner</label>
+                            <select id="TodoOwner" class="form-input editor-control" value="@Todo.OwnerId" @onchange="OnOwnerChanged">
+                                @foreach (var m in AssignableMembers)
+                                {
+                                    <option value="@m.UserId">@MemberLabel(m)</option>
+                                }
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label" for="TodoAssignee">Assignee</label>
+                            <select id="TodoAssignee" class="form-input editor-control"
+                                    value="@(Todo.AssigneeId?.ToString() ?? string.Empty)" @onchange="OnAssigneeChanged">
+                                <option value="">Unassigned</option>
+                                @foreach (var m in AssignableMembers)
+                                {
+                                    <option value="@m.UserId">@MemberLabel(m)</option>
+                                }
+                            </select>
+                        </div>
+                    </div>
                 </div>
-                <div class="form-group">
-                    <label class="form-label" for="TodoAssignee">Assignee</label>
-                    <select id="TodoAssignee" class="form-input"
-                            value="@(Todo.AssigneeId?.ToString() ?? string.Empty)" @onchange="OnAssigneeChanged">
-                        <option value="">Unassigned</option>
-                        @foreach (var m in AssignableMembers)
+            }
+        </MainContent>
+
+        <SideRail>
+            @if (HasHistory)
+            {
+                <div class="editor-rail-card" data-testid="editor-history">
+                    <h3 class="editor-rail-card-head">History</h3>
+                    <ul class="editor-history-list">
+                        @foreach (var (entry, index) in Todo.ChangeLog.OrderByDescending(e => e.ChangedAt).Take(3).Select((e, i) => (e, i)))
                         {
-                            <option value="@m.UserId">@MemberLabel(m)</option>
+                            <li class="editor-history-item" @key="index">
+                                <div class="editor-history-top">
+                                    <span class="editor-history-field">@entry.Field</span>
+                                    <span class="editor-history-when">@entry.ChangedAt.ToLocalTime().ToString("MMM d, h:mm tt")</span>
+                                </div>
+                                <span class="editor-history-delta">
+                                    <span class="editor-history-old">@(string.IsNullOrEmpty(entry.OldValue) ? "—" : entry.OldValue)</span>
+                                    <span aria-hidden="true">→</span>
+                                    <span class="editor-history-new">@(string.IsNullOrEmpty(entry.NewValue) ? "—" : entry.NewValue)</span>
+                                </span>
+                            </li>
                         }
-                    </select>
+                    </ul>
+                    <button type="button" class="editor-history-more" @onclick="() => _showHistory = true"
+                            data-testid="history-see-all">
+                        @* The count only adds information once it exceeds the three shown above,
+                           and "See all 1 changes" is never right. *@
+                        @(Todo.ChangeLog.Count > 3 ? $"See all {Todo.ChangeLog.Count} changes" : "View full history")
+                    </button>
                 </div>
+                <ChangeHistoryModal IsVisible="_showHistory"
+                                    Item="Todo"
+                                    OnClose="() => _showHistory = false" />
             }
         </SideRail>
     </EditorPageShell>
@@ -157,38 +205,145 @@
         color: var(--text-primary);
     }
 
-    .priority-options {
-        display: flex;
+    /* Segmented priority control (replaces the wrapping pills). Priorities are user-managed,
+       so the track count adapts instead of assuming the four built-ins. */
+    .priority-segments {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
         gap: var(--space-2);
-        flex-wrap: wrap;
     }
 
-    .priority-option {
+    .priority-segment {
         display: flex;
         align-items: center;
+        justify-content: center;
         gap: var(--space-2);
-        padding: var(--space-2) var(--space-3);
+        height: 36px;
+        padding: 0 var(--space-3);
         border: 1.5px solid var(--border);
-        border-radius: var(--radius-lg);
+        border-radius: var(--radius-md);
+        background: var(--surface);
+        color: var(--text-secondary);
+        font-size: 0.8125rem;
+        font-weight: 500;
         cursor: pointer;
         transition: all var(--transition-fast);
-        font-size: 0.875rem;
-        font-weight: 500;
+        overflow: hidden;
     }
 
-    .priority-option input {
+    .priority-segment input {
         display: none;
     }
 
-    .priority-option:hover {
+    .priority-segment:hover {
         border-color: var(--gray-300);
         background: var(--surface-hover);
     }
 
     .priority-dot {
-        width: 10px;
-        height: 10px;
+        width: 8px;
+        height: 8px;
         border-radius: var(--radius-full);
+        flex-shrink: 0;
+    }
+
+    .priority-label {
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    .editor-rail-card-head {
+        margin: 0 0 var(--space-3);
+        font-size: 0.6875rem;
+        font-weight: 700;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: var(--text-muted);
+    }
+
+    /* Recent change-log entries (newest first). */
+    .editor-history-list {
+        list-style: none;
+        margin: 0;
+        padding: 0;
+        display: flex;
+        flex-direction: column;
+    }
+
+    .editor-history-item {
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+        padding: var(--space-2) 0;
+        border-bottom: 1px solid var(--border-light);
+    }
+
+    .editor-history-item:first-child {
+        padding-top: 0;
+    }
+
+    .editor-history-item:last-child {
+        border-bottom: none;
+        padding-bottom: 0;
+    }
+
+    .editor-history-top {
+        display: flex;
+        align-items: baseline;
+        justify-content: space-between;
+        gap: var(--space-2);
+    }
+
+    .editor-history-field {
+        font-size: 0.8125rem;
+        font-weight: 600;
+        color: var(--text-primary);
+    }
+
+    .editor-history-when {
+        font-size: 0.6875rem;
+        color: var(--text-muted);
+        white-space: nowrap;
+        font-variant-numeric: tabular-nums;
+    }
+
+    /* Change-log values are whole field values -- a description edit carries up to 2000
+       characters -- so the delta is clamped. The full text is a click away in the modal. */
+    .editor-history-delta {
+        display: -webkit-box;
+        -webkit-line-clamp: 3;
+        -webkit-box-orient: vertical;
+        overflow: hidden;
+        font-size: 0.8125rem;
+        color: var(--text-secondary);
+        word-break: break-word;
+    }
+
+    .editor-history-old {
+        color: var(--text-muted);
+        text-decoration: line-through;
+    }
+
+    .editor-history-new {
+        color: var(--success);
+        font-weight: 500;
+    }
+
+    .editor-history-more {
+        margin-top: var(--space-3);
+        padding: 0;
+        border: none;
+        background: none;
+        color: var(--primary);
+        font-size: 0.8125rem;
+        font-weight: 500;
+        cursor: pointer;
+        text-align: left;
+    }
+
+    .editor-history-more:hover {
+        color: var(--primary-hover);
     }
 </style>
 
@@ -197,6 +352,7 @@
     [Parameter] public bool IsEditing { get; set; }
     [Parameter] public string BackHref { get; set; } = "/";
     [Parameter] public string BackLabel { get; set; } = "Back";
+    [Parameter] public string Crumb { get; set; } = string.Empty;
     [Parameter] public string? ErrorMessage { get; set; }
     [Parameter] public EventCallback<TodoItem> OnSubmit { get; set; }
     [Parameter] public EventCallback OnCancel { get; set; }
@@ -207,6 +363,7 @@
     [Parameter] public IReadOnlyList<ProjectMemberView> Members { get; set; } = Array.Empty<ProjectMemberView>();
 
     private Guid? _selectedParentId;
+    private bool _showHistory;
 
     // Seeded once: the host page only renders this component after its data has loaded, so Todo is
     // final by the time OnInitialized runs, and later re-renders must not clobber the user's choice.
@@ -229,6 +386,10 @@
 
     private static string MemberLabel(ProjectMemberView m) =>
         string.IsNullOrWhiteSpace(m.DisplayName) ? m.Email : m.DisplayName;
+
+    // The rail holds history and nothing else, so a task with no recorded changes (any new task)
+    // drops the rail entirely rather than showing an empty column.
+    private bool HasHistory => Todo.ChangeLog.Count > 0;
 
     private void OnParentChanged(ChangeEventArgs e)
     {

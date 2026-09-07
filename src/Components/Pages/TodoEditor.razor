@@ -19,17 +19,17 @@
 {
     <div class="editor-page" aria-busy="true" aria-live="polite">
         <div class="skeleton-shell">
-            <div class="skeleton-tab"></div>
-            <div class="skeleton-row" style="margin-top: var(--space-5);"></div>
+            <div class="skeleton-row" style="height: 32px; max-width: 520px;"></div>
             <div class="editor-grid" style="margin-top: var(--space-6);">
                 <div class="skeleton-list">
-                    <div class="skeleton-row"></div>
+                    <div class="skeleton-row" style="height: 36px;"></div>
                     <div class="skeleton-row" style="height: 220px;"></div>
+                    <div class="skeleton-row" style="height: 36px;"></div>
+                    <div class="skeleton-row" style="height: 36px;"></div>
                 </div>
                 <div class="skeleton-list">
-                    <div class="skeleton-row"></div>
-                    <div class="skeleton-row"></div>
-                    <div class="skeleton-row"></div>
+                    <div class="skeleton-row" style="height: 150px;"></div>
+                    <div class="skeleton-row" style="height: 130px;"></div>
                 </div>
             </div>
         </div>
@@ -66,6 +66,7 @@ else if (_todo is not null)
               IsEditing="@IsEditing"
               BackHref="@_backHref"
               BackLabel="@_backLabel"
+              Crumb="@_crumb"
               ErrorMessage="@_error"
               Members="@_members"
               OnSubmit="HandleSubmit"
@@ -100,6 +101,7 @@ else if (_todo is not null)
     private TodoItem? _todo;
     private string _backHref = "/";
     private string _backLabel = "Back to Tasks";
+    private string _crumb = string.Empty;
     private IReadOnlyList<ProjectMemberView> _members = Array.Empty<ProjectMemberView>();
 
     private bool IsEditing => Id is not null;
@@ -138,6 +140,7 @@ else if (_todo is not null)
         _noPermission = false;
         _error = null;
         _todo = null;
+        _crumb = string.Empty;
         _members = Array.Empty<ProjectMemberView>();
     }
 
@@ -203,7 +206,10 @@ else if (_todo is not null)
 
         var project = ProjectService.Projects.FirstOrDefault(p => p.Id == _todo.ProjectId);
         if (project is not null)
+        {
             _backLabel = $"Back to {project.Name}";
+            _crumb = project.Name;
+        }
         _isLoading = false;
     }
 
