@@ -209,6 +209,11 @@ else if (_todo is not null)
         {
             _backLabel = $"Back to {project.Name}";
             _crumb = project.Name;
+            // The list and kanban pages render whichever project ProjectService has selected, and
+            // the return URL carries no project of its own. Point the selection at the task being
+            // edited so every way out of this page -- Save, Cancel, the Back link (a plain <a>, so
+            // it never runs GoBack), browser back -- lands on the task's own project.
+            ProjectService.SelectProject(project);
         }
         _isLoading = false;
     }
@@ -245,6 +250,12 @@ else if (_todo is not null)
             _error = "Couldn't save this task. Check that you still have access to the project.";
             return;
         }
+        // Follow the task to whichever project it ended up in. Today this matches what LoadAsync
+        // already selected -- TodoForm scopes the parent picker to the task's own project, so a
+        // reparent can't move it -- but it keeps the selection honest if the form ever does.
+        var moved = ProjectService.Projects.FirstOrDefault(p => p.Id == todo.ProjectId);
+        if (moved is not null)
+            ProjectService.SelectProject(moved);
         GoBack();
     }
 
@@ -262,8 +273,9 @@ else if (_todo is not null)
             Title = todo.Title,
             Content = todo.Description
         };
-        // Note limits are the wider of the two, so this rarely trips — but check before deleting
-        // the task so a rejected note can never cost the user their data.
+        // Nothing can actually overflow here now (the bodies are uncapped and a task title always
+        // fits a note's 200), but check anyway before deleting the task so a future limit change can
+        // never cost the user their data.
         if (!EntityValidation.TryValidate(note, out var problem))
         {
             _error = $"Couldn't convert this task to a note — {problem}. The task was kept.";

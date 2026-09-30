@@ -12,7 +12,8 @@ public class ProjectNote : IEntity, IProjectScoped
 	[StringLength(200, MinimumLength = 1, ErrorMessage = "Title must be 1-200 characters")]
 	public string Title { get; set; } = string.Empty;
 
-	[StringLength(5000, ErrorMessage = "Content cannot exceed 5000 characters")]
+	/// <summary>Uncapped: stored as Postgres <c>text</c>. The only bound is the hub message size
+	/// the editor guards against (see <c>TodoList.Helpers.CircuitLimits</c>).</summary>
 	public string Content { get; set; } = string.Empty;
 
 	public DateTime CreatedAt { get; set; } = DateTime.UtcNow;

@@ -78,9 +78,12 @@ else
                 <div class="form-group">
                     <div class="editor-label-row">
                         <label class="form-label" for="note-content">Content</label>
-                        <span class="editor-count" data-testid="note-content-count">@_note.Content.Length/5000</span>
+                        <span class="editor-count" data-testid="note-content-count">@_note.Content.Length.ToString("N0") characters</span>
                     </div>
+                    @* Same as the task description: the field is uncapped, and maxlength is only the
+                       transport guard that keeps an oversized paste from dropping the circuit. *@
                     <InputTextArea id="note-content" class="form-input form-textarea editor-body-textarea"
+                                   maxlength="@CircuitLimits.MaxTextFieldChars"
                                    @bind-Value="_note.Content" placeholder="Write your note here..." />
                     <ValidationMessage For="@(() => _note.Content)" class="validation-error" />
                 </div>
@@ -208,6 +211,9 @@ else
         {
             _backLabel = $"Back to {project.Name}";
             _crumb = project.Name;
+            // See TodoEditor: the list page shows whichever project ProjectService has selected,
+            // so align it with this note or every exit route lands on the default project.
+            ProjectService.SelectProject(project);
         }
         _isLoading = false;
     }
@@ -237,9 +243,9 @@ else
             Title = _note.Title,
             Description = _note.Content
         };
-        // Notes allow a longer title (200 vs 100) and body (5000 vs 500) than tasks do, so check
-        // up front and name the field that actually overflowed — the note is only deleted once
-        // the task is safely saved.
+        // A note title can be longer than a task title (200 vs 100), so check up front and name the
+        // field that actually overflowed — the note is only deleted once the task is safely saved.
+        // The body never overflows: both are uncapped.
         if (!EntityValidation.TryValidate(todo, out var problem))
         {
             _error = $"Couldn't convert this note to a task — {problem}. The note was kept.";

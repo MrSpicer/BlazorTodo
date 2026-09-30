@@ -42,9 +42,13 @@
             <div class="form-group">
                 <div class="editor-label-row">
                     <label for="TodoDescription" class="form-label">Description</label>
-                    <span class="editor-count" data-testid="description-count">@Todo.Description.Length/2000</span>
+                    <span class="editor-count" data-testid="description-count">@Todo.Description.Length.ToString("N0") characters</span>
                 </div>
+                @* The field itself is uncapped; maxlength is purely the transport guard. Without it
+                   a large paste exceeds the SignalR receive limit on blur and the circuit drops
+                   instead of the browser simply refusing the excess. *@
                 <InputTextArea id="TodoDescription" class="form-input form-textarea editor-body-textarea"
+                               maxlength="@CircuitLimits.MaxTextFieldChars"
                                @bind-Value="Todo.Description" placeholder="Add some details..." />
                 <ValidationMessage For="@(() => Todo.Description)" class="validation-error" />
             </div>
@@ -308,8 +312,8 @@
         font-variant-numeric: tabular-nums;
     }
 
-    /* Change-log values are whole field values -- a description edit carries up to 2000
-       characters -- so the delta is clamped. The full text is a click away in the modal. */
+    /* Change-log values are whole field values, clipped to 500 characters when they are stored
+       (see TodoService.BuildChangeEntries), so the delta is clamped here too. */
     .editor-history-delta {
         display: -webkit-box;
         -webkit-line-clamp: 3;

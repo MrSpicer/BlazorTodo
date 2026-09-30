@@ -7,12 +7,18 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.RateLimiting;
 using TodoList.Components;
 using TodoList.Extensions;
+using TodoList.Helpers;
 
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
 builder.Services.AddRazorComponents()
-	.AddInteractiveServerComponents();
+	.AddInteractiveServerComponents()
+	// Note content and task descriptions are uncapped, but one hub message still carries a whole
+	// textarea on blur (JSON-escaped, so up to 6 bytes per character). The 32 KB default drops the
+	// circuit -- no validation error, just "connection lost" -- so raise it and derive the editors'
+	// maxlength from the same constant, which keeps the two from ever drifting apart.
+	.AddHubOptions(options => options.MaximumReceiveMessageSize = CircuitLimits.MaxReceiveMessageBytes);
 
 builder.Services.AddRazorPages();
 builder.Services.AddCascadingAuthenticationState();

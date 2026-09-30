@@ -1,11 +1,14 @@
 @using TodoList.Models
+@using TodoList.Helpers
 
 <div class="note-card">
 	<div class="note-card-body">
 		<h3 class="note-title">@Note.Title</h3>
 		@if (!string.IsNullOrWhiteSpace(Note.Content))
 		{
-			<p class="note-content">@Note.Content</p>
+			@* Clipped, not just CSS-clamped: note content is uncapped, so the whole of every note
+			   on the tab would otherwise cross the wire to fill three lines. *@
+			<p class="note-content">@TextPreview.Clip(Note.Content, TextPreview.CardPreviewLength)</p>
 		}
 		<div class="note-meta">
 			<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">

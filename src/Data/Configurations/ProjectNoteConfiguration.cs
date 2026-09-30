@@ -14,7 +14,8 @@ public class ProjectNoteConfiguration : IEntityTypeConfiguration<ProjectNote>
 		b.Property(n => n.UserId).HasColumnName("user_id");
 		b.Property(n => n.ProjectId).HasColumnName("project_id");
 		b.Property(n => n.Title).HasColumnName("title").HasMaxLength(200).IsRequired();
-		b.Property(n => n.Content).HasColumnName("content").HasMaxLength(5000);
+		// No HasMaxLength -> Npgsql maps this to `text`, i.e. no length limit at all.
+		b.Property(n => n.Content).HasColumnName("content");
 		b.Property(n => n.CreatedAt).HasColumnName("created_at");
 		b.Property(n => n.UpdatedAt).HasColumnName("updated_at");
 

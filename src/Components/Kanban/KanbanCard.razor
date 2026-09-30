@@ -27,7 +27,8 @@
 
 	@if (!string.IsNullOrWhiteSpace(Item.Description))
 	{
-		<p class="kanban-card-desc">@Item.Description</p>
+		@* Clipped for the same reason as the list row -- see TodoItemRow. *@
+		<p class="kanban-card-desc">@TextPreview.Clip(Item.Description, TextPreview.ListPreviewLength)</p>
 	}
 
 	<div class="kanban-card-meta">

@@ -74,7 +74,12 @@ public class ProjectService : EntityServiceBase<Project>, IProjectService
 		}
 
 		_items = loaded;
-		_selectedProject = _items.FirstOrDefault(p => p.IsDefault) ?? _items.FirstOrDefault();
+		// Every page visit calls this, so keep an already-chosen project selected across
+		// re-initialization -- otherwise navigating to an editor and back resets the user to the
+		// default project. Only fall back when there is no selection or it has gone away (deleted,
+		// or the whole set swapped out by an import or an anonymous->authenticated migration).
+		if (_selectedProject is null || _items.All(p => p.Id != _selectedProject.Id))
+			_selectedProject = _items.FirstOrDefault(p => p.IsDefault) ?? _items.FirstOrDefault();
 		NotifyChanged();
 	}
 

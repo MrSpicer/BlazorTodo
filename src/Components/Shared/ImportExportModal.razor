@@ -731,7 +731,9 @@
 
 		try
 		{
-			using var stream = _selectedFile.OpenReadStream(maxAllowedSize: 10 * 1024 * 1024);
+			// Note content and task descriptions are uncapped, so an export this app produced can
+			// comfortably exceed 10 MB. Keep the read cap well above that or the round-trip breaks.
+			using var stream = _selectedFile.OpenReadStream(maxAllowedSize: 100 * 1024 * 1024);
 			using var reader = new StreamReader(stream);
 			var content = await reader.ReadToEndAsync();
 

@@ -1,4 +1,5 @@
 using TodoList.Data;
+using TodoList.Helpers;
 using TodoList.Identity;
 using TodoList.Models;
 using TodoList.Models.Enums;
@@ -9,6 +10,9 @@ namespace TodoList.Services;
 
 public class TodoService : EntityServiceBase<TodoItem>, ITodoService
 {
+	/// <summary>How much of a changed description the change log keeps.</summary>
+	private const int DescriptionLogLength = 500;
+
 	private readonly ITodoRepository _todoRepository;
 	private readonly IChangeLogFormatter _formatter;
 	private readonly IStatusService _statusService;
@@ -326,10 +330,11 @@ public class TodoService : EntityServiceBase<TodoItem>, ITodoService
 
 		if (!string.IsNullOrWhiteSpace(criteria.SearchText))
 		{
-			var searchLower = criteria.SearchText.ToLowerInvariant();
+			// Ordinal-ignore-case rather than lowering both sides: descriptions run to 10,000
+			// characters and this runs for every todo on every keystroke, so the copies add up.
 			filtered = filtered.Where(t =>
-				t.Title.ToLowerInvariant().Contains(searchLower) ||
-				t.Description.ToLowerInvariant().Contains(searchLower));
+				t.Title.Contains(criteria.SearchText, StringComparison.OrdinalIgnoreCase) ||
+				t.Description.Contains(criteria.SearchText, StringComparison.OrdinalIgnoreCase));
 		}
 
 		if (criteria.SelectedPriorities.Any())
@@ -405,8 +410,13 @@ public class TodoService : EntityServiceBase<TodoItem>, ITodoService
 		if (!string.Equals(oldItem.Title, newItem.Title, StringComparison.Ordinal))
 			yield return Entry("Title", oldItem.Title, newItem.Title);
 
+		// Every other field here is short; a description is not. Storing both whole values would
+		// add up to 20 KB of jsonb to the row per edit (and the same again into the history DOM),
+		// so the log keeps an opening excerpt of each.
 		if (!string.Equals(oldItem.Description, newItem.Description, StringComparison.Ordinal))
-			yield return Entry("Description", oldItem.Description, newItem.Description);
+			yield return Entry("Description",
+				TextPreview.Clip(oldItem.Description, DescriptionLogLength),
+				TextPreview.Clip(newItem.Description, DescriptionLogLength));
 
 		if (oldItem.PriorityId != newItem.PriorityId)
 			yield return Entry("Priority", _formatter.PriorityName(oldItem.PriorityId), _formatter.PriorityName(newItem.PriorityId));
